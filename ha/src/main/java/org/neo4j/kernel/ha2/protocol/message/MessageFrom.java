@@ -20,9 +20,9 @@
 
 package org.neo4j.kernel.ha2.protocol.message;
 
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
-
 import java.io.Serializable;
+
+import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
 
 /**
  * TODO

@@ -20,13 +20,17 @@
 
 package org.neo4j.kernel.ha2.protocol;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
 import org.neo4j.kernel.ha2.protocol.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.message.TargetedMessage;
-import org.neo4j.kernel.ha2.protocol.statemachine.*;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.neo4j.kernel.ha2.protocol.statemachine.State;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateMachine;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateMessage;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateTransitionLogger;
 
 /**
  * TODO

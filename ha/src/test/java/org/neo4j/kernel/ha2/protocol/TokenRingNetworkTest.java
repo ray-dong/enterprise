@@ -20,6 +20,12 @@
 
 package org.neo4j.kernel.ha2.protocol;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import org.junit.Test;
 import org.neo4j.com2.NetworkChannels;
 import org.neo4j.com2.NetworkMessageListener;
@@ -34,14 +40,12 @@ import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
 import org.neo4j.kernel.ha2.protocol.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.message.ExpectationMessage;
 import org.neo4j.kernel.ha2.protocol.message.TargetedMessage;
-import org.neo4j.kernel.ha2.protocol.statemachine.*;
+import org.neo4j.kernel.ha2.protocol.statemachine.State;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateMachine;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateMessage;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.protocol.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.impl.util.StringLogger;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * TODO

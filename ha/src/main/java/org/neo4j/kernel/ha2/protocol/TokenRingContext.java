@@ -20,15 +20,15 @@
 
 package org.neo4j.kernel.ha2.protocol;
 
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
 import org.neo4j.kernel.ha2.protocol.context.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
 import org.neo4j.kernel.ha2.protocol.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.message.ExpectationMessage;
 import org.neo4j.kernel.ha2.protocol.message.TargetedMessage;
 import org.neo4j.kernel.ha2.protocol.statemachine.StateMessage;
-
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * TODO

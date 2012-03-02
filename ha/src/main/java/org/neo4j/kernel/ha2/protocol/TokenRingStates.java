@@ -20,11 +20,15 @@
 
 package org.neo4j.kernel.ha2.protocol;
 
+import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.becomeMaster;
+import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.discoverRing;
+import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.discoverRingFailed;
+import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.newAfter;
+import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.newBefore;
+import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.ringDiscovered;
+
 import org.neo4j.kernel.ha2.protocol.context.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
-
-import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.*;
-
 import org.neo4j.kernel.ha2.protocol.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.message.TargetedMessage;
 import org.neo4j.kernel.ha2.protocol.statemachine.State;
