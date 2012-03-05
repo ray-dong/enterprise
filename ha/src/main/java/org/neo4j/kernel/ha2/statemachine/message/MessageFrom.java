@@ -18,12 +18,33 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.statemachine;
+package org.neo4j.kernel.ha2.statemachine.message;
+
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
+
+import java.io.Serializable;
 
 /**
  * TODO
  */
-public interface State<T, E extends Enum>
+public class MessageFrom
+    extends Message
 {
-    public State<T,E> receive(T context, E message, Object payLoad) throws Throwable;
+    private RingParticipant from;
+
+    public MessageFrom(MessageType messageType, RingParticipant from, Object payload)
+    {
+        super(messageType, payload);
+        this.from = from;
+    }
+
+    public RingParticipant getFrom()
+    {
+        return from;
+    }
+    @Override
+    public String toString()
+    {
+        return from.toString()+":"+getPayload();
+    }
 }

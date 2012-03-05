@@ -18,22 +18,38 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.message;
+package org.neo4j.kernel.ha2.protocol;
+
+import java.io.Serializable;
 
 /**
  * TODO
  */
-public class InternalMessage<T>
+public class RingNeighbours
+    implements Serializable
 {
-    final private T payload;
+    private RingParticipant before;
+    private RingParticipant after;
 
-    public InternalMessage(T payload)
+    public RingNeighbours(RingParticipant before, RingParticipant after)
     {
-        this.payload = payload;
+        this.before = before;
+        this.after = after;
     }
 
-    public T getPayload()
+    public RingParticipant getBefore()
     {
-        return payload;
+        return before;
+    }
+
+    public RingParticipant getAfter()
+    {
+        return after;
+    }
+
+    @Override
+    public String toString()
+    {
+        return before+"-()->"+after;
     }
 }

@@ -18,24 +18,45 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.message;
+package org.neo4j.kernel.ha2.statemachine;
 
-import org.neo4j.kernel.ha2.protocol.TokenRingMessages;
+import java.io.Serializable;
+import org.neo4j.kernel.ha2.statemachine.message.Message;
 
 /**
  * TODO
  */
-public class ExpectationMessage
+public class StateMessage
+    implements Serializable
 {
-    private TokenRingMessages failMessage;
+    private String conversationId;
+    private Message message;
 
-    public ExpectationMessage(TokenRingMessages failMessage)
+    public StateMessage(String conversationId, Message message)
     {
-        this.failMessage = failMessage;
+        this.conversationId = conversationId;
+        this.message = message;
     }
 
-    public TokenRingMessages getFailMessage()
+    public String getConversationId()
     {
-        return failMessage;
+        return conversationId;
+    }
+
+    public Message getMessage()
+    {
+        return message;
+    }
+
+    public <T,E extends Enum> State<T, E> dispatch(T context, State<T,E> state)
+            throws Throwable
+    {
+        return state.receive(context, message);
+    }
+
+    @Override
+    public String toString()
+    {
+        return conversationId+"/"+message.getMessageType().name()+"/"+message.getPayload();
     }
 }

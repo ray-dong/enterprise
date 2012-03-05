@@ -18,16 +18,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
 /**
  * TODO
  */
-public enum TokenRingMessages
+public interface TokenRing
 {
-    start,
-    discoverRing, ringDiscovered, discoverRingFailed,
-    newAfter,newBefore,
-    leaveRing,
-    becomeMaster, sendToken
+    void start();
+    void leaveRing();
+    void sendToken();
 }

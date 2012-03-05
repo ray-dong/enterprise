@@ -18,10 +18,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import org.junit.Test;
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
  * TODO
@@ -70,16 +70,12 @@ public class TokenRingProtocolTest
     {
         NetworkMock tokenRing = new NetworkMock();
 
-        RingParticipant server1 = new RingParticipant("server1");
-        tokenRing.addParticipant(server1);
+        NetworkMock.Server server1 = tokenRing.addParticipant(new RingParticipant("server1"));
+        NetworkMock.Server server2 = tokenRing.addParticipant(new RingParticipant("server2"));
+        NetworkMock.Server server3 = tokenRing.addParticipant(new RingParticipant("server3"));
 
-        RingParticipant server2 = new RingParticipant("server2");
-        tokenRing.addParticipant(server2);
-
-        RingParticipant server3 = new RingParticipant("server3");
-        tokenRing.addParticipant(server3);
-
-        tokenRing.send(server1, "sendToken");
-        tokenRing.send(server2, "sendToken");
+        TokenRing tokenRing1 = server1.newProxy( TokenRing.class );
+        tokenRing1.sendToken();
+        server2.newProxy( TokenRing.class ).sendToken();
     }
 }

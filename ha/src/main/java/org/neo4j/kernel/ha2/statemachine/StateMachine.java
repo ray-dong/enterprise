@@ -18,8 +18,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.statemachine;
+package org.neo4j.kernel.ha2.statemachine;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,35 +42,46 @@ public class StateMachine<CONTEXT, E extends Enum>
         this.state = state;
     }
 
-    public void addStateTransitionListener(StateTransitionListener listener)
+    public CONTEXT getContext()
+    {
+        return context;
+    }
+    
+    public void checkValidProxyInterface(Class<?> proxyInterface)
+        throws IllegalArgumentException
+    {
+        for( Method method : proxyInterface.getMethods() )
+        {
+            Enum.valueOf( messageEnumType, method.getName() );
+        }
+    }
+
+    public void addStateTransitionListener( StateTransitionListener listener
+    )
     {
         List<StateTransitionListener> newlisteners = new ArrayList<StateTransitionListener>(listeners);
-        newlisteners.add(listener);
+        newlisteners.add( listener );
         listeners = newlisteners;
     }
 
-    public void remoteStateTransitionListener(StateTransitionListener listener)
+    public void removeStateTransitionListener(StateTransitionListener listener)
     {
         List<StateTransitionListener> newlisteners = new ArrayList<StateTransitionListener>(listeners);
         newlisteners.remove(listener);
         listeners = newlisteners;
     }
 
-    public CONTEXT getContext()
-    {
-        return context;
-    }
-
-    public void receive(StateMessage event)
+    public synchronized void receive(StateMessage message)
     {
         try
         {
             State<CONTEXT,E> oldState = state;
-            State<CONTEXT,E> newState = event.dispatch(messageEnumType, context, state);
+            State<CONTEXT,E> newState = message.dispatch(context, state);
             state = newState;
+            StateTransition transition = new StateTransition( oldState, message, newState );
             for (StateTransitionListener listener : listeners)
             {
-                listener.stateTransition(oldState, event, newState);
+                listener.stateTransition(transition);
             }
 
         } catch (IllegalStateException throwable)

@@ -18,12 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.statemachine;
+package org.neo4j.kernel.ha2.statemachine.message;
 
 /**
  * TODO
  */
-public interface StateTransitionListener
+public class ExpectationMessage
+    extends Message
 {
-    void stateTransition(State oldState, StateMessage event, State newState);
+    public ExpectationMessage(MessageType failMessage, String failureMessage)
+    {
+        super(failMessage, failureMessage);
+    }
 }

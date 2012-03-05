@@ -18,40 +18,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.message;
+package org.neo4j.kernel.ha2.statemachine.message;
 
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
-
-import java.io.Serializable;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
  * TODO
  */
-public class MessageFrom<T>
-    implements Serializable
+public class BroadcastMessage
+        extends MessageFrom
 {
-    RingParticipant from;
-    private T payload;
-
-    public MessageFrom(RingParticipant from, T payload)
+    public BroadcastMessage(MessageType messageType, RingParticipant from)
     {
-        this.from = from;
-        this.payload = payload;
+        super(messageType, from, null);
     }
 
-    public RingParticipant getFrom()
+    public BroadcastMessage(MessageType messageType, RingParticipant from, Object payload)
     {
-        return from;
-    }
-
-    public T getPayload()
-    {
-        return payload;
-    }
-
-    @Override
-    public String toString()
-    {
-        return from.toString()+":"+payload;
+        super(messageType, from, payload);
     }
 }

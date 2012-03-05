@@ -18,8 +18,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.neo4j.com2.NetworkChannels;
 import org.neo4j.com2.NetworkMessageListener;
@@ -30,11 +31,17 @@ import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.LifecycleAdapter;
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
-import org.neo4j.kernel.ha2.protocol.message.BroadcastMessage;
-import org.neo4j.kernel.ha2.protocol.message.ExpectationMessage;
-import org.neo4j.kernel.ha2.protocol.message.TargetedMessage;
-import org.neo4j.kernel.ha2.protocol.statemachine.*;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
+import org.neo4j.kernel.ha2.statemachine.message.ExpectationMessage;
+import org.neo4j.kernel.ha2.statemachine.message.Message;
+import org.neo4j.kernel.ha2.statemachine.message.MessageType;
+import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
+import org.neo4j.kernel.ha2.statemachine.*;
+import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
+import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
+import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
+import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 import java.util.Map;
@@ -103,6 +110,7 @@ public class TokenRingNetworkTest
 
                 private ScheduledExecutorService expectationScheduler;
                 private StateMachine stateMachine;
+                private StateMachineConversations conversations;
                 private RingParticipant me;
 
                 @Override
@@ -112,7 +120,8 @@ public class TokenRingNetworkTest
 
                     me = new RingParticipant(channels.getMe().toString());
                     final TokenRingContext context = new TokenRingContext(me);
-                    stateMachine = new StateMachine(context, TokenRingMessages.class, TokenRingStates.start);
+                    stateMachine = new StateMachine(context, TokenRingMessage.class, TokenRingState.start);
+                    conversations = new StateMachineConversations( me.toString(), TokenRingMessage.class );
 
                     receiver.addMessageListener(new NetworkMessageListener()
                     {
@@ -121,7 +130,7 @@ public class TokenRingNetworkTest
                         {
                             StateMessage stateEvent = (StateMessage) message;
 
-                            ExpectationFailure expectationFailure = expectations.remove(stateEvent.getName());
+                            ExpectationFailure expectationFailure = expectations.remove(stateEvent.getConversationId());
                             if (expectationFailure != null)
                                 expectationFailure.cancel();
 
@@ -129,58 +138,55 @@ public class TokenRingNetworkTest
                         }
                     });
 
-                    stateMachine.addStateTransitionListener(new StateTransitionLogger(me));
+                    stateMachine.addStateTransitionListener(new StateTransitionLogger(me, Logger.getAnonymousLogger()) );
                     stateMachine.addStateTransitionListener(new StateTransitionListener()
                     {
-                        public void stateTransition(State oldState, StateMessage event, State newState)
+                        public void stateTransition(StateTransition transition)
                         {
                             try
                             {
 
                                 while (!context.getSendQueue().isEmpty())
-                                    process(context.getSendQueue().poll());
+                                    process(transition.getMessage().getConversationId(), context.getSendQueue().poll());
                             } catch (Throwable throwable)
                             {
                                 throwable.printStackTrace();
                             }
                         }
 
-                        private void process(StateMessage event)
+                        private void process(String conversationId, Message message)
                         {
-                            Object payLoad = event.getPayload();
-
-                            if (payLoad instanceof BroadcastMessage)
+                            MessageType messageType = message.getMessageType();
+                            if (messageType.failureMessage() != null)
                             {
-                                sender.broadcast(event);
-                                return;
-                            }
-
-                            if (payLoad instanceof TargetedMessage)
-                            {
-                                TargetedMessage targetedEvent = (TargetedMessage) payLoad;
-                                sender.send(targetedEvent.getTo().getServerId(), event);
-                                return;
-                            }
-
-                            if (payLoad instanceof ExpectationMessage)
-                            {
-                                ExpectationMessage expectationEvent = (ExpectationMessage) payLoad;
-                                ExpectationFailure expectationFailure = new ExpectationFailure(expectationEvent);
+                                ExpectationFailure expectationFailure = new ExpectationFailure(conversationId, messageType.failureMessage());
                                 expectationScheduler.schedule(expectationFailure, 7, TimeUnit.SECONDS);
-                                expectations.put(event.getName(), expectationFailure);
+                                expectations.put(conversationId, expectationFailure);
+                            }
+
+                            if (message instanceof BroadcastMessage)
+                            {
+                                sender.broadcast(message);
                                 return;
                             }
 
-                            System.out.println("Unknown payload type:" + payLoad.getClass().getName());
+                            if (message instanceof TargetedMessage)
+                            {
+                                TargetedMessage targetedEvent = (TargetedMessage) message;
+                                sender.send(targetedEvent.getTo().getServerId(), message);
+                                return;
+                            }
+
+                            System.out.println("Unknown payload type:" + message.getClass().getName());
                         }
-                    });
+                    } );
                 }
 
                 @Override
                 public void start() throws Throwable
                 {
                     System.out.println("==== " + me + " starts");
-                    stateMachine.receive(new StateMessage("start"));
+                    new StateMachineProxyFactory( stateMachine, conversations ).newProxy( TokenRing.class ).start();
                 }
 
                 @Override
@@ -197,12 +203,14 @@ public class TokenRingNetworkTest
                 class ExpectationFailure
                         implements Runnable
                 {
-                    private ExpectationMessage expectationEvent;
+                    private String conversationId;
+                    private MessageType messageType;
                     private boolean cancelled = false;
 
-                    public ExpectationFailure(ExpectationMessage expectationEvent)
+                    public ExpectationFailure(String conversationId, MessageType messageType )
                     {
-                        this.expectationEvent = expectationEvent;
+                        this.conversationId = conversationId;
+                        this.messageType = messageType;
                     }
 
                     public synchronized void cancel()
@@ -214,7 +222,7 @@ public class TokenRingNetworkTest
                     public synchronized void run()
                     {
                         if (!cancelled)
-                            stateMachine.receive(new StateMessage(expectationEvent.getFailMessage().name()));
+                            stateMachine.receive(new StateMessage(conversationId, new ExpectationMessage( messageType, "Timed out" )));
                     }
                 }
             });

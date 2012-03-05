@@ -18,38 +18,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.context;
+package org.neo4j.kernel.ha2.statemachine.message;
 
-import java.io.Serializable;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
  * TODO
  */
-public class RingNeighbours
-    implements Serializable
+public class TargetedMessage
+        extends MessageFrom
 {
-    private RingParticipant before;
-    private RingParticipant after;
+    private RingParticipant to;
 
-    public RingNeighbours(RingParticipant before, RingParticipant after)
+    public TargetedMessage(MessageType messageType, RingParticipant from, RingParticipant to, Object payload)
     {
-        this.before = before;
-        this.after = after;
+        super(messageType, from, payload);
+        this.to = to;
     }
 
-    public RingParticipant getBefore()
+    public RingParticipant getTo()
     {
-        return before;
-    }
-
-    public RingParticipant getAfter()
-    {
-        return after;
-    }
-
-    @Override
-    public String toString()
-    {
-        return before+"-()->"+after;
+        return to;
     }
 }

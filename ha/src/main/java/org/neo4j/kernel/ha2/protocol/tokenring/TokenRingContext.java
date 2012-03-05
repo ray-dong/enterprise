@@ -18,24 +18,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol;
-
-import org.neo4j.kernel.ha2.protocol.context.RingNeighbours;
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
-import org.neo4j.kernel.ha2.protocol.message.BroadcastMessage;
-import org.neo4j.kernel.ha2.protocol.message.ExpectationMessage;
-import org.neo4j.kernel.ha2.protocol.message.TargetedMessage;
-import org.neo4j.kernel.ha2.protocol.statemachine.StateMessage;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import org.neo4j.kernel.ha2.protocol.RingNeighbours;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
+import org.neo4j.kernel.ha2.statemachine.message.Message;
+import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
 
 /**
  * TODO
  */
 public class TokenRingContext
 {
-    private Queue<StateMessage> sendQueue = new ConcurrentLinkedQueue<StateMessage>();
+    private Queue<Message> sendQueue = new ConcurrentLinkedQueue<Message>();
 
     private RingParticipant me;
     private RingNeighbours neighbours;
@@ -75,28 +73,23 @@ public class TokenRingContext
         neighbours = new RingNeighbours(neighbours.getBefore(), after);
     }
 
-    public Queue<StateMessage> getSendQueue()
+    public Queue<Message> getSendQueue()
     {
         return sendQueue;
     }
 
-    public void broadcast(TokenRingMessages message)
+    public void broadcast(TokenRingMessage message)
     {
         broadcast(message, null);
     }
 
-    public void broadcast(TokenRingMessages message, Object payload)
+    public void broadcast(TokenRingMessage message, Object payload)
     {
-        sendQueue.add(new StateMessage(message.name(), new BroadcastMessage<Object>(me, payload)));
+        sendQueue.add(new BroadcastMessage(message, me, payload));
     }
 
-    public void send(TokenRingMessages message, RingParticipant to, Object payload)
+    public void send(TokenRingMessage message, RingParticipant to, Object payload)
     {
-        sendQueue.add(new StateMessage(message.name(), new TargetedMessage<Object>(me, to, payload)));
-    }
-
-    public void expect(TokenRingMessages expected, TokenRingMessages failMessage)
-    {
-        sendQueue.add(new StateMessage(expected.name(), new ExpectationMessage(failMessage)));
+        sendQueue.add(new TargetedMessage(message, me, to, payload));
     }
 }

@@ -18,23 +18,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.message;
-
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
+package org.neo4j.kernel.ha2.statemachine.message;
 
 /**
  * TODO
  */
-public class BroadcastMessage<T>
-        extends MessageFrom<T>
+public class InternalMessage
+    extends Message
 {
-    public BroadcastMessage(RingParticipant from)
+    public InternalMessage(MessageType messageType, Object payload)
     {
-        super(from, null);
-    }
-
-    public BroadcastMessage(RingParticipant from, T payload)
-    {
-        super(from, payload);
+        super(messageType, payload);
     }
 }

@@ -18,33 +18,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.statemachine;
+package org.neo4j.kernel.ha2.statemachine.message;
 
 import java.io.Serializable;
 
 /**
  * TODO
  */
-public class StateMessage
+public abstract class Message
     implements Serializable
 {
-    private String name;
-    private Object payload;
+    final private MessageType messageType;
+    final private Object payload;
 
-    public StateMessage(String name)
+    protected Message( MessageType messageType, Object payload )
     {
-        this.name = name;
-    }
-
-    public StateMessage(String name, Object payload)
-    {
-        this.name = name;
+        this.messageType = messageType;
         this.payload = payload;
     }
 
-    public String getName()
+    public MessageType getMessageType()
     {
-        return name;
+        return messageType;
     }
 
     public Object getPayload()
@@ -52,16 +47,4 @@ public class StateMessage
         return payload;
     }
 
-    public <T,E extends Enum> State<T, E> dispatch(Class<E> messageEnumType, T context, State<T,E> state)
-            throws Throwable
-    {
-        E message = (E)Enum.valueOf(messageEnumType, name);
-        return state.receive(context, message, payload);
-    }
-
-    @Override
-    public String toString()
-    {
-        return name+"/"+payload;
-    }
 }

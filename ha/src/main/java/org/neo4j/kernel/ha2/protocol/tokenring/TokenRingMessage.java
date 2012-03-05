@@ -18,26 +18,49 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.message;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 
 /**
  * TODO
  */
-public class TargetedMessage<T>
-        extends MessageFrom<T>
+public enum TokenRingMessage
+    implements MessageType
 {
-    private RingParticipant to;
+    failure,
+    ringDiscovered,
+    discoverRing(failure, ringDiscovered),
+    newAfter,newBefore,
+    leaveRing,
+    becomeMaster, sendToken,
+    start;
+    
+    private TokenRingMessage failureMessage;
+    private TokenRingMessage[] next;
 
-    public TargetedMessage(RingParticipant from, RingParticipant to, T payload)
+    private TokenRingMessage()
     {
-        super(from, payload);
-        this.to = to;
+        next = new TokenRingMessage[0];
     }
 
-    public RingParticipant getTo()
+    private TokenRingMessage( TokenRingMessage failureMessage, TokenRingMessage... next )
     {
-        return to;
+        this.failureMessage = failureMessage;
+        this.next = next;
     }
+
+    @Override
+    public MessageType[] next()
+    {
+        return next;
+    }
+
+    @Override
+    public MessageType failureMessage()
+    {
+        return failureMessage;
+    }
+
+
 }

@@ -18,25 +18,28 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.statemachine;
+package org.neo4j.kernel.ha2.statemachine;
 
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
+import java.lang.reflect.Proxy;
 
 /**
  * TODO
  */
-public class StateTransitionLogger
-        implements StateTransitionListener
+public class StateMachineProxyFactory
 {
-    private RingParticipant participant;
+    private StateMachine stateMachine;
+    private StateMachineConversations conversations;
 
-    public StateTransitionLogger(RingParticipant participant)
+    public StateMachineProxyFactory( StateMachine stateMachine, StateMachineConversations conversations )
     {
-        this.participant = participant;
+        this.stateMachine = stateMachine;
+        this.conversations = conversations;
     }
-
-    public void stateTransition(State oldState, StateMessage event, State newState)
+    
+    public <T> T newProxy(Class<T> proxyInterface)
     {
-        System.out.println(participant.toString()+": "+oldState.toString()+"-["+event.getName()+"]->"+newState.toString());
+        stateMachine.checkValidProxyInterface( proxyInterface );
+
+        return proxyInterface.cast( Proxy.newProxyInstance( proxyInterface.getClassLoader(), new Class<?>[]{ proxyInterface }, new StateMachineProxyHandler( stateMachine, conversations ) ) );
     }
 }

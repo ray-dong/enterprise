@@ -18,32 +18,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import org.neo4j.kernel.ha2.protocol.context.RingNeighbours;
-import org.neo4j.kernel.ha2.protocol.context.RingParticipant;
+import org.neo4j.kernel.ha2.protocol.RingNeighbours;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
-import static org.neo4j.kernel.ha2.protocol.TokenRingMessages.*;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
 
-import org.neo4j.kernel.ha2.protocol.message.BroadcastMessage;
-import org.neo4j.kernel.ha2.protocol.message.TargetedMessage;
-import org.neo4j.kernel.ha2.protocol.statemachine.State;
+import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
+import org.neo4j.kernel.ha2.statemachine.message.Message;
+import org.neo4j.kernel.ha2.statemachine.message.MessageFrom;
+import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
+import org.neo4j.kernel.ha2.statemachine.State;
 
 /**
  * TODO
  */
-public enum TokenRingStates
-        implements State<TokenRingContext, TokenRingMessages>
+public enum TokenRingState
+        implements State<TokenRingContext, TokenRingMessage>
 {
     start
             {
-                public State receive(TokenRingContext context, TokenRingMessages message, Object payLoad) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> receive(TokenRingContext context, Message message) throws Throwable
                 {
-                    switch(message)
+                    TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
+                    switch(messageType)
                     {
                         case start:
                             context.broadcast(discoverRing);
-                            context.expect(ringDiscovered, discoverRingFailed);
                             return initial;
 
                         default:
@@ -54,18 +56,18 @@ public enum TokenRingStates
 
     initial
             {
-                public State receive(TokenRingContext context, TokenRingMessages message, Object payLoad) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> receive(TokenRingContext context, Message message) throws Throwable
                 {
-                    switch (message)
+                    TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
+                    switch (messageType)
                     {
                         case ringDiscovered:
                         {
-                            TargetedMessage<RingNeighbours> event = (TargetedMessage<RingNeighbours>) payLoad;
-                            context.setNeighbours(event.getPayload());
+                            context.setNeighbours((RingNeighbours)message.getPayload());
                             return slave;
                         }
 
-                        case discoverRingFailed:
+                        case failure:
                         {
                             context.setNeighbours(context.getMe(), context.getMe());
                             return master;
@@ -73,15 +75,15 @@ public enum TokenRingStates
 
                         case discoverRing:
                         {
-                            BroadcastMessage<RingParticipant> event = (BroadcastMessage<RingParticipant>)payLoad;
-                            if (event.getFrom().getServerId().compareTo(context.getMe().getServerId())>0)
+                            MessageFrom broadcastMessage = (MessageFrom)message;
+                            if (broadcastMessage.getFrom().getServerId().compareTo(context.getMe().getServerId())>0)
                             {
                                 // We're both looking for ring but this server has higher server id so wins
                                 // and switches to master mode
 
-                                context.setNeighbours(event.getFrom(),event.getFrom());
+                                context.setNeighbours(broadcastMessage.getFrom(),broadcastMessage.getFrom());
                                 
-                                context.send(ringDiscovered, event.getFrom(),
+                                context.send(ringDiscovered, broadcastMessage.getFrom(),
                                         new RingNeighbours(context.getMe(), context.getMe()));
                                 
                                 return master;
@@ -99,19 +101,20 @@ public enum TokenRingStates
 
     master
             {
-                public State receive(TokenRingContext context, TokenRingMessages message, Object payLoad) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> receive(TokenRingContext context, Message message) throws Throwable
                 {
-                    switch (message)
+                    TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
+                    switch (messageType)
                     {
                         case discoverRing:
                         {
-                            BroadcastMessage<RingParticipant> event = (BroadcastMessage<RingParticipant>)payLoad;
-                            context.setNeighbours(event.getFrom(),
-                                    context.getNeighbours().getAfter().equals(context.getMe())?event.getFrom(): context.getNeighbours().getAfter());
+                            BroadcastMessage broadcastMessage = (BroadcastMessage)message;
+                            context.setNeighbours(broadcastMessage.getFrom(),
+                                    context.getNeighbours().getAfter().equals(context.getMe())?broadcastMessage.getFrom(): context.getNeighbours().getAfter());
 
                             if (!context.getNeighbours().getBefore().equals(context.getMe()))
-                                context.send(newAfter, context.getNeighbours().getBefore(), event.getFrom());
-                            context.send(ringDiscovered, event.getFrom(),
+                                context.send(newAfter, context.getNeighbours().getBefore(), broadcastMessage.getFrom());
+                            context.send(ringDiscovered, broadcastMessage.getFrom(),
                                     new RingNeighbours(context.getNeighbours().getBefore(), context.getMe()));
 
                             return this;
@@ -119,15 +122,13 @@ public enum TokenRingStates
 
                         case newAfter:
                         {
-                            TargetedMessage<RingParticipant> event = (TargetedMessage<RingParticipant>) payLoad;
-                            context.newAfter(event.getPayload());
+                            context.newAfter((RingParticipant) message.getPayload());
                             return this;
                         }
 
                         case newBefore:
                         {
-                            TargetedMessage<RingParticipant> event = (TargetedMessage<RingParticipant>) payLoad;
-                            context.newBefore(event.getPayload());
+                            context.newBefore((RingParticipant) message.getPayload());
                             return this;
                         }
 
@@ -155,30 +156,28 @@ public enum TokenRingStates
 
     slave
             {
-                public State receive(TokenRingContext context, TokenRingMessages message, Object payLoad) throws Throwable
+                public State receive(TokenRingContext context, Message message) throws Throwable
                 {
-                    switch (message)
+                    TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
+                    switch ( messageType )
                     {
                         case becomeMaster:
                         {
-                            TargetedMessage<RingParticipant> event = (TargetedMessage<RingParticipant>) payLoad;
-                            if (event.getPayload() != null)
-                                context.newBefore(event.getPayload());
+                            if (message.getPayload() != null)
+                                context.newBefore((RingParticipant) message.getPayload());
 
                             return master;
                         }
 
                         case newAfter:
                         {
-                            TargetedMessage<RingParticipant> event = (TargetedMessage<RingParticipant>) payLoad;
-                            context.newAfter(event.getPayload());
+                            context.newAfter((RingParticipant) message.getPayload());
                             return this;
                         }
 
                         case newBefore:
                         {
-                            TargetedMessage<RingParticipant> event = (TargetedMessage<RingParticipant>) payLoad;
-                            context.newBefore(event.getPayload());
+                            context.newBefore((RingParticipant) message.getPayload());
 
                             return this;
                         }
