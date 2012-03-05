@@ -21,8 +21,8 @@ package slavetest;
 
 import org.neo4j.helpers.Args;
 import org.neo4j.kernel.HaConfig;
-import org.neo4j.kernel.ha.zookeeper.ZooKeeperClusterClient;
 import org.neo4j.kernel.ha.zookeeper.Machine;
+import org.neo4j.kernel.ha.zookeeper.ZooKeeperClusterClient;
 
 public class DumpZooInfo
 {

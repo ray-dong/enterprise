@@ -22,8 +22,6 @@ package org.neo4j.kernel.ha2.statemachine.message;
 
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
-import java.io.Serializable;
-
 /**
  * TODO
  */

@@ -20,6 +20,11 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.neo4j.com2.NetworkChannels;
@@ -32,23 +37,19 @@ import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.LifecycleAdapter;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.StateMachine;
+import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
+import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
+import org.neo4j.kernel.ha2.statemachine.StateMessage;
+import org.neo4j.kernel.ha2.statemachine.StateTransition;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.statemachine.message.ExpectationMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
-import org.neo4j.kernel.ha2.statemachine.*;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState;
 import org.neo4j.kernel.impl.util.StringLogger;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * TODO
@@ -116,7 +117,7 @@ public class TokenRingNetworkTest
                 @Override
                 public void init() throws Throwable
                 {
-                    expectationScheduler = Executors.newScheduledThreadPool(3);
+                    expectationScheduler = Executors.newScheduledThreadPool( 3 );
 
                     me = new RingParticipant(channels.getMe().toString());
                     final TokenRingContext context = new TokenRingContext(me);
@@ -166,14 +167,14 @@ public class TokenRingNetworkTest
 
                             if (message instanceof BroadcastMessage)
                             {
-                                sender.broadcast(message);
+                                sender.broadcast( message );
                                 return;
                             }
 
                             if (message instanceof TargetedMessage)
                             {
                                 TargetedMessage targetedEvent = (TargetedMessage) message;
-                                sender.send(targetedEvent.getTo().getServerId(), message);
+                                sender.send( targetedEvent.getTo().getServerId(), message );
                                 return;
                             }
 
