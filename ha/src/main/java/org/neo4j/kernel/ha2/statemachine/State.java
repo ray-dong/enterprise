@@ -24,7 +24,7 @@ import org.neo4j.kernel.ha2.statemachine.message.Message;
 /**
  * TODO
  */
-public interface State<T, E extends Enum>
+public interface State<T, E extends Enum<E>>
 {
     public State<T,E> receive(T context, Message message) throws Throwable;
 }

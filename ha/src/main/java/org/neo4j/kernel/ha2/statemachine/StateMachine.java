@@ -28,7 +28,7 @@ import org.neo4j.kernel.ha2.statemachine.message.Message;
 /**
  * TODO
  */
-public class StateMachine<CONTEXT, E extends Enum>
+public class StateMachine<CONTEXT, E extends Enum<E>>
 {
     private CONTEXT context;
     private Class<E> messageEnumType;

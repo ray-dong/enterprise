@@ -42,11 +42,12 @@ public class NetworkMock
 {
     Map<RingParticipant, Server> participants = new HashMap<RingParticipant, Server>();
     
-    public Server addParticipant(RingParticipant participant)
+    public Server addParticipant( RingParticipant participant, StateTransitionListener verifier )
     {
         final TokenRingContext context = new TokenRingContext(participant);
         final StateMachine<TokenRingContext, TokenRingMessage> stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>(context, TokenRingMessage.class, TokenRingState.start);
 
+        stateMachine.addStateTransitionListener( verifier );
         stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger(  ) ) );
         stateMachine.addStateTransitionListener( new StateTransitionListener()
         {
@@ -68,7 +69,7 @@ public class NetworkMock
             }
         } );
         
-        System.out.println("===="+participant+" joins ring");
+        debug( participant, "joins ring" );
 
         Server server = new Server(participant, stateMachine);
         participants.put(participant, server);
@@ -77,9 +78,14 @@ public class NetworkMock
         return server;
     }
 
+    private void debug( RingParticipant participant, String string )
+    {
+//        System.out.println( "===" + participant + " " + string );
+    }
+
     public void removeParticipant(RingParticipant participant)
     {
-        System.out.println("===="+participant+" leaves ring");
+        debug( participant, "leaves ring" );
         Server server = participants.get(participant);
         server.newProxy( TokenRing.class ).leaveRing();
 
