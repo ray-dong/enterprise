@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
+import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
 
@@ -91,5 +92,10 @@ public class TokenRingContext
     public void send(TokenRingMessage message, RingParticipant to, Object payload)
     {
         sendQueue.add(new TargetedMessage(message, me, to, payload));
+    }
+    
+    public void internal(TokenRingMessage message, Object payload)
+    {
+        sendQueue.add( new InternalMessage( message, payload ));
     }
 }

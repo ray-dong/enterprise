@@ -34,6 +34,7 @@ public enum TokenRingMessage
     newAfter,newBefore,
     leaveRing,
     becomeMaster, sendToken,
+    getParticipantsResponse,getParticipants(failure, getParticipantsResponse ),
     start;
     
     private TokenRingMessage failureMessage;

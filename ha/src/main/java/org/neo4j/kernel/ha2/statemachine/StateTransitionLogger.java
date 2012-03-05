@@ -41,11 +41,11 @@ public class StateTransitionLogger
 
     public void stateTransition(StateTransition transition)
     {
-        if (transition.getMessage().getMessage() instanceof ExpectationMessage)
+        if (transition.getMessage() instanceof ExpectationMessage)
             logger.warning(participant.toString()+": "+
-                               transition.getOldState().toString()+"-["+transition.getMessage().getMessage().getMessageType()+":"+transition.getMessage().getMessage().getPayload()+"]->"+
+                               transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
                                                                                                                                transition.getNewState().toString());
         else
-            logger.info(participant.toString()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessage().getMessageType()+"]->"+transition.getNewState().toString());
+            logger.info(participant.toString()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
     }
 }

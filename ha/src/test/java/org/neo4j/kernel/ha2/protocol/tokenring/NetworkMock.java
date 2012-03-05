@@ -55,9 +55,12 @@ public class NetworkMock
             {
                 try
                 {
-
                     while( !context.getSendQueue().isEmpty() )
-                        process( transition.getMessage().getConversationId(), context.getSendQueue().poll() );
+                    {
+                        Message message = context.getSendQueue().poll();
+                        message.copyHeaders(transition.getMessage());
+                        process( message );
+                    }
                 }
                 catch( Throwable throwable )
                 {
@@ -84,7 +87,7 @@ public class NetworkMock
         participants.remove( participant );
     }
 
-    private void process( String conversationId, Message message )
+    private void process( Message message )
     {
         if (message instanceof BroadcastMessage)
         {
@@ -95,13 +98,13 @@ public class NetworkMock
                 if (!ringParticipantStateMachineEntry.getKey().equals(broadcastEvent.getFrom()))
                 {
                     alone = false;
-                    ringParticipantStateMachineEntry.getValue().receive(new StateMessage( conversationId, message));
+                    ringParticipantStateMachineEntry.getValue().receive(message);
                 }
             }
 
             if (alone)
             {
-                participants.get(broadcastEvent.getFrom()).receive(new StateMessage(conversationId, new ExpectationMessage(message.getMessageType().failureMessage(), "No servers founds")));
+                participants.get(broadcastEvent.getFrom()).receive(new ExpectationMessage(message.getMessageType().failureMessage(), "No servers founds"));
             }
             return;
         }
@@ -115,7 +118,7 @@ public class NetworkMock
                 System.out.println("Target "+targetedEvent.getTo()+" does not exist");
             } else
             {
-                targetMachine.receive(new StateMessage( conversationId, message));
+                targetMachine.receive(message);
             }
             return;
         }
@@ -133,8 +136,8 @@ public class NetworkMock
         public Server( RingParticipant participant, StateMachine stateMachine )
         {
             this.stateMachine = stateMachine;
-            conversations = new StateMachineConversations(participant.toString(), TokenRingMessage.class);
-            proxyFactory = new StateMachineProxyFactory( stateMachine, conversations );
+            conversations = new StateMachineConversations();
+            proxyFactory = new StateMachineProxyFactory( participant.toString(), TokenRingMessage.class, stateMachine, conversations );
         }
         
         public <T> T newProxy(Class<T> proxyInterface)
@@ -142,7 +145,7 @@ public class NetworkMock
             return proxyFactory.newProxy( proxyInterface );
         }
 
-        public void receive( StateMessage message )
+        public void receive( Message message )
         {
             stateMachine.receive( message );
         }

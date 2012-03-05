@@ -20,6 +20,9 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
@@ -28,7 +31,6 @@ import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
 import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.MessageFrom;
-import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 
 /**
@@ -148,6 +150,10 @@ public enum TokenRingState
                             return slave;
                         }
 
+                        case getParticipants:
+                        case getParticipantsResponse:
+                            getParticipants( context, message );
+
                         default:
                             return this;
                     }
@@ -192,10 +198,50 @@ public enum TokenRingState
 
                             return start;
                         }
+                        
+                        case getParticipants:
+                        case getParticipantsResponse:
+                            getParticipants( context, message );
 
                         default:
                             return this;
                     }
                 }
+            };
+
+    public void getParticipants( TokenRingContext context, Message message )
+    {
+        TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
+        switch ( messageType )
+        {
+            case getParticipants:
+            {
+                if (!context.getNeighbours().getAfter().equals(context.getMe()))
+                {
+                    List<RingParticipant> participants = new ArrayList<RingParticipant>(  );
+                    participants.add( context.getMe() );
+                    context.send( getParticipantsResponse, context.getNeighbours().getAfter(), participants );
+                } else
+                {
+                    context.internal( getParticipantsResponse, Collections.singleton( context.getMe() ) );
+                }
+                return;
             }
+
+            case getParticipantsResponse:
+            {
+                if (context.getMe().toString().equals(message.getHeader( Message.CREATED_BY ) ))
+                {
+                    // We're done
+                    context.internal( getParticipantsResponse, message.getPayload() );
+                } else
+                {
+                    List<RingParticipant> participants = (List<RingParticipant>) message.getPayload();
+                    participants.add( context.getMe() );
+                    context.send( getParticipantsResponse, context.getNeighbours().getAfter(), participants );
+                }
+                return;
+            }
+        }
+    }
 }

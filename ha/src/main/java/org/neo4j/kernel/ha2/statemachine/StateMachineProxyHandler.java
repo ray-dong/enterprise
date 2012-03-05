@@ -22,6 +22,9 @@ package org.neo4j.kernel.ha2.statemachine;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.util.concurrent.ExecutionException;
+import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
+import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 
 /**
  * TODO
@@ -29,19 +32,17 @@ import java.lang.reflect.Method;
 public class StateMachineProxyHandler
     implements InvocationHandler
 {
-    private StateMachine stateMachine;
-    private StateMachineConversations conversations;
+    private StateMachineProxyFactory stateMachineProxyFactory;
 
-    public StateMachineProxyHandler( StateMachine stateMachine, StateMachineConversations conversations )
+    public StateMachineProxyHandler( StateMachineProxyFactory stateMachineProxyFactory )
     {
-        this.stateMachine = stateMachine;
-        this.conversations = conversations;
+        this.stateMachineProxyFactory = stateMachineProxyFactory;
     }
 
     @Override
     public Object invoke( Object proxy, Method method, Object[] args )
         throws Throwable
     {
-        return conversations.invoke(stateMachine, method, args == null ? null : args[0]);
+        return stateMachineProxyFactory.invoke(method, args == null ? null : args[0]);
     }
 }

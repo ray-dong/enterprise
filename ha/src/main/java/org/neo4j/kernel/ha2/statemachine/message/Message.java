@@ -21,15 +21,22 @@
 package org.neo4j.kernel.ha2.statemachine.message;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * TODO
+ * State machine message
  */
 public abstract class Message
     implements Serializable
 {
+    // Standard headers
+    public static final String CONVERSATION_ID = "conversation-id";
+    public static final String CREATED_BY = "created-by";
+
     final private MessageType messageType;
     final private Object payload;
+    final private Map<String,String> headers = new HashMap<String, String>(  );
 
     protected Message( MessageType messageType, Object payload )
     {
@@ -46,5 +53,20 @@ public abstract class Message
     {
         return payload;
     }
+    
+    public Message setHeader(String name, String value)
+    {
+        headers.put( name, value );
+        return this;
+    }
+    
+    public String getHeader(String name)
+    {
+        return headers.get( name );
+    }
 
+    public void copyHeaders( Message message )
+    {
+        headers.putAll( message.headers );
+    }
 }

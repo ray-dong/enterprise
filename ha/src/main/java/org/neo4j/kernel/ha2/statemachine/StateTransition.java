@@ -20,16 +20,19 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
+import org.neo4j.kernel.ha2.statemachine.message.ExpectationMessage;
+import org.neo4j.kernel.ha2.statemachine.message.Message;
+
 /**
  * TODO
  */
 public class StateTransition
 {
     private Object oldState;
-    private StateMessage message;
+    private Message message;
     private Object newState;
 
-    public StateTransition( Object oldState, StateMessage message, Object newState )
+    public StateTransition( Object oldState, Message message, Object newState )
     {
         this.oldState = oldState;
         this.message = message;
@@ -41,7 +44,7 @@ public class StateTransition
         return oldState;
     }
 
-    public StateMessage getMessage()
+    public Message getMessage()
     {
         return message;
     }
@@ -49,5 +52,18 @@ public class StateTransition
     public Object getNewState()
     {
         return newState;
+    }
+
+    @Override
+    public String toString()
+    {
+        if (message instanceof ExpectationMessage )
+            return getOldState().toString()+
+                   "-["+getMessage().getMessageType()+":"+getMessage().getPayload()+"]->"+
+                   getNewState().toString();
+        else
+            return getOldState().toString()+
+                   "-["+getMessage().getMessageType()+"]->"+
+                   getNewState().toString();
     }
 }

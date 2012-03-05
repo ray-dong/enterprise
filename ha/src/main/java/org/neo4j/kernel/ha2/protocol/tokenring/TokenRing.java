@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
+
 /**
  * TODO
  */
@@ -28,4 +30,5 @@ public interface TokenRing
     void start();
     void leaveRing();
     void sendToken();
+    Iterable<RingParticipant> getParticipants();
 }

@@ -104,9 +104,9 @@ public class NetworkMessageSender
         channels.send(uri, message, channelFactory);
     }
 
-    public void broadcast(Object event)
+    public void broadcast(Object message)
     {
-        channels.broadcast(event, channelFactory);
+        channels.broadcast(message, channelFactory);
     }
 
     private class NetworkNodePipelineFactory

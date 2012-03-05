@@ -40,22 +40,26 @@ import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
-import org.neo4j.kernel.ha2.statemachine.StateMessage;
 import org.neo4j.kernel.ha2.statemachine.StateTransition;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.statemachine.message.ExpectationMessage;
+import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
 import org.neo4j.kernel.impl.util.StringLogger;
+
+import static org.neo4j.kernel.ha2.statemachine.message.Message.CONVERSATION_ID;
 
 /**
  * TODO
  */
 public class TokenRingNetworkTest
 {
+    Logger logger = Logger.getAnonymousLogger(  );
+    
     @Test
     public void testSendReceive()
     {
@@ -80,6 +84,7 @@ public class TokenRingNetworkTest
     {
 
         private final LifeSupport life = new LifeSupport();
+        private TokenRing tokenRing;
 
         @Override
         public void init() throws Throwable
@@ -91,7 +96,7 @@ public class TokenRingNetworkTest
         {
             Map<String, String> config = MapUtil.stringMap("port", "1234");
 
-            final NetworkChannels channels = new NetworkChannels();
+            final NetworkChannels channels = new NetworkChannels(StringLogger.SYSTEM);
 
             final NetworkMessageReceiver receiver = new NetworkMessageReceiver(ConfigProxy.config(config, NetworkMessageReceiver.Configuration.class), StringLogger.SYSTEM, channels);
             final NetworkMessageSender sender = new NetworkMessageSender( StringLogger.SYSTEM, channels );
@@ -122,16 +127,16 @@ public class TokenRingNetworkTest
                     me = new RingParticipant(channels.getMe().toString());
                     final TokenRingContext context = new TokenRingContext(me);
                     stateMachine = new StateMachine(context, TokenRingMessage.class, TokenRingState.start);
-                    conversations = new StateMachineConversations( me.toString(), TokenRingMessage.class );
+                    conversations = new StateMachineConversations( );
 
                     receiver.addMessageListener(new NetworkMessageListener()
                     {
                         @Override
                         public void received(Object message)
                         {
-                            StateMessage stateEvent = (StateMessage) message;
+                            Message stateEvent = (Message) message;
 
-                            ExpectationFailure expectationFailure = expectations.remove(stateEvent.getConversationId());
+                            ExpectationFailure expectationFailure = expectations.remove(stateEvent.getHeader( CONVERSATION_ID ));
                             if (expectationFailure != null)
                                 expectationFailure.cancel();
 
@@ -148,20 +153,25 @@ public class TokenRingNetworkTest
                             {
 
                                 while (!context.getSendQueue().isEmpty())
-                                    process(transition.getMessage().getConversationId(), context.getSendQueue().poll());
+                                {
+                                    Message message = context.getSendQueue().poll();
+                                    message.copyHeaders(transition.getMessage());
+                                    process( message );
+                                }
                             } catch (Throwable throwable)
                             {
                                 throwable.printStackTrace();
                             }
                         }
 
-                        private void process(String conversationId, Message message)
+                        private void process(Message message)
                         {
                             MessageType messageType = message.getMessageType();
                             if (messageType.failureMessage() != null)
                             {
-                                ExpectationFailure expectationFailure = new ExpectationFailure(conversationId, messageType.failureMessage());
-                                expectationScheduler.schedule(expectationFailure, 7, TimeUnit.SECONDS);
+                                String conversationId = message.getHeader( CONVERSATION_ID );
+                                ExpectationFailure expectationFailure = new ExpectationFailure( conversationId, messageType.failureMessage());
+                                expectationScheduler.schedule(expectationFailure, 3, TimeUnit.SECONDS);
                                 expectations.put(conversationId, expectationFailure);
                             }
 
@@ -177,8 +187,14 @@ public class TokenRingNetworkTest
                                 sender.send( targetedEvent.getTo().getServerId(), message );
                                 return;
                             }
+                            
+                            if (message instanceof InternalMessage )
+                            {
+//                                stateMachine.receive( message );
+                                return;
+                            }
 
-                            System.out.println("Unknown payload type:" + message.getClass().getName());
+                            logger.severe("Unknown payload type:" + message.getClass().getName());
                         }
                     } );
                 }
@@ -186,8 +202,10 @@ public class TokenRingNetworkTest
                 @Override
                 public void start() throws Throwable
                 {
-                    System.out.println("==== " + me + " starts");
-                    new StateMachineProxyFactory( stateMachine, conversations ).newProxy( TokenRing.class ).start();
+                    logger.info("==== " + me + " starts");
+                    tokenRing = new StateMachineProxyFactory( me.toString(), TokenRingMessage.class, stateMachine, conversations )
+                               .newProxy( TokenRing.class );
+                    tokenRing.start();
                 }
 
                 @Override
@@ -223,7 +241,7 @@ public class TokenRingNetworkTest
                     public synchronized void run()
                     {
                         if (!cancelled)
-                            stateMachine.receive(new StateMessage(conversationId, new ExpectationMessage( messageType, "Timed out" )));
+                            stateMachine.receive(new ExpectationMessage( messageType, "Timed out" ).setHeader( CONVERSATION_ID, conversationId ));
                     }
                 }
             });
@@ -234,7 +252,8 @@ public class TokenRingNetworkTest
         @Override
         public void stop() throws Throwable
         {
-            System.out.println("Stop server");
+            logger.info( "Participants:"+ tokenRing.getParticipants());
+            logger.info("Stop server");
             life.stop();
         }
 

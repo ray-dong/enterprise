@@ -26,12 +26,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.jboss.netty.channel.Channel;
+import org.neo4j.kernel.impl.util.StringLogger;
 
 /**
  * TODO
  */
 public class NetworkChannels
 {
+    private StringLogger msgLog;
+
     public interface ChannelFactory
     {
         Channel openChannel(URI uri);
@@ -41,8 +44,9 @@ public class NetworkChannels
 
     private Map<URI, Channel> connections = new ConcurrentHashMap<URI, Channel>();
 
-    public NetworkChannels()
+    public NetworkChannels(StringLogger msgLog)
     {
+        this.msgLog = msgLog;
     }
 
     public void listeningAt(URI me)
@@ -90,7 +94,7 @@ public class NetworkChannels
 
         try
         {
-            System.out.println("Sending to "+to+": "+message);
+            msgLog.logMessage("Sending to "+to+": "+message);
             channel.write(message);
         } catch (Exception e)
         {

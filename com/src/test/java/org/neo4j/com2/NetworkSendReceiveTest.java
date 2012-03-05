@@ -70,7 +70,7 @@ public class NetworkSendReceiveTest
         {
             Map<String, String> config = MapUtil.stringMap("port", "1234");
 
-            NetworkChannels channels = new NetworkChannels();
+            NetworkChannels channels = new NetworkChannels(StringLogger.SYSTEM);
 
             final NetworkMessageReceiver receiver = new NetworkMessageReceiver(ConfigProxy.config(config, NetworkMessageReceiver.Configuration.class), StringLogger.SYSTEM, channels);
             final NetworkMessageSender sender = new NetworkMessageSender( StringLogger.SYSTEM, channels );

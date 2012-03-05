@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.statemachine;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import org.neo4j.kernel.ha2.statemachine.message.Message;
 
 /**
  * TODO
@@ -71,12 +72,12 @@ public class StateMachine<CONTEXT, E extends Enum>
         listeners = newlisteners;
     }
 
-    public synchronized void receive(StateMessage message)
+    public synchronized void receive(Message message)
     {
         try
         {
             State<CONTEXT,E> oldState = state;
-            State<CONTEXT,E> newState = message.dispatch(context, state);
+            State<CONTEXT,E> newState = state.receive(context, message);
             state = newState;
             StateTransition transition = new StateTransition( oldState, message, newState );
             for (StateTransitionListener listener : listeners)

@@ -57,15 +57,15 @@ public class NetworkMessageReceiver
     implements Lifecycle
 {
 
-    private ExecutorService executor;
-    private ServerBootstrap bootstrap;
-    private Channel channel;
-
     public interface Configuration
     {
         int port(int def);
     }
     
+    private ExecutorService executor;
+    private ServerBootstrap bootstrap;
+    private Channel channel;
+
     private Configuration config;
     private StringLogger msgLog;
     private NetworkChannels channels;
@@ -179,7 +179,7 @@ public class NetworkMessageReceiver
         public void messageReceived(ChannelHandlerContext ctx, MessageEvent event) throws Exception
         {
             final Object message =  event.getMessage();
-            System.out.println("Received:" + message);
+            msgLog.logMessage("Received:" + message);
             executor.submit(new Runnable()
             {
                 @Override
@@ -208,14 +208,13 @@ public class NetworkMessageReceiver
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
         {
-            System.out.println("Receive exception:");
-            e.getCause().printStackTrace();
+            msgLog.logMessage("Receive exception:", e.getCause());
         }
 
         @Override
         public void writeComplete(ChannelHandlerContext ctx, WriteCompletionEvent e) throws Exception
         {
-            System.out.println("Write complete");
+            msgLog.logMessage("Write complete");
             super.writeComplete(ctx, e);
         }
     }

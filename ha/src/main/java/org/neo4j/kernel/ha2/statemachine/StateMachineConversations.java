@@ -21,6 +21,8 @@
 package org.neo4j.kernel.ha2.statemachine;
 
 import java.lang.reflect.Method;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -29,146 +31,14 @@ import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
 import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 
 /**
- * TODO
+ * Generate id's for state machine conversations. This should be shared between all state machines in a server.
  */
 public class StateMachineConversations
 {
-    private String prefix;
-    private Class<? extends Enum> messageTypeEnum;
     private long nextConversationId = 0;
-
-    public StateMachineConversations( String prefix, Class<? extends Enum> messageTypeEnum)
-    {
-        this.prefix = prefix;
-        this.messageTypeEnum = messageTypeEnum;
-    }
-
-    public Object invoke( StateMachine stateMachine, Method method, Object arg )
-        throws Throwable
-    {
-        String conversationId = prefix+getNextConversationId();
-
-        Enum typeAsEnum = Enum.valueOf( messageTypeEnum, method.getName() );
-        StateMessage stateMessage = new StateMessage( conversationId, new InternalMessage( (MessageType) typeAsEnum, arg ) );
-
-        if (method.getReturnType().equals( Void.TYPE ))
-        {
-            stateMachine.receive( stateMessage );
-            return null;
-        }
-        else
-        {
-            ResponseFuture future = new ResponseFuture();
-            stateMachine.addStateTransitionListener( new ResponseListener(conversationId, future) );
-            stateMachine.receive( stateMessage );
-
-            try
-            {
-                // Wait for response or timeout/failure
-                return future.get(  );
-            }
-            catch( InterruptedException e )
-            {
-                throw e;
-            }
-            catch( ExecutionException e )
-            {
-                throw e.getCause();
-            }
-        }
-    }
 
     public synchronized long getNextConversationId()
     {
         return nextConversationId++;
-    }
-
-    class ResponseListener
-        implements StateTransitionListener
-    {
-        private String conversationId;
-        private ResponseFuture future;
-
-        public ResponseListener( String conversationId, ResponseFuture future )
-        {
-            this.conversationId = conversationId;
-            this.future = future;
-        }
-
-        @Override
-        public void stateTransition( StateTransition transition )
-        {
-            if (transition.getMessage().getConversationId().equals( conversationId ))
-            {
-                future.setResponse( transition.getMessage().getMessage().getPayload() );
-            }
-        }
-    }
-    
-    class ResponseFuture
-        implements Future
-    {
-        private Object response;
-        private Exception exception;
-
-        public synchronized void setResponse( Object response )
-        {
-            this.response = response;
-            this.notifyAll();
-        }
-
-        public synchronized void setException( Exception exception )
-        {
-            this.exception = exception;
-            this.notifyAll();
-        }
-
-        @Override
-        public boolean cancel( boolean mayInterruptIfRunning )
-        {
-            return false;
-        }
-
-        @Override
-        public boolean isCancelled()
-        {
-            return false;
-        }
-
-        @Override
-        public boolean isDone()
-        {
-            return response != null || exception != null;
-        }
-
-        @Override
-        public synchronized Object get()
-            throws InterruptedException, ExecutionException
-        {
-            if (response != null)
-                return response;
-            
-            if (exception != null)
-                throw new ExecutionException( exception );
-            
-            this.wait();
-            
-            return get( );
-        }
-
-        @Override
-        public Object get( long timeout, TimeUnit unit )
-            throws InterruptedException, ExecutionException, TimeoutException
-        {
-            if (response != null)
-                return response;
-
-            if (exception != null)
-                throw new ExecutionException( exception );
-            
-            this.wait(unit.toMillis( timeout ));
-            
-            return get( timeout, unit);
-        }
     }
 }
