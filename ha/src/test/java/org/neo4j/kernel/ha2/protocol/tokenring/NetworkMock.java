@@ -19,21 +19,21 @@
  */
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.logging.Logger;
-import org.apache.log4j.spi.LoggerFactory;
+
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.StateMachine;
+import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
+import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
+import org.neo4j.kernel.ha2.statemachine.StateTransition;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.statemachine.message.ExpectationMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
-import org.neo4j.kernel.ha2.statemachine.*;
-
-import java.util.HashMap;
-import java.util.Map;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState;
 
 /**
  * TODO

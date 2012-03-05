@@ -19,12 +19,15 @@
  */
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import static org.neo4j.kernel.ha2.statemachine.message.Message.CONVERSATION_ID;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+
 import org.junit.Test;
 import org.neo4j.com2.NetworkChannels;
 import org.neo4j.com2.NetworkMessageListener;
@@ -49,8 +52,6 @@ import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
 import org.neo4j.kernel.impl.util.StringLogger;
-
-import static org.neo4j.kernel.ha2.statemachine.message.Message.CONVERSATION_ID;
 
 /**
  * TODO

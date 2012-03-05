@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
 import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.MessageType;

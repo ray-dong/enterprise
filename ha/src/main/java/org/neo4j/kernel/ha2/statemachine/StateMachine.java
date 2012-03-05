@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.statemachine;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 
 /**

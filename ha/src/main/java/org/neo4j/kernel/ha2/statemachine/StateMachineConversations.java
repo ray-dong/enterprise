@@ -19,15 +19,6 @@
  */
 package org.neo4j.kernel.ha2.statemachine;
 
-import java.lang.reflect.Method;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
-import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 
 /**
  * Generate id's for state machine conversations. This should be shared between all state machines in a server.

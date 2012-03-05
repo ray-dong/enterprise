@@ -21,6 +21,7 @@ package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;

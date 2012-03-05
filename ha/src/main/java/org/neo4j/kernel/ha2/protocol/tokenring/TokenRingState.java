@@ -19,18 +19,23 @@
  */
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.becomeMaster;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.discoverRing;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.getParticipantsResponse;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.newAfter;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.newBefore;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.ringDiscovered;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
-
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
-
+import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 import org.neo4j.kernel.ha2.statemachine.message.MessageFrom;
-import org.neo4j.kernel.ha2.statemachine.State;
 
 /**
  * TODO

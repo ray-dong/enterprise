@@ -21,9 +21,6 @@ package org.neo4j.kernel.ha2.statemachine;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.util.concurrent.ExecutionException;
-import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
-import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 
 /**
  * TODO
