@@ -19,7 +19,6 @@
  */
 package org.neo4j.kernel.ha2.statemachine;
 
-import org.neo4j.kernel.ha2.statemachine.message.ExpectationMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
 
 /**
@@ -56,7 +55,7 @@ public class StateTransition
     @Override
     public String toString()
     {
-        if (message instanceof ExpectationMessage )
+        if (message.getPayload() instanceof String)
             return getOldState().toString()+
                    "-["+getMessage().getMessageType()+":"+getMessage().getPayload()+"]->"+
                    getNewState().toString();

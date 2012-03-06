@@ -20,11 +20,12 @@
 package org.neo4j.kernel.ha2.statemachine;
 
 import org.neo4j.kernel.ha2.statemachine.message.Message;
+import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
 
 /**
  * TODO
  */
 public interface State<T, E extends Enum<E>>
 {
-    public State<T,E> receive(T context, Message message) throws Throwable;
+    public State<T,E> receive( T context, Message message, MessageProcessor outgoing ) throws Throwable;
 }

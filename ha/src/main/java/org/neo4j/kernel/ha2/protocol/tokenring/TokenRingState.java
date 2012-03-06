@@ -19,23 +19,17 @@
  */
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.becomeMaster;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.discoverRing;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.getParticipantsResponse;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.newAfter;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.newBefore;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.ringDiscovered;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
-import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
-import org.neo4j.kernel.ha2.statemachine.message.MessageFrom;
+
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
+import static org.neo4j.kernel.ha2.statemachine.message.Message.*;
 
 /**
  * TODO
@@ -45,13 +39,16 @@ public enum TokenRingState
 {
     start
             {
-                public State<TokenRingContext, TokenRingMessage> receive(TokenRingContext context, Message message) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context,
+                                                                          Message message,
+                                                                          MessageProcessor outgoing
+                ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
                     switch(messageType)
                     {
                         case start:
-                            context.broadcast(discoverRing);
+                            outgoing.process( broadcast( discoverRing ) );
                             return initial;
 
                         default:
@@ -62,7 +59,10 @@ public enum TokenRingState
 
     initial
             {
-                public State<TokenRingContext, TokenRingMessage> receive(TokenRingContext context, Message message) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context,
+                                                                          Message message,
+                                                                          MessageProcessor outgoing
+                ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
                     switch (messageType)
@@ -81,16 +81,15 @@ public enum TokenRingState
 
                         case discoverRing:
                         {
-                            MessageFrom broadcastMessage = (MessageFrom)message;
-                            if (broadcastMessage.getFrom().getServerId().compareTo(context.getMe().getServerId())>0)
+                            RingParticipant from = new RingParticipant(message.getHeader( FROM ));
+                            if ( from.getServerId().compareTo( context.getMe().getServerId() )>0)
                             {
                                 // We're both looking for ring but this server has higher server id so wins
                                 // and switches to master mode
 
-                                context.setNeighbours(broadcastMessage.getFrom(),broadcastMessage.getFrom());
+                                context.setNeighbours(from, from);
                                 
-                                context.send(ringDiscovered, broadcastMessage.getFrom(),
-                                        new RingNeighbours(context.getMe(), context.getMe()));
+                                outgoing.process( Message.to( ringDiscovered, from, new RingNeighbours(context.getMe(), context.getMe()) ) );
                                 
                                 return master;
                             } else
@@ -107,21 +106,29 @@ public enum TokenRingState
 
     master
             {
-                public State<TokenRingContext, TokenRingMessage> receive(TokenRingContext context, Message message) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context,
+                                                                          Message message,
+                                                                          MessageProcessor outgoing
+                ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
                     switch (messageType)
                     {
                         case discoverRing:
                         {
-                            BroadcastMessage broadcastMessage = (BroadcastMessage)message;
-                            context.setNeighbours(broadcastMessage.getFrom(),
-                                    context.getNeighbours().getAfter().equals(context.getMe())?broadcastMessage.getFrom(): context.getNeighbours().getAfter());
-
+                            RingParticipant from = new RingParticipant(message.getHeader( FROM ));
+                            
                             if (!context.getNeighbours().getBefore().equals(context.getMe()))
-                                context.send(newAfter, context.getNeighbours().getBefore(), broadcastMessage.getFrom());
-                            context.send(ringDiscovered, broadcastMessage.getFrom(),
-                                    new RingNeighbours(context.getNeighbours().getBefore(), context.getMe()));
+                                outgoing.process( Message.to( newAfter, context.getNeighbours().getBefore(), from ) );
+
+                            outgoing.process( Message.to( ringDiscovered, from, new RingNeighbours( context.getNeighbours()
+                                                                                                        .getBefore(), context.getMe() ) ) );
+
+                            context.setNeighbours( from,
+                                                   context.getNeighbours()
+                                                       .getAfter()
+                                                       .equals( context.getMe() ) ? from : context.getNeighbours()
+                                                       .getAfter() );
 
                             return this;
                         }
@@ -142,21 +149,23 @@ public enum TokenRingState
                         {
                             if (!context.getNeighbours().getAfter().equals(context.getMe()))
                             {
-                                context.send(newAfter, context.getNeighbours().getBefore(), context.getNeighbours().getAfter());
-                                context.send(becomeMaster, context.getNeighbours().getAfter(), context.getNeighbours().getBefore());
+                                outgoing.process( Message.to( newAfter, context.getNeighbours()
+                                    .getBefore(), context.getNeighbours().getAfter() ) );
+                                outgoing.process( Message.to( becomeMaster, context.getNeighbours()
+                                    .getAfter(), context.getNeighbours().getBefore() ) );
                                 return start;
                             }
                         }
 
                         case sendToken:
                         {
-                            context.send(becomeMaster, context.getNeighbours().getAfter(), null);
+                            outgoing.process( Message.to( becomeMaster, context.getNeighbours().getAfter() ) );
                             return slave;
                         }
 
                         case getParticipants:
                         case getParticipantsResponse:
-                            getParticipants( context, message );
+                            getParticipants( context, message, outgoing );
 
                         default:
                             return this;
@@ -166,7 +175,7 @@ public enum TokenRingState
 
     slave
             {
-                public State receive(TokenRingContext context, Message message) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context, Message message, MessageProcessor outgoing ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
                     switch ( messageType )
@@ -196,8 +205,10 @@ public enum TokenRingState
                         {
                             if (!context.getNeighbours().getAfter().equals(context.getMe()))
                             {
-                                context.send(newAfter, context.getNeighbours().getBefore(), context.getNeighbours().getAfter());
-                                context.send(newBefore, context.getNeighbours().getAfter(), context.getNeighbours().getBefore());
+                                outgoing.process( Message.to( newAfter, context.getNeighbours()
+                                    .getBefore(), context.getNeighbours().getAfter() ) );
+                                outgoing.process( Message.to( newBefore, context.getNeighbours()
+                                    .getAfter(), context.getNeighbours().getBefore() ) );
                             }
 
                             return start;
@@ -205,7 +216,7 @@ public enum TokenRingState
                         
                         case getParticipants:
                         case getParticipantsResponse:
-                            getParticipants( context, message );
+                            getParticipants( context, message, outgoing );
 
                         default:
                             return this;
@@ -213,21 +224,21 @@ public enum TokenRingState
                 }
             };
 
-    public void getParticipants( TokenRingContext context, Message message )
+    private static void getParticipants( TokenRingContext context, Message message, MessageProcessor outgoing )
     {
         TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
         switch ( messageType )
         {
             case getParticipants:
             {
-                if (!context.getNeighbours().getAfter().equals(context.getMe()))
+                if (context.getNeighbours().getAfter().equals(context.getMe()))
+                {
+                    outgoing.process( Message.internal( getParticipantsResponse, Collections.singleton( context.getMe() ) ) );
+                } else
                 {
                     List<RingParticipant> participants = new ArrayList<RingParticipant>(  );
                     participants.add( context.getMe() );
-                    context.send( getParticipantsResponse, context.getNeighbours().getAfter(), participants );
-                } else
-                {
-                    context.internal( getParticipantsResponse, Collections.singleton( context.getMe() ) );
+                    outgoing.process( Message.to( getParticipantsResponse, context.getNeighbours().getAfter(), participants ) );
                 }
                 return;
             }
@@ -237,12 +248,12 @@ public enum TokenRingState
                 if (context.getMe().toString().equals(message.getHeader( Message.CREATED_BY ) ))
                 {
                     // We're done
-                    context.internal( getParticipantsResponse, message.getPayload() );
+                    outgoing.process( Message.internal( getParticipantsResponse, message.getPayload() ) );
                 } else
                 {
                     List<RingParticipant> participants = (List<RingParticipant>) message.getPayload();
                     participants.add( context.getMe() );
-                    context.send( getParticipantsResponse, context.getNeighbours().getAfter(), participants );
+                    outgoing.process( Message.to( getParticipantsResponse, context.getNeighbours().getAfter(), participants ) );
                 }
                 return;
             }

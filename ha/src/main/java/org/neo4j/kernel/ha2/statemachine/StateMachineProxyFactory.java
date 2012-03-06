@@ -27,32 +27,32 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
+import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 
 /**
  * TODO
  */
 public class StateMachineProxyFactory
+    implements MessageProcessor
 {
     private String prefix;
     private StateMachine stateMachine;
+    private MessageProcessor incoming;
     private StateMachineConversations conversations;
     private Class<? extends Enum> messageTypeEnum;
 
     private Map<String, ResponseFuture> responseFutureMap = new ConcurrentHashMap<String, ResponseFuture>(  );
     
     
-    public StateMachineProxyFactory( String prefix, Class<? extends Enum> messageTypeEnum, StateMachine stateMachine, StateMachineConversations conversations )
+    public StateMachineProxyFactory( String prefix, Class<? extends Enum> messageTypeEnum, StateMachine stateMachine, MessageProcessor incoming, StateMachineConversations conversations )
     {
         this.prefix = prefix;
         this.messageTypeEnum = messageTypeEnum;
         this.stateMachine = stateMachine;
+        this.incoming = incoming;
         this.conversations = conversations;
-        
-        stateMachine.addStateTransitionListener( new ResponseListener(  ) );
     }
     
     public <T> T newProxy(Class<T> proxyInterface)
@@ -62,24 +62,24 @@ public class StateMachineProxyFactory
         return proxyInterface.cast( Proxy.newProxyInstance( proxyInterface.getClassLoader(), new Class<?>[]{ proxyInterface }, new StateMachineProxyHandler( this ) ) );
     }
 
-    public Object invoke( Method method, Object arg )
+    Object invoke( Method method, Object arg )
         throws Throwable
     {
-        String conversationId = prefix+conversations.getNextConversationId();
+        String conversationId = prefix+"/"+conversations.getNextConversationId();
 
         Enum typeAsEnum = Enum.valueOf( messageTypeEnum, method.getName() );
-        Message message = new InternalMessage( (MessageType) typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, prefix );
+        Message message = Message.internal( (MessageType) typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, prefix );
 
         if (method.getReturnType().equals( Void.TYPE ))
         {
-            stateMachine.receive( message );
+            incoming.process( message );
             return null;
         }
         else
         {
             ResponseFuture future = new ResponseFuture(method.getName());
             responseFutureMap.put( conversationId, future );
-            stateMachine.receive( message );
+            incoming.process( message );
 
             try
             {
@@ -97,25 +97,21 @@ public class StateMachineProxyFactory
         }
     }
 
-    class ResponseListener
-        implements StateTransitionListener
+    @Override
+    public void process( Message message )
     {
-        @Override
-        public void stateTransition( StateTransition transition )
+        if (!message.hasHeader( Message.TO ) && !responseFutureMap.isEmpty())
         {
-            if (!responseFutureMap.isEmpty())
+            String conversationId = message.getHeader( Message.CONVERSATION_ID );
+            ResponseFuture future = responseFutureMap.get( conversationId );
+            if (future != null && !future.wasInitiatedBy(message.getMessageType().name()))
             {
-                String conversationId = transition.getMessage().getHeader( Message.CONVERSATION_ID );
-                ResponseFuture future = responseFutureMap.get( conversationId );
-                if (future != null && !future.wasInitiatedBy(transition.getMessage().getMessageType().name()))
-                {
-                    future.setResponse( transition.getMessage().getPayload() );
-                    responseFutureMap.remove( conversationId );
-                }
+                future.setResponse( message.getPayload() );
+                responseFutureMap.remove( conversationId );
             }
         }
     }
-    
+
     class ResponseFuture
         implements Future
     {

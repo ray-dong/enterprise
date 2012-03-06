@@ -48,7 +48,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
  * TODO
  */
 public class NetworkMessageSender
-    implements Lifecycle
+    implements Lifecycle, MessageSender
 {
     StringLogger msgLog;
     private NetworkChannels channels;
@@ -90,6 +90,12 @@ public class NetworkMessageSender
     
     public void send(String to, Object message)
     {
+        if (to.equals( "*" ))
+        {
+            broadcast( message );
+            return;
+        }
+        
         URI uri = null;
         try
         {
@@ -103,7 +109,7 @@ public class NetworkMessageSender
         channels.send(uri, message, channelFactory);
     }
 
-    public void broadcast(Object message)
+    private void broadcast(Object message)
     {
         channels.broadcast(message, channelFactory);
     }

@@ -22,7 +22,6 @@ package org.neo4j.kernel.ha2.statemachine;
 import java.util.logging.Logger;
 
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
-import org.neo4j.kernel.ha2.statemachine.message.ExpectationMessage;
 
 /**
  * TODO
@@ -41,7 +40,7 @@ public class StateTransitionLogger
 
     public void stateTransition(StateTransition transition)
     {
-        if (transition.getMessage() instanceof ExpectationMessage)
+        if (transition.getMessage().getPayload() instanceof String)
             logger.warning(participant.toString()+": "+
                                transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
                                                                                                                                transition.getNewState().toString());

@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.neo4j.kernel.ha2.statemachine.message.Message;
+import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
 
 /**
  * TODO
@@ -72,12 +73,12 @@ public class StateMachine<CONTEXT, E extends Enum<E>>
         listeners = newlisteners;
     }
 
-    public synchronized void receive(Message message)
+    public synchronized void receive(Message message, MessageProcessor outgoing)
     {
         try
         {
             State<CONTEXT,E> oldState = state;
-            State<CONTEXT,E> newState = state.receive(context, message);
+            State<CONTEXT,E> newState = state.receive(context, message, outgoing );
             state = newState;
             StateTransition transition = new StateTransition( oldState, message, newState );
             for (StateTransitionListener listener : listeners)

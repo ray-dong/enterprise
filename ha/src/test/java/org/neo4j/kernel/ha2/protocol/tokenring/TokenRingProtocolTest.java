@@ -24,8 +24,18 @@ import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.master;
 import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.slave;
 import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.start;
 
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Formatter;
+import java.util.logging.Handler;
+import java.util.logging.LogManager;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import org.junit.Before;
 import org.junit.Test;
+import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.StateTransitionExpectations;
+import org.neo4j.kernel.ha2.TestServer;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
@@ -33,121 +43,159 @@ import org.neo4j.kernel.ha2.protocol.RingParticipant;
  */
 public class TokenRingProtocolTest
 {
+    @Before
+    public void setupLogging()
+    {
+        for( Handler handler : Logger.getLogger( "" ).getHandlers() )
+        {
+            Logger.getLogger( "" ).removeHandler( handler );
+        }
+
+        ConsoleHandler handler = new ConsoleHandler();
+        handler.setFormatter( new Formatter()
+        {
+            @Override
+            public String format( LogRecord record )
+            {
+                return record.getMessage()+"\n";
+            }
+        });
+
+        Logger.getLogger( "" ).addHandler( handler );
+    }
+    
     @Test
     public void startNewRingWith3ParticipantsAndShutItDown()
     {
-        NetworkMock tokenRing = new NetworkMock();
+        NetworkMock network = new NetworkMock();
         StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
 
-        RingParticipant server1 = new RingParticipant("server1");
-        tokenRing.addParticipant(server1, expectations.newExpectations().includeUnchangedStates()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.failure, master )
-                .expect( TokenRingMessage.discoverRing, master )
-                .expect( TokenRingMessage.discoverRing, master )
-                .expect( TokenRingMessage.leaveRing, start )
-                .build( server1 ) );
+        String server1 = "server1";
+        network.addServer( server1, expectations.newExpectations().includeUnchangedStates()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.failure, master )
+            .expect( TokenRingMessage.discoverRing, master )
+            .expect( TokenRingMessage.discoverRing, master )
+            .expect( TokenRingMessage.leaveRing, start )
+            .build( server1 ) );
 
-        RingParticipant server2 = new RingParticipant("server2");
-        tokenRing.addParticipant(server2, expectations.newExpectations().includeUnchangedStates()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.newAfter, initial )
-                .expect( TokenRingMessage.ringDiscovered, slave )
-                .expect( TokenRingMessage.discoverRing, slave )
-                .expect( TokenRingMessage.becomeMaster, master )
-                .expect( TokenRingMessage.leaveRing, start )
-                .build( server2 ) );
+        String server2 = "server2";
+        network.addServer( server2, expectations.newExpectations().includeUnchangedStates()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.newAfter, initial )
+            .expect( TokenRingMessage.ringDiscovered, slave )
+            .expect( TokenRingMessage.discoverRing, slave )
+            .expect( TokenRingMessage.becomeMaster, master )
+            .expect( TokenRingMessage.leaveRing, start )
+            .build( server2 ) );
 
-        RingParticipant server3 = new RingParticipant("server3");
-        tokenRing.addParticipant(server3, expectations.newExpectations().includeUnchangedStates()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.newAfter, initial )
-                .expect( TokenRingMessage.ringDiscovered, slave )
-                .expect( TokenRingMessage.newAfter, slave )
-                .expect( TokenRingMessage.newAfter, slave )
-                .expect( TokenRingMessage.leaveRing, start )
-                .expect( TokenRingMessage.newAfter, start )
-                .build( server3 ) );
+        String server3 = "server3";
+        network.addServer( server3, expectations.newExpectations().includeUnchangedStates()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.newAfter, initial )
+            .expect( TokenRingMessage.ringDiscovered, slave )
+            .expect( TokenRingMessage.newAfter, slave )
+            .expect( TokenRingMessage.newAfter, slave )
+            .expect( TokenRingMessage.leaveRing, start )
+            .expect( TokenRingMessage.newAfter, start )
+            .build( server3 ) );
 
-        tokenRing.removeParticipant(server1);
-        tokenRing.removeParticipant(server2);
-        tokenRing.removeParticipant(server3);
-        
+        network.tickUntilDone();
+
+        network.removeServer( server1 );
+
+        network.tickUntilDone();
+
+        network.removeServer( server2 );
+
+        network.tickUntilDone();
+
+        network.removeServer( server3 );
+
+        network.tickUntilDone();
+
         expectations.verify();
     }
 
     @Test
     public void startNewRingWith3ParticipantsAndSlavesLeave()
     {
-        NetworkMock tokenRing = new NetworkMock();
+        NetworkMock network = new NetworkMock();
         StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
 
-        RingParticipant server1 = new RingParticipant("server1");
-        tokenRing.addParticipant(server1, expectations.newExpectations().includeUnchangedStates()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.failure, master )
-                .expect( TokenRingMessage.discoverRing, master )
-                .expect( TokenRingMessage.discoverRing, master )
-                .expect( TokenRingMessage.newBefore, master )
-                .expect( TokenRingMessage.newBefore, master )
-                .build( server1 ) );
+        String server1 = "server1";
+        network.addServer( server1, expectations.newExpectations().includeUnchangedStates()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.failure, master )
+            .expect( TokenRingMessage.discoverRing, master )
+            .expect( TokenRingMessage.discoverRing, master )
+            .expect( TokenRingMessage.newBefore, master )
+            .expect( TokenRingMessage.newBefore, master )
+            .build( server1 ) );
 
-        RingParticipant server2 = new RingParticipant("server2");
-        tokenRing.addParticipant(server2, expectations.newExpectations().includeUnchangedStates()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.newAfter, initial )
-                .expect( TokenRingMessage.ringDiscovered, slave )
-                .expect( TokenRingMessage.discoverRing, slave )
-                .expect( TokenRingMessage.leaveRing, start )
-                .expect( TokenRingMessage.newAfter, start )
-                .build( server2 ) );
+        String server2 = "server2";
+        network.addServer( server2, expectations.newExpectations().includeUnchangedStates()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.newAfter, initial )
+            .expect( TokenRingMessage.ringDiscovered, slave )
+            .expect( TokenRingMessage.discoverRing, slave )
+            .expect( TokenRingMessage.leaveRing, start )
+            .expect( TokenRingMessage.newAfter, start )
+            .build( server2 ) );
 
-        RingParticipant server3 = new RingParticipant("server3");
-        tokenRing.addParticipant(server3, expectations.newExpectations().includeUnchangedStates()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.newAfter, initial )
-                .expect( TokenRingMessage.ringDiscovered, slave )
-                .expect( TokenRingMessage.leaveRing, start )
-                .expect( TokenRingMessage.newAfter, start )
-                .build( server3 ) );
+        String server3 = "server3";
+        network.addServer( server3, expectations.newExpectations().includeUnchangedStates()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.newAfter, initial )
+            .expect( TokenRingMessage.ringDiscovered, slave )
+            .expect( TokenRingMessage.leaveRing, start )
+            .expect( TokenRingMessage.newAfter, start )
+            .build( server3 ) );
 
-        tokenRing.removeParticipant(server2);
-        tokenRing.removeParticipant(server3);
+        network.tickUntilDone();
+
+        network.removeServer( server2 );
+        network.removeServer( server3 );
         
+        network.tickUntilDone();
+
         expectations.verify();
     }
 
     @Test
     public void startNewRingWith3ParticipantsAndSendTokenAround()
     {
-        NetworkMock tokenRing = new NetworkMock();
+        NetworkMock network = new NetworkMock();
         StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
 
-        RingParticipant participant1 = new RingParticipant("server1");
-        NetworkMock.Server server1 = tokenRing.addParticipant(participant1, expectations.newExpectations()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.failure, master )
-                .expect( TokenRingMessage.sendToken, slave )
-                .expect( TokenRingMessage.becomeMaster, master )
-                .build( participant1 ) );
+        String participant1 = "server1";
+        TestServer server1 = network.addServer( participant1, expectations.newExpectations()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.failure, master )
+            .expect( TokenRingMessage.sendToken, slave )
+            .expect( TokenRingMessage.becomeMaster, master )
+            .build( participant1 ) );
         
-        RingParticipant participant2 = new RingParticipant("server2");
-        NetworkMock.Server server2 = tokenRing.addParticipant(participant2, expectations.newExpectations()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.ringDiscovered, slave )
-                .expect( TokenRingMessage.becomeMaster, master )
-                .expect( TokenRingMessage.sendToken, slave )
-                .build( participant2 ) );
+        String participant2 = "server2";
+        TestServer server2 = network.addServer( participant2, expectations.newExpectations()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.ringDiscovered, slave )
+            .expect( TokenRingMessage.becomeMaster, master )
+            .expect( TokenRingMessage.sendToken, slave )
+            .build( participant2 ) );
         
-        RingParticipant participant3 = new RingParticipant("server3");
-        NetworkMock.Server server3 = tokenRing.addParticipant(participant3, expectations.newExpectations()
-                .expect( TokenRingMessage.start, initial )
-                .expect( TokenRingMessage.ringDiscovered, slave )
-                .build( participant3 ) );
+        String participant3 = "server3";
+        TestServer server3 = network.addServer( participant3, expectations.newExpectations()
+            .expect( TokenRingMessage.start, initial )
+            .expect( TokenRingMessage.ringDiscovered, slave )
+            .build( participant3 ) );
         
-        TokenRing tokenRing1 = server1.newProxy( TokenRing.class );
+        network.tickUntilDone();
+
+        TokenRing tokenRing1 = server1.newClient( TokenRing.class );
         tokenRing1.sendToken();
-        server2.newProxy( TokenRing.class ).sendToken();
+
+        network.tickUntilDone();
 
         expectations.verify();
     }

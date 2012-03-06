@@ -46,6 +46,7 @@ import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.jboss.netty.handler.codec.serialization.ObjectDecoder;
 import org.jboss.netty.handler.codec.serialization.ObjectEncoder;
 import org.jboss.netty.handler.logging.LoggingHandler;
+import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -53,12 +54,13 @@ import org.neo4j.kernel.impl.util.StringLogger;
  * TODO
  */
 public class NetworkMessageReceiver
-    implements Lifecycle
+    implements Lifecycle, MessageReceiver
 {
 
     public interface Configuration
     {
-        int port(int def);
+        String address(String def);
+        int[] port(int[] defaultPortRange, int min, int max);
     }
     
     private ExecutorService executor;
@@ -69,7 +71,7 @@ public class NetworkMessageReceiver
     private StringLogger msgLog;
     private NetworkChannels channels;
 
-    private List<NetworkMessageListener> listeners = new ArrayList<NetworkMessageListener>();
+    private Iterable<NetworkMessageListener> listeners = Listeners.newListeners();
 
     public NetworkMessageReceiver(Configuration config, StringLogger msgLog, NetworkChannels channels)
     {
@@ -88,32 +90,33 @@ public class NetworkMessageReceiver
         bootstrap = new ServerBootstrap( channelFactory );
         bootstrap.setPipelineFactory(new NetworkNodePipelineFactory());
 
-        int port = config.port(1234);
-        int checkPort = port;
-        while (true)
+        int[] ports = config.port(new int[]{1234,1244}, 1, 65535);
+        
+        int minPort = ports[0];
+        int maxPort = ports.length == 2 ? ports[1] : minPort;
+        
+        // Try all ports in the given range
+        ChannelException ex = null;
+        for(int checkPort = minPort; checkPort <= maxPort; checkPort++)
         {
             try
             {
-                channel = bootstrap.bind(new InetSocketAddress("127.0.0.1", checkPort));
+                channel = bootstrap.bind(new InetSocketAddress(config.address( "127.0.0.1" ), checkPort));
                 channels.listeningAt((getURI((InetSocketAddress) channel.getLocalAddress())));
-                break;
+
+
+                ChannelGroup channelGroup = new DefaultChannelGroup();
+                channelGroup.add(channel);
+                return;
             }
             catch ( ChannelException e )
             {
-                if (checkPort < port+3)
-                {
-                    checkPort++;
-                    continue;
-                }
-
-                msgLog.logMessage( "Failed to bind master server to port " + port, e );
-                executor.shutdown();
-                throw e;
+                ex = e;
             }
         }
 
-        ChannelGroup channelGroup = new DefaultChannelGroup();
-        channelGroup.add(channel);
+        executor.shutdown();
+        throw ex;
     }
 
     @Override
@@ -133,9 +136,9 @@ public class NetworkMessageReceiver
         channel.disconnect();
     }
 
-    public void addMessageListener(NetworkMessageListener listener)
+    public void addMessageListener( NetworkMessageListener listener )
     {
-        listeners.add(listener);
+        listeners = Listeners.addListener( listener, listeners);
     }
 
     private URI getURI(InetSocketAddress address) throws URISyntaxException

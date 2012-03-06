@@ -21,10 +21,13 @@ package org.neo4j.com2;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.jboss.netty.channel.Channel;
+import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 /**
@@ -32,6 +35,13 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public class NetworkChannels
 {
+    public interface NetworkChannelsListener
+    {
+        void listeningAt(URI me);
+        void channelOpened(URI to);
+        void channelClosed(URI to);
+    }
+    
     private StringLogger msgLog;
 
     public interface ChannelFactory
@@ -43,6 +53,8 @@ public class NetworkChannels
 
     private Map<URI, Channel> connections = new ConcurrentHashMap<URI, Channel>();
 
+    private Iterable<NetworkChannelsListener> listeners = Listeners.newListeners();
+
     public NetworkChannels(StringLogger msgLog)
     {
         this.msgLog = msgLog;
@@ -51,6 +63,10 @@ public class NetworkChannels
     public void listeningAt(URI me)
     {
         this.me = me;
+        for( NetworkChannelsListener listener : listeners )
+        {
+            listener.listeningAt( me );
+        }
     }
 
     public void broadcast(Object message, ChannelFactory channelFactory)
@@ -87,7 +103,7 @@ public class NetworkChannels
             }
         } catch (Exception e)
         {
-            System.out.println("Could not connect to:" + to);
+            msgLog.logMessage("Could not connect to:" + to);
             return;
         }
 
@@ -106,6 +122,11 @@ public class NetworkChannels
     public void openedChannel(URI uri, Channel ctxChannel)
     {
         connections.put(uri, ctxChannel);
+
+        for( NetworkChannelsListener listener : listeners )
+        {
+            listener.channelOpened( uri );
+        }
     }
 
     public void closedChannel(URI uri)
@@ -113,6 +134,11 @@ public class NetworkChannels
         Channel channel = connections.remove(uri);
         if (channel != null)
             channel.close();
+
+        for( NetworkChannelsListener listener : listeners )
+        {
+            listener.channelClosed( uri );
+        }
     }
 
     public URI getMe()
@@ -125,5 +151,13 @@ public class NetworkChannels
         return connections.get(uri);
     }
     
-    
+    public void addNetworkChannelsListener(NetworkChannelsListener listener)
+    {
+        listeners = Listeners.addListener( listener, listeners );
+    }
+
+    public void removeNetworkChannelsListener(NetworkChannelsListener listener)
+    {
+        listeners = Listeners.removeListener( listener, listeners );
+    }
 }

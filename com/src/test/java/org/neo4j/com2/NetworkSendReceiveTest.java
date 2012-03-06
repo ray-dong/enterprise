@@ -81,14 +81,14 @@ public class NetworkSendReceiveTest
                 @Override
                 public void start() throws Throwable
                 {
-                    receiver.addMessageListener(new NetworkMessageListener()
+                    receiver.addMessageListener( new NetworkMessageListener()
                     {
                         @Override
-                        public void received(Object message)
+                        public void received( Object message )
                         {
-                            System.out.println(message);
+                            System.out.println( message );
                         }
-                    });
+                    } );
                 }
             });
             life.add(new LifecycleAdapter()

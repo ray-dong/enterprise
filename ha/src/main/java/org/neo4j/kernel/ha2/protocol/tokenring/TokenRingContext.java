@@ -19,34 +19,30 @@
  */
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-
+import java.util.logging.Logger;
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
-import org.neo4j.kernel.ha2.statemachine.message.BroadcastMessage;
-import org.neo4j.kernel.ha2.statemachine.message.InternalMessage;
-import org.neo4j.kernel.ha2.statemachine.message.Message;
-import org.neo4j.kernel.ha2.statemachine.message.TargetedMessage;
 
 /**
  * TODO
  */
 public class TokenRingContext
 {
-    private Queue<Message> sendQueue = new ConcurrentLinkedQueue<Message>();
-
     private RingParticipant me;
     private RingNeighbours neighbours;
 
-    public TokenRingContext(RingParticipant me)
+    public TokenRingContext()
     {
-        this.me = me;
     }
 
     public RingParticipant getMe()
     {
         return me;
+    }
+
+    public void setMe( RingParticipant me )
+    {
+        this.me = me;
     }
 
     public RingNeighbours getNeighbours()
@@ -61,41 +57,17 @@ public class TokenRingContext
 
     public void setNeighbours(RingNeighbours neighbours)
     {
+        Logger.getAnonymousLogger().info( me + " has new neighbours: " + neighbours );
         this.neighbours = neighbours;
     }
 
     public void newBefore(RingParticipant before)
     {
-        neighbours = new RingNeighbours(before, neighbours.getAfter());
+        setNeighbours(new RingNeighbours(before, neighbours.getAfter()));
     }
 
     public void newAfter(RingParticipant after)
     {
-        neighbours = new RingNeighbours(neighbours.getBefore(), after);
-    }
-
-    public Queue<Message> getSendQueue()
-    {
-        return sendQueue;
-    }
-
-    public void broadcast(TokenRingMessage message)
-    {
-        broadcast(message, null);
-    }
-
-    public void broadcast(TokenRingMessage message, Object payload)
-    {
-        sendQueue.add(new BroadcastMessage(message, me, payload));
-    }
-
-    public void send(TokenRingMessage message, RingParticipant to, Object payload)
-    {
-        sendQueue.add(new TargetedMessage(message, me, to, payload));
-    }
-    
-    public void internal(TokenRingMessage message, Object payload)
-    {
-        sendQueue.add( new InternalMessage( message, payload ));
+        setNeighbours(new RingNeighbours(neighbours.getBefore(), after));
     }
 }

@@ -22,16 +22,45 @@ package org.neo4j.kernel.ha2.statemachine.message;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
 
 /**
  * State machine message
  */
-public abstract class Message
+public class Message
     implements Serializable
 {
+    public static Message broadcast(MessageType message)
+    {
+        return broadcast(message, null);
+    }
+
+    public static Message broadcast(MessageType message, Object payload)
+    {
+        return new Message(message, payload).setHeader( TO, "*" );
+    }
+
+    public static Message to(MessageType message, RingParticipant to)
+    {
+        return to( message, to, null );
+    }
+    
+    public static Message to(MessageType message, RingParticipant to, Object payload)
+    {
+        return new Message(message, payload).setHeader( TO, to.toString() );
+    }
+    
+    public static Message internal(MessageType message, Object payload)
+    {
+        return new Message( message, payload );
+    }
+    
     // Standard headers
     public static final String CONVERSATION_ID = "conversation-id";
     public static final String CREATED_BY = "created-by";
+    public static final String FROM = "from";
+    public static final String TO = "to";
 
     final private MessageType messageType;
     final private Object payload;
@@ -59,13 +88,33 @@ public abstract class Message
         return this;
     }
     
-    public String getHeader(String name)
+    public boolean hasHeader(String name)
     {
-        return headers.get( name );
+        return headers.containsKey( name );
+    }
+    
+    public String getHeader(String name)
+        throws IllegalArgumentException
+    {
+        String value = headers.get( name );
+        if (value == null)
+            throw new IllegalArgumentException( "No such header:"+name );
+        return value;
     }
 
-    public void copyHeaders( Message message )
+    public void copyHeadersTo( Message message, String... names )
     {
-        headers.putAll( message.headers );
+        for( String name : names )
+        {
+            String value = headers.get( name );
+            if (value != null)
+                message.setHeader( name, value );
+        }
+    }
+
+    @Override
+    public String toString()
+    {
+        return messageType.name()+headers;
     }
 }
