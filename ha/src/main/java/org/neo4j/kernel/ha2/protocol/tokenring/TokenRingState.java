@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import java.util.ArrayList;
@@ -24,9 +25,9 @@ import java.util.Collections;
 import java.util.List;
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
-import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.message.Message;
+import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
 
 import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
 import static org.neo4j.kernel.ha2.statemachine.message.Message.*;
