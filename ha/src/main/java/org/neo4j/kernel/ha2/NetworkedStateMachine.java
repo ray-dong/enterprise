@@ -72,7 +72,7 @@ public class NetworkedStateMachine
     public void start()
         throws Throwable
     {
-        logger.info( "==== " + me + " starts" );
+        logger.info( "=== " + me + " starts" );
     }
 
     @Override

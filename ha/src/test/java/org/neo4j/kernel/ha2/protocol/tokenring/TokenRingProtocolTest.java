@@ -20,25 +20,48 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import static junit.framework.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.initial;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.master;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.slave;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.start;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.StateTransitionExpectations;
+import org.neo4j.kernel.ha2.StateTransitionExpectations.ExpectationsBuilder;
 import org.neo4j.kernel.ha2.TestServer;
-
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.*;
+import org.neo4j.kernel.ha2.Verifier;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.State;
 
 /**
  * TODO
  */
 public class TokenRingProtocolTest
 {
-
+    private static final String ID1 = "1";
+    private static final String ID2 = "2";
+    private static final String ID3 = "3";
+    
+    private NetworkMock network;
+    private StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations;
     protected Logger logger;
 
     @Before
@@ -64,12 +87,111 @@ public class TokenRingProtocolTest
         logger.addHandler( handler );
     }
     
+    @Before
+    public void setupEnvironment()
+    {
+        network = new NetworkMock();
+        expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
+    }
+    
+    @After
+    public void verifyWhatHappened()
+    {
+        expectations.verify();
+    }
+    
+    /* TESTS TO WRITE
+     * whenEveryoneStartsAtTheSameTimeTheRingIsFormedByConsensus
+     * formSizeTwoRingWithAnotherMember
+     * leaveRingOfSizeTwoResultingInTwoStrayParticipants
+     * leaveRingOfSizeThreeResultingInRingOfSizeTwo
+     * leaveRingOfSizeFourResultingInRingOfSizeThree
+     * leaveAndThenRejoinSameRingInTheSamePlace
+     * leaveAndThenRejoinSameRingInAnotherPlace
+     * joinFailsMidWay (also permutations for different points in the conversation)
+     * leaveFailsMidWay (also permutations for different points in the conversation)
+     * twoMembersJoinEstablishedRingAtTheSameTimeByAskingDifferentMembers
+     * twoMembersJoinEstablishedRingAtTheSameTimeByAskingDifferentDirectlyConnectdMembers
+     * twoMembersJoinEstablishedRingAtTheSameTimeByAskingSameRingMember
+     * twoNotDirectlyConnectedMembersLeaveAtTheSameTime
+     * twoDirectlyConnectedMembersLeaveAtTheSameTime
+     * oneJoinsEstablishedRingWhileTheOneBeforeLeavesAtTheSameTime
+     * oneJoinsEstablishedRingWhileTheOneAfterLeavesAtTheSameTime
+     * 
+     * Introduce failures at any point for all the tests above? exploooosion of tests
+     * if we don't build a super fancy framework for that.
+     * 
+     * FOR LATER
+     * sendTokenAroundTheRing
+     * leaveRingWhenNotHavingToken
+     * joinRingWhileRingIsPassingAroundToken
+     */ 
+    
+    @Test
+    public void formSizeTwoRingWithAnotherMember() throws Exception
+    {
+        TokenRing member1 = newMember( ID1,
+                TokenRingMessage.start, initial,
+                TokenRingMessage.failure, master );
+        network.tickUntilDone();
+        assertRingParticipants( member1.getParticipants(), ID1 );
+        verifyNeighbours( ID1, ID1, ID1 );
+        
+        TokenRing member2 = newMember( ID2,
+                TokenRingMessage.start, initial,
+                TokenRingMessage.ringDiscovered, slave );
+        network.tickUntilDone();
+        assertRingParticipants( member2.getParticipants(), ID1, ID2 );
+        verifyNeighbours( ID2, ID1, ID2 );
+        assertRingParticipants( member1.getParticipants(), ID1, ID2 );
+        verifyNeighbours( ID1, ID2, ID1 );
+    }
+    
+    @Test
+    public void leaveRingOfSizeTwoResultingInTwoStrayParticipants() throws Exception
+    {
+        TokenRing member1 = newMember( ID1,
+                TokenRingMessage.start, initial,
+                TokenRingMessage.failure, master );
+        network.tickUntilDone();
+        TokenRing member2 = newMember( ID2,
+                TokenRingMessage.start, initial,
+                TokenRingMessage.ringDiscovered, slave,
+                TokenRingMessage.leaveRing, start );
+        network.tickUntilDone();
+        verifyNeighbours( ID2, ID1, ID2 );
+        verifyNeighbours( ID1, ID2, ID1 );
+        
+        network.removeServer( ID2 );
+        verifyNeighbours( ID1, ID1, ID1 );
+    }
+    
+    @Test
+    public void leaveRingOfSizeThreeResultingInRingOfSizeTwo() throws Exception
+    {
+        newMember( ID1,
+                TokenRingMessage.start, initial,
+                TokenRingMessage.failure, master );
+        newMember( ID2,
+                TokenRingMessage.start, initial,
+                TokenRingMessage.ringDiscovered, slave,
+                TokenRingMessage.leaveRing, start );
+        newMember( ID3,
+                TokenRingMessage.start, initial,
+                TokenRingMessage.ringDiscovered, slave );
+        network.tickUntilDone();
+        verifyNeighboursWithUnknownPosition( ID2, ID1, ID3 ); // 1 has got 2 and 3 as neighbors
+        verifyNeighboursWithUnknownPosition( ID1, ID2, ID3 ); // 2 has got 1 and 3 as neighbors
+        verifyNeighboursWithUnknownPosition( ID1, ID3, ID2 ); // 3 has got 1 and 2 as neighbors
+        
+        network.removeServer( ID2 );
+        verifyNeighbours( ID3, ID1, ID3 );
+        verifyNeighbours( ID1, ID3, ID1 );
+    }
+    
     @Test
     public void startNewRingWith3ParticipantsAndShutItDown()
     {
-        NetworkMock network = new NetworkMock();
-        StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
-
         String server1 = "server1";
         network.addServer( server1).addStateTransitionListener( expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
@@ -112,16 +234,11 @@ public class TokenRingProtocolTest
         network.removeServer( server3 );
 
         network.tickUntilDone();
-
-        expectations.verify();
     }
 
     @Test
     public void startNewRingWith3ParticipantsAndSlavesLeave()
     {
-        NetworkMock network = new NetworkMock();
-        StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
-
         String server1 = "server1";
         network.addServer( server1 ).addStateTransitionListener(expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
@@ -160,16 +277,11 @@ public class TokenRingProtocolTest
         network.removeServer( server3 );
         
         network.tickUntilDone();
-
-        expectations.verify();
     }
 
     @Test
     public void startNewRingWith3ParticipantsAndSendTokenAround()
     {
-        NetworkMock network = new NetworkMock();
-        StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
-
         String participant1 = "server1";
         TestServer server1 = network.addServer( participant1 ).addStateTransitionListener( expectations.newExpectations()
                                                                                                .expect( TokenRingMessage.start, initial )
@@ -210,7 +322,62 @@ public class TokenRingProtocolTest
         tokenRing2.sendToken();
 
         network.tickUntilDone();
+    }
 
-        expectations.verify();
+    private void verifyNeighbours( final String before, final String me, final String after )
+    {
+        network.verifyState( me, new Verifier<TokenRingContext>()
+        {
+            @Override
+            public void verify( TokenRingContext state )
+            {
+                assertEquals( before, state.getNeighbours().getBefore().getServerId() );
+                assertEquals( me, state.getMe().getServerId() );
+                assertEquals( after, state.getNeighbours().getAfter().getServerId() );
+            }
+        } );
+    }
+    
+    private void verifyNeighboursWithUnknownPosition( final String one, final String me, final String other )
+    {
+        network.verifyState( me, new Verifier<TokenRingContext>()
+        {
+            @Override
+            public void verify( TokenRingContext state )
+            {
+                String before = state.getNeighbours().getBefore().getServerId();
+                String after = state.getNeighbours().getBefore().getServerId();
+                assertFalse( before.equals( after ) );
+                assertTrue( one.equals( before ) || one.equals( after ) );
+                assertEquals( me, state.getMe().getServerId() );
+                assertTrue( other.equals( before ) || other.equals( after ) );
+            }
+        } );
+    }
+    
+    @SuppressWarnings( { "unchecked", "rawtypes" } )
+    private TokenRing newMember( String id, Enum<?>... alternatingExpectedMessageAndState )
+    {
+        TestServer server = network.addServer( id );
+        if ( alternatingExpectedMessageAndState.length > 0 )
+        {
+            ExpectationsBuilder expectationBuilder = expectations.newExpectations();
+            for ( int i = 0; i < alternatingExpectedMessageAndState.length; i++ )
+                expectationBuilder.expect( (MessageType) alternatingExpectedMessageAndState[i++], (State) alternatingExpectedMessageAndState[i] );
+            server.addStateTransitionListener( expectationBuilder.build( id ) );
+        }
+        TokenRing member = server.newClient( TokenRing.class );
+        member.start();
+        return member;
+    }
+    
+    private void assertRingParticipants( Future<Iterable<RingParticipant>> participants,
+            String... expectedParticipantIds ) throws InterruptedException, ExecutionException
+    {
+        network.tickUntilDone();
+        Set<String> expectedSet = new HashSet<String>( Arrays.asList( expectedParticipantIds ) );
+        for ( RingParticipant participant : participants.get() )
+            assertTrue( expectedSet.remove( participant.getServerId() ) );
+        assertTrue( "Didn't get expected items: " + expectedSet, expectedSet.isEmpty() );
     }
 }

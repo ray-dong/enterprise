@@ -31,11 +31,7 @@ public class TokenRingContext
 {
     private RingParticipant me;
     private RingNeighbours neighbours;
-
-    public TokenRingContext()
-    {
-    }
-
+    
     public RingParticipant getMe()
     {
         return me;

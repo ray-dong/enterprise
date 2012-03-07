@@ -45,7 +45,6 @@ import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 public class TestServer
     implements MessageProcessor
 {
-
     protected final StateMachine<TokenRingContext, TokenRingMessage> stateMachine;
     protected final StateMachineConversations conversations;
     protected final TokenRingContext context;
@@ -88,6 +87,11 @@ public class TestServer
         life.add( networkedStateMachine );
 
         start();
+    }
+    
+    public void verifyState( Verifier<TokenRingContext> verifier )
+    {
+        verifier.verify( context );
     }
 
     @Override

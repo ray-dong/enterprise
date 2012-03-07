@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
+import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
 
 /**
  * TODO
@@ -48,15 +49,23 @@ public class NetworkMock
 
     private void debug( String participant, String string )
     {
-        Logger.getLogger("").info( "===" + participant + " " + string );
+        Logger.getLogger("").info( "=== " + participant + " " + string );
     }
 
     public void removeServer( String serverId )
     {
+        removeServer( serverId, true );
+    }
+    
+    public void removeServer( String serverId, boolean callLeaveRing )
+    {
         debug( serverId, "leaves ring" );
         TestServer server = participants.get(serverId);
-        server.newClient( TokenRing.class ).leaveRing();
-        tickUntilDone();
+        if ( callLeaveRing )
+        {
+            server.newClient( TokenRing.class ).leaveRing();
+            tickUntilDone();
+        }
         server.stop();
 
         participants.remove( serverId );
@@ -109,5 +118,13 @@ public class NetworkMock
                 testServer.checkExpectations();
             }
         } while (tick() > 0);
+    }
+    
+    public void verifyState( String serverId, Verifier<TokenRingContext> verifier )
+    {
+        TestServer participant = participants.get( serverId );
+        if ( participant == null ) 
+            throw new IllegalArgumentException( "Unknown server id '" + serverId + "'" );
+        participant.verifyState( verifier );
     }
 }
