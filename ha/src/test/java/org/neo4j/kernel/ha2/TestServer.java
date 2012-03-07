@@ -36,6 +36,7 @@ import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 
 /**
@@ -67,7 +68,7 @@ public class TestServer
         
         context = new TokenRingContext();
         stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
-        conversations = new StateMachineConversations();
+        conversations = new StateMachineConversations(serverId);
 
         this.receiver = new TestMessageSource();
         this.sender = new TestMessageSender();
@@ -75,7 +76,7 @@ public class TestServer
 
         stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger() ) );
 
-        proxyFactory = new StateMachineProxyFactory( participant.getServerId(), TokenRingMessage.class, stateMachine, networkedStateMachine, conversations );
+        proxyFactory = new StateMachineProxyFactory( serverId, TokenRingMessage.class, stateMachine, networkedStateMachine, conversations );
         networkedStateMachine.addMessageProcessor( proxyFactory );
 
         failureHandler = new TestMessageFailureHandler(networkedStateMachine, networkedStateMachine, receiver);
@@ -92,10 +93,7 @@ public class TestServer
     @Override
     public void process( Message message )
     {
-        for( MessageProcessor listener : listeners )
-        {
-            listener.process( message );
-        }
+        receiver.process( message );
     }
     
     public void sendMessages(List<Message> output)
@@ -106,9 +104,6 @@ public class TestServer
     public void start()
     {
         life.start();
-
-        tokenRing = proxyFactory.newProxy( TokenRing.class );
-        tokenRing.start();
     }
 
     public void stop()
@@ -120,6 +115,12 @@ public class TestServer
     public <T> T newClient( Class<T> clientProxyInterface )
     {
         return proxyFactory.newProxy(clientProxyInterface);
+    }
+    
+    public TestServer addStateTransitionListener(StateTransitionListener listener)
+    {
+        stateMachine.addStateTransitionListener( listener );
+        return this;
     }
 
     public void checkExpectations()

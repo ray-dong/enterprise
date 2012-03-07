@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
-import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 
 /**
  * TODO
@@ -36,7 +35,7 @@ public class NetworkMock
 {
     Map<String, TestServer> participants = new HashMap<String, TestServer>();
     
-    public TestServer addServer( String serverId, StateTransitionListener verifier )
+    public TestServer addServer( String serverId )
     {
         TestServer server = new TestServer( serverId );
 

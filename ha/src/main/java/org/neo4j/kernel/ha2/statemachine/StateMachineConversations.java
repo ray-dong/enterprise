@@ -27,9 +27,15 @@ package org.neo4j.kernel.ha2.statemachine;
 public class StateMachineConversations
 {
     private long nextConversationId = 0;
+    private String serverId;
 
-    public synchronized long getNextConversationId()
+    public StateMachineConversations( String serverId )
     {
-        return nextConversationId++;
+        this.serverId = serverId;
+    }
+
+    public synchronized String getNextConversationId()
+    {
+        return serverId+"/"+nextConversationId++;
     }
 }

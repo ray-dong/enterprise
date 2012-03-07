@@ -202,13 +202,18 @@ public class NetworkNode
         return new URI("neo4j:/" + address);
     }
     
-    public void listeningAt(URI me)
+    public void listeningAt( final URI me)
     {
         this.me = me;
-        for( NetworkChannelsListener listener : listeners )
+
+        Listeners.notifyListeners( listeners, new Listeners.Notification<NetworkChannelsListener>()
         {
-            listener.listeningAt( me );
-        }
+            @Override
+            public void notify( NetworkChannelsListener listener )
+            {
+                listener.listeningAt( me );
+            }
+        } );
     }
 
     public void broadcast(Message message)
@@ -264,26 +269,34 @@ public class NetworkNode
         }
     }
 
-    protected void openedChannel(URI uri, Channel ctxChannel)
+    protected void openedChannel( final URI uri, Channel ctxChannel)
     {
         connections.put(uri, ctxChannel);
 
-        for( NetworkChannelsListener listener : listeners )
+        Listeners.notifyListeners( listeners, new Listeners.Notification<NetworkChannelsListener>()
         {
-            listener.channelOpened( uri );
-        }
+            @Override
+            public void notify( NetworkChannelsListener listener )
+            {
+                listener.channelOpened( uri );
+            }
+        } );
     }
 
-    protected void closedChannel(URI uri)
+    protected void closedChannel( final URI uri)
     {
         Channel channel = connections.remove(uri);
         if (channel != null)
             channel.close();
 
-        for( NetworkChannelsListener listener : listeners )
+        Listeners.notifyListeners( listeners, new Listeners.Notification<NetworkChannelsListener>()
         {
-            listener.channelClosed( uri );
-        }
+            @Override
+            public void notify( NetworkChannelsListener listener )
+            {
+                listener.channelClosed( uri );
+            }
+        } );
     }
 
     public URI getMe()
@@ -378,7 +391,14 @@ public class NetworkNode
                 {
                     for( MessageProcessor listener : processors )
                     {
-                        listener.process( message );
+                        try
+                        {
+                            listener.process( message );
+                        }
+                        catch( Exception e )
+                        {
+                            // Ignore
+                        }
                     }
                 }
             } );

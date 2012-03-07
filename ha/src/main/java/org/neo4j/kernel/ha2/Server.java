@@ -44,7 +44,6 @@ public class Server
 {
 
     protected final StateMachine<TokenRingContext, TokenRingMessage> stateMachine;
-    protected final StateMachineConversations conversations;
     protected final TokenRingContext context;
     protected final NetworkNode node;
     protected StateMachineProxyFactory proxyFactory;
@@ -67,7 +66,6 @@ public class Server
 
         context = new TokenRingContext();
         stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
-        conversations = new StateMachineConversations();
 
         node = new NetworkNode( config, StringLogger.SYSTEM );
         node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
@@ -81,6 +79,7 @@ public class Server
 
                 stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger() ) );
 
+                StateMachineConversations conversations = new StateMachineConversations(participant.getServerId());
                 proxyFactory = new StateMachineProxyFactory( participant.getServerId(), TokenRingMessage.class, stateMachine, networkedStateMachine, conversations );
                 networkedStateMachine.addMessageProcessor( proxyFactory );
 

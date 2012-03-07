@@ -38,12 +38,17 @@ import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.*;
  */
 public class TokenRingProtocolTest
 {
+
+    protected Logger logger;
+
     @Before
     public void setupLogging()
     {
-        for( Handler handler : Logger.getLogger( "" ).getHandlers() )
+        logger = Logger.getLogger( "" );
+
+        for( Handler handler : logger.getHandlers() )
         {
-            Logger.getLogger( "" ).removeHandler( handler );
+            logger.removeHandler( handler );
         }
 
         ConsoleHandler handler = new ConsoleHandler();
@@ -56,7 +61,7 @@ public class TokenRingProtocolTest
             }
         });
 
-        Logger.getLogger( "" ).addHandler( handler );
+        logger.addHandler( handler );
     }
     
     @Test
@@ -66,49 +71,44 @@ public class TokenRingProtocolTest
         StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
 
         String server1 = "server1";
-        network.addServer( server1, expectations.newExpectations().includeUnchangedStates()
+        network.addServer( server1).addStateTransitionListener( expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
             .expect( TokenRingMessage.failure, master )
             .expect( TokenRingMessage.discoverRing, master )
             .expect( TokenRingMessage.discoverRing, master )
             .expect( TokenRingMessage.leaveRing, start )
-            .build( server1 ) );
+            .build( server1 ) ).newClient( TokenRing.class ).start();
 
         network.tickUntilDone();
 
         String server2 = "server2";
-        network.addServer( server2, expectations.newExpectations().includeUnchangedStates()
+        network.addServer( server2 ). addStateTransitionListener( expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
-            .expect( TokenRingMessage.newAfter, initial )
             .expect( TokenRingMessage.ringDiscovered, slave )
             .expect( TokenRingMessage.discoverRing, slave )
+            .expect( TokenRingMessage.newAfter, slave )
             .expect( TokenRingMessage.becomeMaster, master )
             .expect( TokenRingMessage.leaveRing, start )
-            .build( server2 ) );
+            .build( server2 ) ).newClient( TokenRing.class ).start();
 
         network.tickUntilDone();
 
         String server3 = "server3";
-        network.addServer( server3, expectations.newExpectations().includeUnchangedStates()
+        network.addServer( server3 ).addStateTransitionListener( expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
-            .expect( TokenRingMessage.newAfter, initial )
             .expect( TokenRingMessage.ringDiscovered, slave )
             .expect( TokenRingMessage.newAfter, slave )
             .expect( TokenRingMessage.newAfter, slave )
+            .expect( TokenRingMessage.becomeMaster, master )
             .expect( TokenRingMessage.leaveRing, start )
-            .expect( TokenRingMessage.newAfter, start )
-            .build( server3 ) );
+            .build( server3 ) ).newClient( TokenRing.class ).start();
 
         network.tickUntilDone();
+
+//        expectations.printRemaining(logger);
 
         network.removeServer( server1 );
-
-        network.tickUntilDone();
-
         network.removeServer( server2 );
-
-        network.tickUntilDone();
-
         network.removeServer( server3 );
 
         network.tickUntilDone();
@@ -123,33 +123,36 @@ public class TokenRingProtocolTest
         StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
 
         String server1 = "server1";
-        network.addServer( server1, expectations.newExpectations().includeUnchangedStates()
+        network.addServer( server1 ).addStateTransitionListener(expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
             .expect( TokenRingMessage.failure, master )
             .expect( TokenRingMessage.discoverRing, master )
             .expect( TokenRingMessage.discoverRing, master )
+            .expect( TokenRingMessage.newAfter, master )
+            .expect( TokenRingMessage.newAfter, master )
             .expect( TokenRingMessage.newBefore, master )
-            .expect( TokenRingMessage.newBefore, master )
-            .build( server1 ) );
+            .build( server1 ) ).newClient( TokenRing.class ).start();
+
+        network.tickUntilDone();
 
         String server2 = "server2";
-        network.addServer( server2, expectations.newExpectations().includeUnchangedStates()
+        network.addServer( server2 ).addStateTransitionListener( expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
-            .expect( TokenRingMessage.newAfter, initial )
             .expect( TokenRingMessage.ringDiscovered, slave )
             .expect( TokenRingMessage.discoverRing, slave )
+            .expect( TokenRingMessage.newAfter, slave )
             .expect( TokenRingMessage.leaveRing, start )
-            .expect( TokenRingMessage.newAfter, start )
-            .build( server2 ) );
+            .build( server2 ) ).newClient( TokenRing.class ).start();
+
+        network.tickUntilDone();
 
         String server3 = "server3";
-        network.addServer( server3, expectations.newExpectations().includeUnchangedStates()
+        network.addServer( server3 ).addStateTransitionListener( expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
-            .expect( TokenRingMessage.newAfter, initial )
             .expect( TokenRingMessage.ringDiscovered, slave )
+            .expect( TokenRingMessage.newBefore, slave )
             .expect( TokenRingMessage.leaveRing, start )
-            .expect( TokenRingMessage.newAfter, start )
-            .build( server3 ) );
+            .build( server3 ) ).newClient( TokenRing.class ).start();
 
         network.tickUntilDone();
 
@@ -168,31 +171,43 @@ public class TokenRingProtocolTest
         StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
 
         String participant1 = "server1";
-        TestServer server1 = network.addServer( participant1, expectations.newExpectations()
-            .expect( TokenRingMessage.start, initial )
-            .expect( TokenRingMessage.failure, master )
-            .expect( TokenRingMessage.sendToken, slave )
-            .expect( TokenRingMessage.becomeMaster, master )
-            .build( participant1 ) );
+        TestServer server1 = network.addServer( participant1 ).addStateTransitionListener( expectations.newExpectations()
+                                                                                               .expect( TokenRingMessage.start, initial )
+                                                                                               .expect( TokenRingMessage.failure, master )
+                                                                                               .expect( TokenRingMessage.sendToken, slave )
+                                                                                               .build( participant1 ) );
+        server1.newClient( TokenRing.class ).start();
         
+        network.tickUntilDone();
+
         String participant2 = "server2";
-        TestServer server2 = network.addServer( participant2, expectations.newExpectations()
+        TestServer server2 = network.addServer( participant2 ).addStateTransitionListener( expectations.newExpectations()
             .expect( TokenRingMessage.start, initial )
             .expect( TokenRingMessage.ringDiscovered, slave )
             .expect( TokenRingMessage.becomeMaster, master )
             .expect( TokenRingMessage.sendToken, slave )
             .build( participant2 ) );
+        server2.newClient( TokenRing.class ).start();
         
+        network.tickUntilDone();
+
         String participant3 = "server3";
-        TestServer server3 = network.addServer( participant3, expectations.newExpectations()
+        TestServer server3 = network.addServer( participant3 ).addStateTransitionListener( expectations.newExpectations()
             .expect( TokenRingMessage.start, initial )
             .expect( TokenRingMessage.ringDiscovered, slave )
+            .expect( TokenRingMessage.becomeMaster, master )
             .build( participant3 ) );
+        server3.newClient( TokenRing.class ).start();
         
         network.tickUntilDone();
 
         TokenRing tokenRing1 = server1.newClient( TokenRing.class );
         tokenRing1.sendToken();
+
+        network.tickUntilDone();
+
+        TokenRing tokenRing2 = server2.newClient( TokenRing.class );
+        tokenRing2.sendToken();
 
         network.tickUntilDone();
 

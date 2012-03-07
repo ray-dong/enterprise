@@ -154,8 +154,8 @@ public enum TokenRingState
                                     .getBefore(), context.getNeighbours().getAfter() ) );
                                 outgoing.process( Message.to( becomeMaster, context.getNeighbours()
                                     .getAfter(), context.getNeighbours().getBefore() ) );
-                                return start;
                             }
+                            return start;
                         }
 
                         case sendToken:

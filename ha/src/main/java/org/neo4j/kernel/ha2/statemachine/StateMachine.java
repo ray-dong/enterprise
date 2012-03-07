@@ -80,10 +80,18 @@ public class StateMachine<CONTEXT, E extends Enum<E>>
             State<CONTEXT,E> oldState = state;
             State<CONTEXT,E> newState = state.receive(context, message, outgoing );
             state = newState;
+
             StateTransition transition = new StateTransition( oldState, message, newState );
             for (StateTransitionListener listener : listeners)
             {
-                listener.stateTransition(transition);
+                try
+                {
+                    listener.stateTransition(transition);
+                }
+                catch( Throwable e )
+                {
+                    // Ignore
+                }
             }
 
         } catch (IllegalStateException throwable)

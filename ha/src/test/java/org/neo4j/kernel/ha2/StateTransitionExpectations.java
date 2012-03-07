@@ -17,12 +17,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.kernel.ha2;
 
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.logging.Logger;
 import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.StateTransition;
@@ -47,10 +49,27 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
     
     public void verify()
     {
+        StringBuilder builder = new StringBuilder(  );
         for ( ExpectingStateTransitionListener listener : expectations )
-            listener.verify();
+            listener.transitionHistory( builder );
+        
+        if (builder.length() != 0)
+        {
+            throw new IllegalStateException( "Failed expectations:"+builder.toString() );
+        }
     }
-    
+
+    public void printRemaining( Logger logger )
+    {
+        StringBuilder builder = new StringBuilder(  );
+        builder.append( "=== Remaining state transitions ===\n" );
+        for( ExpectingStateTransitionListener expectation : expectations )
+        {
+            expectation.printRemaining(builder);
+        }
+        logger.info( builder.toString() );
+    }
+
     public class ExpectationsBuilder
     {
         private final Deque<ExpectedTransition> transitions = new LinkedList<ExpectedTransition>();
@@ -84,8 +103,9 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
     
     private class ExpectingStateTransitionListener implements StateTransitionListener
     {
+        private final Deque<String> transitionHistory = new LinkedList<String>();
         private final Deque<ExpectedTransition> transitions;
-        private volatile IllegalStateException mostRecentException;
+        private volatile boolean valid = true;
         private final Object id;
         private final boolean includeUnchanged;
 
@@ -99,36 +119,57 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
         @Override
         public void stateTransition( StateTransition transition )
         {
-            try
+            if (valid || transitions.isEmpty())
             {
                 if ( !includeUnchanged && transition.getOldState().equals( transition.getNewState() ) )
                     return;
-                
-                if ( transitions.isEmpty() )
-                    throw new IllegalStateException( message( "No more transactions expected, but got " + transition ) );
-                
-                ExpectedTransition expected = transitions.pop();
-                if ( !expected.matches( transition ) )
-                    throw new IllegalStateException( message( "Expected " + expected + ", but got " + transition ) );
-            }
-            catch ( IllegalStateException e )
-            {
-                mostRecentException = e;
-                throw e;
+    
+                if ( transitions.isEmpty())
+                {
+                    valid = false;
+                    transitionHistory.add( "UNEXPECTED:" + transition );
+                } else
+                {
+                    ExpectedTransition expected = transitions.pop();
+                    if ( expected.matches( transition ) )
+                    {
+                        transitionHistory.add( expected.toString() );
+                    } else
+                    {
+                        transitionHistory.add( "EXPECTED " + expected + ", GOT " + transition );
+                        valid = false;
+                    }
+                }
             }
         }
         
-        private String message( String string )
+        void transitionHistory(StringBuilder builder)
         {
-            return "[" + id + "]: " + string;
+            if (valid && transitions.isEmpty())
+                return;
+
+            builder.append( "\n=== Failed state transition expectations for " ).append( id );
+            for( String transition : transitionHistory )
+            {
+                builder.append( "\n " ).append( transition );
+            }
+
+            if (valid)
+            {
+                for( ExpectedTransition transition : transitions )
+                {
+                    builder.append( "\n " ).append( "MISSING ").append( transition );
+                }
+            }
         }
 
-        void verify()
+        void printRemaining( StringBuilder builder )
         {
-            if ( mostRecentException != null )
-                throw mostRecentException;
-            if ( !transitions.isEmpty() )
-                throw new IllegalStateException( message( "Expected transactions not encountered: " + transitions ) );
+            builder.append( "==  " ).append( id ).append( "\n" );
+            for( ExpectedTransition transition : transitions )
+            {
+                builder.append( transition.toString() ).append( "\n" );
+            }
         }
     }
     

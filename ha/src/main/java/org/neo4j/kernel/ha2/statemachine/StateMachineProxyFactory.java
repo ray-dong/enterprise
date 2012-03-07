@@ -38,18 +38,18 @@ import org.neo4j.com2.message.MessageType;
 public class StateMachineProxyFactory
     implements MessageProcessor
 {
-    private String prefix;
     private StateMachine stateMachine;
     private MessageProcessor incoming;
     private StateMachineConversations conversations;
+    private String serverId;
     private Class<? extends Enum> messageTypeEnum;
 
     private Map<String, ResponseFuture> responseFutureMap = new ConcurrentHashMap<String, ResponseFuture>(  );
     
     
-    public StateMachineProxyFactory( String prefix, Class<? extends Enum> messageTypeEnum, StateMachine stateMachine, MessageProcessor incoming, StateMachineConversations conversations )
+    public StateMachineProxyFactory(String serverId, Class<? extends Enum> messageTypeEnum, StateMachine stateMachine, MessageProcessor incoming, StateMachineConversations conversations )
     {
-        this.prefix = prefix;
+        this.serverId = serverId;
         this.messageTypeEnum = messageTypeEnum;
         this.stateMachine = stateMachine;
         this.incoming = incoming;
@@ -66,10 +66,10 @@ public class StateMachineProxyFactory
     Object invoke( Method method, Object arg )
         throws Throwable
     {
-        String conversationId = prefix+"/"+conversations.getNextConversationId();
+        String conversationId = conversations.getNextConversationId();
 
         Enum typeAsEnum = Enum.valueOf( messageTypeEnum, method.getName() );
-        Message message = Message.internal( (MessageType) typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, prefix );
+        Message message = Message.internal( (MessageType) typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
 
         if (method.getReturnType().equals( Void.TYPE ))
         {
