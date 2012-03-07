@@ -150,11 +150,11 @@ public class TokenRingProtocolTest
     @Test
     public void leaveRingOfSizeTwoResultingInTwoStrayParticipants() throws Exception
     {
-        TokenRing member1 = newMember( ID1,
+        newMember( ID1,
                 TokenRingMessage.start, initial,
                 TokenRingMessage.failure, master );
         network.tickUntilDone();
-        TokenRing member2 = newMember( ID2,
+        newMember( ID2,
                 TokenRingMessage.start, initial,
                 TokenRingMessage.ringDiscovered, slave,
                 TokenRingMessage.leaveRing, start );
@@ -172,17 +172,21 @@ public class TokenRingProtocolTest
         newMember( ID1,
                 TokenRingMessage.start, initial,
                 TokenRingMessage.failure, master );
+        network.tickUntilDone();
         newMember( ID2,
                 TokenRingMessage.start, initial,
                 TokenRingMessage.ringDiscovered, slave,
                 TokenRingMessage.leaveRing, start );
+        network.tickUntilDone();
+        verifyNeighbours( ID2, ID1, ID2 );
+        verifyNeighbours( ID1, ID2, ID1 );
         newMember( ID3,
                 TokenRingMessage.start, initial,
                 TokenRingMessage.ringDiscovered, slave );
         network.tickUntilDone();
-        verifyNeighboursWithUnknownPosition( ID2, ID1, ID3 ); // 1 has got 2 and 3 as neighbors
-        verifyNeighboursWithUnknownPosition( ID1, ID2, ID3 ); // 2 has got 1 and 3 as neighbors
-        verifyNeighboursWithUnknownPosition( ID1, ID3, ID2 ); // 3 has got 1 and 2 as neighbors
+        verifyNeighboursWithUnknownPosition( ID2, ID1, ID3 );
+        verifyNeighboursWithUnknownPosition( ID1, ID2, ID3 );
+        verifyNeighboursWithUnknownPosition( ID1, ID3, ID2 );
         
         network.removeServer( ID2 );
         verifyNeighbours( ID3, ID1, ID3 );
@@ -346,11 +350,11 @@ public class TokenRingProtocolTest
             public void verify( TokenRingContext state )
             {
                 String before = state.getNeighbours().getBefore().getServerId();
-                String after = state.getNeighbours().getBefore().getServerId();
-                assertFalse( before.equals( after ) );
-                assertTrue( one.equals( before ) || one.equals( after ) );
-                assertEquals( me, state.getMe().getServerId() );
-                assertTrue( other.equals( before ) || other.equals( after ) );
+                String after = state.getNeighbours().getAfter().getServerId();
+                assertFalse( "Before and after both are '" + before + "', but was expected to be '" + one + "','" + other + "'", before.equals( after ) );
+                assertTrue( "Expected one of '" + me + "'s neighbors to be '" + one + "', but was '" + before + "','" + after + "'", one.equals( before ) || one.equals( after ) );
+                assertEquals( "Expected me to be '" + me + "', but was '" + state.getMe().getServerId() + "'", me, state.getMe().getServerId() );
+                assertTrue( "Expected other of '" + me + "'s neighbors to be '" + one + "', but was '" + before + "','" + after + "'", other.equals( before ) || other.equals( after ) );
             }
         } );
     }
