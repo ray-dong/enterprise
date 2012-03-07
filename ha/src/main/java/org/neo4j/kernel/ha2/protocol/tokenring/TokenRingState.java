@@ -23,14 +23,14 @@ package org.neo4j.kernel.ha2.protocol.tokenring;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.State;
-import org.neo4j.kernel.ha2.statemachine.message.Message;
-import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
 
+import static org.neo4j.com2.message.Message.*;
 import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
-import static org.neo4j.kernel.ha2.statemachine.message.Message.*;
 
 /**
  * TODO

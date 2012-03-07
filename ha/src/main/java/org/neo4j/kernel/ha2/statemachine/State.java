@@ -20,8 +20,8 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
-import org.neo4j.kernel.ha2.statemachine.message.Message;
-import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
+import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageProcessor;
 
 /**
  * TODO

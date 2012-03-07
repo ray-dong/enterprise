@@ -17,26 +17,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.initial;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.master;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.slave;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.start;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
-import java.util.logging.LogManager;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-import java.util.logging.SimpleFormatter;
 import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.StateTransitionExpectations;
 import org.neo4j.kernel.ha2.TestServer;
-import org.neo4j.kernel.ha2.protocol.RingParticipant;
+
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.*;
 
 /**
  * TODO
@@ -79,6 +74,8 @@ public class TokenRingProtocolTest
             .expect( TokenRingMessage.leaveRing, start )
             .build( server1 ) );
 
+        network.tickUntilDone();
+
         String server2 = "server2";
         network.addServer( server2, expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
@@ -88,6 +85,8 @@ public class TokenRingProtocolTest
             .expect( TokenRingMessage.becomeMaster, master )
             .expect( TokenRingMessage.leaveRing, start )
             .build( server2 ) );
+
+        network.tickUntilDone();
 
         String server3 = "server3";
         network.addServer( server3, expectations.newExpectations().includeUnchangedStates()

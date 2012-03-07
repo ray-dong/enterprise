@@ -20,7 +20,7 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import org.neo4j.kernel.ha2.statemachine.message.MessageType;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO

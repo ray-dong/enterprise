@@ -17,10 +17,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import java.util.Map;
-
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -69,6 +71,7 @@ public class TokenRingNetworkTest
 
     @Test
     public void testSendReceive()
+        throws ExecutionException, InterruptedException
     {
         Map<String, String> config = MapUtil.stringMap( "port", "1234-1244" );
 
@@ -76,8 +79,10 @@ public class TokenRingNetworkTest
         LifeSupport life = new LifeSupport();
         Server server1 = new Server( configuration );
         life.add( server1 );
-        life.add(new Server( configuration ));
-        life.add(new Server( configuration ));
+        Server server2 = new Server( configuration );
+        life.add( server2 );
+        Server server3 = new Server( configuration );
+        life.add( server3 );
         life.start();
 
         try
@@ -90,11 +95,26 @@ public class TokenRingNetworkTest
         }
 
         Logger logger = Logger.getLogger( "" );
-        logger.info( "Find ring participants:" );
-        Iterable<RingParticipant> participants = server1.newClient( TokenRing.class ).getParticipants();
-        for( RingParticipant ringParticipant : participants )
+        Future<Iterable<RingParticipant>> participants1 = server1.newClient( TokenRing.class ).getParticipants();
+        Future<Iterable<RingParticipant>> participants2 = server2.newClient( TokenRing.class ).getParticipants();
+        Future<Iterable<RingParticipant>> participants3 = server3.newClient( TokenRing.class ).getParticipants();
+
+        logger.info( "Found ring participants from server1:" );
+        for( RingParticipant ringParticipant : participants1.get() )
         {
-            logger.info(ringParticipant.toString());
+            logger.info( ringParticipant.toString() );
+        }
+
+        logger.info( "Found ring participants from server2:" );
+        for( RingParticipant ringParticipant : participants2.get() )
+        {
+            logger.info( ringParticipant.toString() );
+        }
+
+        logger.info( "Found ring participants from server3:" );
+        for( RingParticipant ringParticipant : participants3.get() )
+        {
+            logger.info( ringParticipant.toString() );
         }
 
         logger.info( "Shutting down" );

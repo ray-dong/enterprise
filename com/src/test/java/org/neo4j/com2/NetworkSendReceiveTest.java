@@ -17,9 +17,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.com2;
 
+import java.util.Map;
 import org.junit.Test;
+import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageType;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
@@ -27,24 +32,51 @@ import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.LifecycleAdapter;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-import java.util.Map;
-
 /**
  * TODO
  */
 public class NetworkSendReceiveTest
 {
+    public enum TestMessage
+        implements MessageType
+    {
+        helloWorld;
+
+        @Override
+        public MessageType[] next()
+        {
+            return new MessageType[ 0 ];
+        }
+
+        @Override
+        public MessageType failureMessage()
+        {
+            return null;
+        }
+    }
+
     @Test
     public void testSendReceive()
     {
         LifeSupport life = new LifeSupport();
-        life.add(new Server());
-        life.add(new Server());
-        life.start();
 
+        Server server1;
+        {
+            Map<String, String> config = MapUtil.stringMap("port", "1234");
+            life.add(server1 = new Server(ConfigProxy.config(config, Server.Configuration.class)));
+        }
+        {
+            Map<String, String> config = MapUtil.stringMap("port", "1235");
+            life.add(new Server(ConfigProxy.config(config, Server.Configuration.class)));
+        }
+        
+        life.start();
+        
+        server1.process( Message.to( TestMessage.helloWorld, "neo4j://127.0.0.1:1235", "Hello World" ) );
+        
         try
         {
-            Thread.sleep(5000);
+            Thread.sleep(2000);
         } catch (InterruptedException e)
         {
             e.printStackTrace();
@@ -53,11 +85,39 @@ public class NetworkSendReceiveTest
         life.shutdown();
     }
 
-    private class Server
-        implements Lifecycle
+    private static class Server
+        implements Lifecycle, MessageProcessor
     {
 
+        protected NetworkNode node;
+
+        public interface Configuration
+            extends NetworkNode.Configuration
+        {}
+        
         private final LifeSupport life = new LifeSupport();
+        
+        private Server( Configuration config )
+        {
+            node = new NetworkNode(config, StringLogger.SYSTEM);
+
+            life.add( node );
+            life.add(new LifecycleAdapter()
+            {
+                @Override
+                public void start() throws Throwable
+                {
+                    node.addMessageProcessor( new MessageProcessor()
+                    {
+                        @Override
+                        public void process( Message message )
+                        {
+                            System.out.println( message );
+                        }
+                    } );
+                }
+            });
+        }
 
         @Override
         public void init() throws Throwable
@@ -67,38 +127,6 @@ public class NetworkSendReceiveTest
         @Override
         public void start() throws Throwable
         {
-            Map<String, String> config = MapUtil.stringMap("port", "1234");
-
-            NetworkChannels channels = new NetworkChannels(StringLogger.SYSTEM);
-
-            final NetworkMessageReceiver receiver = new NetworkMessageReceiver(ConfigProxy.config(config, NetworkMessageReceiver.Configuration.class), StringLogger.SYSTEM, channels);
-            final NetworkMessageSender sender = new NetworkMessageSender( StringLogger.SYSTEM, channels );
-
-            life.add(receiver);
-            life.add(sender);
-            life.add(new LifecycleAdapter()
-            {
-                @Override
-                public void start() throws Throwable
-                {
-                    receiver.addMessageListener( new NetworkMessageListener()
-                    {
-                        @Override
-                        public void received( Object message )
-                        {
-                            System.out.println( message );
-                        }
-                    } );
-                }
-            });
-            life.add(new LifecycleAdapter()
-            {
-                @Override
-                public void start() throws Throwable
-                {
-                    sender.send("neo4j://127.0.0.1:1234", "Hello World");
-                }
-            });
 
             life.start();
         }
@@ -112,6 +140,12 @@ public class NetworkSendReceiveTest
         @Override
         public void shutdown() throws Throwable
         {
+        }
+
+        @Override
+        public void process( Message message )
+        {
+            node.process( message );
         }
     }
 }

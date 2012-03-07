@@ -28,9 +28,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.neo4j.kernel.ha2.statemachine.message.Message;
-import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
-import org.neo4j.kernel.ha2.statemachine.message.MessageType;
+import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO
@@ -84,8 +84,16 @@ public class StateMachineProxyFactory
 
             try
             {
-                // Wait for response or timeout/failure
-                return future.get(  );
+                if (method.getReturnType().equals( Future.class ))
+                {
+                    // Return the future and let client decide on how to wait
+                    return future;
+                }
+                else
+                {
+                    // Wait for response or timeout/failure
+                    return future.get(  );
+                }
             }
             catch( InterruptedException e )
             {

@@ -18,14 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.statemachine.message;
+package org.neo4j.com2.message;
 
 /**
  * TODO
  */
-public interface MessageType
+public interface MessageSource
 {
-    String name();
-    MessageType[] next();
-    MessageType failureMessage();
+    void addMessageProcessor( MessageProcessor messageProcessor );
 }

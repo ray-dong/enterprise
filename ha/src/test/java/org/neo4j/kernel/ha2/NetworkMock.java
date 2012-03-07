@@ -17,17 +17,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.kernel.ha2;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.logging.Logger;
+import org.neo4j.com2.message.Message;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
-import org.neo4j.kernel.ha2.statemachine.message.Message;
 
 /**
  * TODO
@@ -66,7 +66,7 @@ public class NetworkMock
     public int tick()
     {
         // Get all messages from all test servers
-        List<TestServer.TestMessage> messages = new ArrayList<TestServer.TestMessage>(  );
+        List<Message> messages = new ArrayList<Message>(  );
         for( TestServer testServer : participants.values() )
         {
             testServer.sendMessages( messages );
@@ -74,24 +74,25 @@ public class NetworkMock
         
         // Now send them
         int nrOfReceivedMessages = 0;
-        for( TestServer.TestMessage message : messages )
+        for( Message message : messages )
         {
-            if (message.getTo().equals( "*" ))
+            String to = message.getHeader( Message.TO );
+            if ( to.equals( "*" ))
             {
                 for( Map.Entry<String, TestServer> testServer : participants.entrySet() )
                 {
-                    if (!testServer.getKey().equals( ((Message)message.getMessage()).getHeader( Message.FROM ) ))
+                    if (!testServer.getKey().equals( message.getHeader( Message.FROM ) ))
                     {
-                        Logger.getLogger("").info( "Broadcast to "+testServer.getKey()+": "+message.getMessage());
-                        testServer.getValue().receive(message.getMessage());
+                        Logger.getLogger("").info( "Broadcast to "+testServer.getKey()+": "+message);
+                        testServer.getValue().process( message );
                         nrOfReceivedMessages++;
                     }
                 }
             } else
             {
-                TestServer server = participants.get( message.getTo() );
-                Logger.getLogger("").info( "Send to "+message.getTo()+": "+message.getMessage());
-                server.receive( message.getMessage() );
+                TestServer server = participants.get( to );
+                Logger.getLogger("").info( "Send to "+to+": "+message);
+                server.process( message );
                 nrOfReceivedMessages++;
             }
         }
@@ -100,6 +101,14 @@ public class NetworkMock
     
     public void tickUntilDone()
     {
-        while (tick()>0){}
+        do
+        {
+            while (tick()>0){}
+            
+            for( TestServer testServer : participants.values() )
+            {
+                testServer.checkExpectations();
+            }
+        } while (tick() > 0);
     }
 }

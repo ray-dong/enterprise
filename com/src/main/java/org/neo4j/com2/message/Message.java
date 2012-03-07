@@ -18,15 +18,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.statemachine.message;
+package org.neo4j.com2.message;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
- * State machine message
+ * Message for state machines which can be sent out in the cluster as well.
  */
 public class Message
     implements Serializable
@@ -41,12 +40,12 @@ public class Message
         return new Message(message, payload).setHeader( TO, "*" );
     }
 
-    public static Message to(MessageType message, RingParticipant to)
+    public static Message to(MessageType message, Object to)
     {
         return to( message, to, null );
     }
     
-    public static Message to(MessageType message, RingParticipant to, Object payload)
+    public static Message to(MessageType message, Object to, Object payload)
     {
         return new Message(message, payload).setHeader( TO, to.toString() );
     }
@@ -102,7 +101,7 @@ public class Message
         return value;
     }
 
-    public void copyHeadersTo( Message message, String... names )
+    public Message copyHeadersTo( Message message, String... names )
     {
         for( String name : names )
         {
@@ -110,6 +109,8 @@ public class Message
             if (value != null)
                 message.setHeader( name, value );
         }
+        
+        return message;
     }
 
     @Override

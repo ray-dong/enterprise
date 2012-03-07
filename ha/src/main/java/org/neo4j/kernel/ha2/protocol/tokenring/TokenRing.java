@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import java.util.concurrent.Future;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
@@ -30,5 +31,5 @@ public interface TokenRing
     void start();
     void leaveRing();
     void sendToken();
-    Iterable<RingParticipant> getParticipants();
+    Future<Iterable<RingParticipant>> getParticipants();
 }

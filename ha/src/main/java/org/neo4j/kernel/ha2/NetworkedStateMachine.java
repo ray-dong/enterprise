@@ -22,67 +22,50 @@ package org.neo4j.kernel.ha2;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
-import org.neo4j.com2.MessageReceiver;
-import org.neo4j.com2.MessageSender;
-import org.neo4j.com2.NetworkMessageListener;
-import org.neo4j.kernel.LifecycleAdapter;
+import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageSource;
+import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
-import org.neo4j.kernel.ha2.statemachine.message.Message;
-import org.neo4j.kernel.ha2.statemachine.message.MessageProcessor;
-import org.neo4j.kernel.ha2.statemachine.message.MessageType;
 
-import static org.neo4j.kernel.ha2.statemachine.message.Message.*;
+import static org.neo4j.com2.message.Message.*;
 
 /**
  * TODO
  */
 public class NetworkedStateMachine
-    extends LifecycleAdapter
-    implements MessageProcessor
+    implements Lifecycle, MessageProcessor, MessageSource
 {
     private Logger logger = Logger.getLogger( NetworkedStateMachine.class.getName() );
     
-    private Map<String, ExpectationFailure> expectations;
-
-    private ScheduledExecutorService expectationScheduler;
     private RingParticipant me;
-    private final MessageReceiver receiver;
-    private MessageSender sender;
+    private final MessageSource source;
+    private MessageProcessor sender;
     private StateMachine stateMachine;
 
     private List<Message> outgoingMessages = new ArrayList<Message>();
     private List<MessageProcessor> outgoingProcessors = new ArrayList<MessageProcessor>(  );
     protected final MessageProcessor outgoing;
-    protected final NetworkMessageListener messageReceiver;
 
-    public NetworkedStateMachine( MessageReceiver receiver,
-                                  final MessageSender sender,
+    public NetworkedStateMachine( MessageSource source,
+                                  final MessageProcessor sender,
                                   final StateMachine stateMachine
     )
     {
-        this.receiver = receiver;
+        this.source = source;
         this.sender = sender;
         this.stateMachine = stateMachine;
-        expectations = new ConcurrentHashMap<String, ExpectationFailure>();
 
         outgoing = new OutgoingMessageProcessor();
-        messageReceiver = new StateMachineMessageListenerAdapter();
     }
 
     @Override
     public void init()
         throws Throwable
     {
-        expectationScheduler = Executors.newScheduledThreadPool( 3 );
-
-        receiver.addMessageListener( messageReceiver );
+        source.addMessageProcessor( this );
     }
 
     @Override
@@ -102,15 +85,15 @@ public class NetworkedStateMachine
     public void shutdown()
         throws Throwable
     {
-        expectationScheduler.shutdown();
     }
     
     public void setMe(RingParticipant participant)
     {
         this.me = participant;
     }
-    
-    public void addOutgoingProcessor( MessageProcessor messageProcessor )
+
+    @Override
+    public void addMessageProcessor( MessageProcessor messageProcessor )
     {
         outgoingProcessors.add( messageProcessor );
     }
@@ -118,15 +101,6 @@ public class NetworkedStateMachine
     @Override
     public synchronized void process( Message message )
     {
-        // Cancel existing timeout
-        {
-            ExpectationFailure expectationFailure = expectations.remove( message.getHeader( CONVERSATION_ID ) );
-            if( expectationFailure != null )
-            {
-                expectationFailure.cancel();
-            }
-        }
-
         stateMachine.receive( message, outgoing );
 
         // Process and send messages
@@ -143,50 +117,10 @@ public class NetworkedStateMachine
             {
                 outgoingMessage.setHeader( Message.FROM, me.getServerId() );
 
-                String to = outgoingMessage.getHeader( Message.TO );
-                sender.send( to, outgoingMessage );
-
-                // Create timeout
-                MessageType messageType = outgoingMessage.getMessageType();
-                if( messageType.failureMessage() != null )
-                {
-                    String conversationId = outgoingMessage.getHeader( CONVERSATION_ID );
-                    ExpectationFailure expectationFailure = new ExpectationFailure( conversationId, messageType
-                        .failureMessage() );
-                    expectationScheduler.schedule( expectationFailure, 3, TimeUnit.SECONDS );
-                    expectations.put( conversationId, expectationFailure );
-                }
+                sender.process( outgoingMessage );
             }
         }
         outgoingMessages.clear();
-    }
-
-    class ExpectationFailure
-        implements Runnable
-    {
-        private String conversationId;
-        private MessageType messageType;
-        private boolean cancelled = false;
-
-        public ExpectationFailure( String conversationId, MessageType messageType )
-        {
-            this.conversationId = conversationId;
-            this.messageType = messageType;
-        }
-
-        public synchronized void cancel()
-        {
-            cancelled = true;
-        }
-
-        @Override
-        public synchronized void run()
-        {
-            if( !cancelled )
-            {
-                messageReceiver.received( Message.internal( messageType, "Timed out" ).setHeader( CONVERSATION_ID, conversationId ) );
-            }
-        }
     }
 
     private class OutgoingMessageProcessor
@@ -196,18 +130,6 @@ public class NetworkedStateMachine
         public void process( Message message )
         {
             outgoingMessages.add( message );
-        }
-    }
-
-    private class StateMachineMessageListenerAdapter
-        implements NetworkMessageListener
-    {
-        @Override
-        public void received( Object message )
-        {
-            Message stateMessage = (Message) message;
-
-            process( stateMessage );
         }
     }
 }

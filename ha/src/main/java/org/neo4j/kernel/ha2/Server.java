@@ -22,9 +22,7 @@ package org.neo4j.kernel.ha2;
 
 import java.net.URI;
 import java.util.logging.Logger;
-import org.neo4j.com2.NetworkChannels;
-import org.neo4j.com2.NetworkMessageReceiver;
-import org.neo4j.com2.NetworkMessageSender;
+import org.neo4j.com2.NetworkNode;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
@@ -48,13 +46,12 @@ public class Server
     protected final StateMachine<TokenRingContext, TokenRingMessage> stateMachine;
     protected final StateMachineConversations conversations;
     protected final TokenRingContext context;
-    protected final NetworkMessageReceiver receiver;
-    protected final NetworkMessageSender sender;
+    protected final NetworkNode node;
     protected StateMachineProxyFactory proxyFactory;
     protected final NetworkedStateMachine networkedStateMachine;
 
     public interface Configuration
-        extends NetworkMessageReceiver.Configuration
+        extends NetworkNode.Configuration
     {
     }
 
@@ -72,8 +69,8 @@ public class Server
         stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
         conversations = new StateMachineConversations();
 
-        final NetworkChannels channels = new NetworkChannels( StringLogger.SYSTEM );
-        channels.addNetworkChannelsListener( new NetworkChannels.NetworkChannelsListener()
+        node = new NetworkNode( config, StringLogger.SYSTEM );
+        node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
         {
             @Override
             public void listeningAt( URI me )
@@ -85,7 +82,7 @@ public class Server
                 stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger() ) );
 
                 proxyFactory = new StateMachineProxyFactory( participant.getServerId(), TokenRingMessage.class, stateMachine, networkedStateMachine, conversations );
-                networkedStateMachine.addOutgoingProcessor( proxyFactory );
+                networkedStateMachine.addMessageProcessor( proxyFactory );
 
             }
 
@@ -100,12 +97,10 @@ public class Server
             }
         } );
 
-        receiver = new NetworkMessageReceiver( config, StringLogger.SYSTEM, channels );
-        sender = new NetworkMessageSender( StringLogger.SYSTEM, channels );
-        networkedStateMachine = new NetworkedStateMachine( receiver, sender, stateMachine );
+        networkedStateMachine = new NetworkedStateMachine( node, node, stateMachine );
+        life.add(new TimeoutMessageFailureHandler( networkedStateMachine, networkedStateMachine, node ));
 
-        life.add( receiver );
-        life.add( sender );
+        life.add( node );
         life.add( networkedStateMachine );
     }
 
