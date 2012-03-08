@@ -26,13 +26,17 @@ import java.util.concurrent.Future;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import javax.swing.SwingUtilities;
 import org.junit.Before;
 import org.junit.Test;
+import org.neo4j.helpers.Specifications;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.Server;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.statemachine.StateTransition;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 /**
@@ -40,6 +44,9 @@ import org.neo4j.kernel.impl.util.StringLogger;
  */
 public class TokenRingNetworkTest
 {
+
+    protected Logger logger;
+
     @Before
     public void setupLogging()
     {
@@ -67,6 +74,7 @@ public class TokenRingNetworkTest
             {
             }
         } );
+        logger = Logger.getLogger( "" );
     }
 
     @Test
@@ -77,47 +85,73 @@ public class TokenRingNetworkTest
 
         Server.Configuration configuration = ConfigProxy.config( config, Server.Configuration.class );
         LifeSupport life = new LifeSupport();
-        Server server1 = new Server( configuration );
+        final Server server1 = new Server( configuration );
         life.add( server1 );
         Server server2 = new Server( configuration );
         life.add( server2 );
         Server server3 = new Server( configuration );
         life.add( server3 );
+
+        showParticipants( server1 );
+        showParticipants( server2 );
+        showParticipants( server3 );
+
         life.start();
 
         try
         {
-            Thread.sleep( 3000 );
+            Thread.sleep( 10000 );
         }
         catch( InterruptedException e )
         {
             e.printStackTrace();
         }
 
-        Logger logger = Logger.getLogger( "" );
-        Future<Iterable<RingParticipant>> participants1 = server1.newClient( TokenRing.class ).getParticipants();
-        Future<Iterable<RingParticipant>> participants2 = server2.newClient( TokenRing.class ).getParticipants();
-        Future<Iterable<RingParticipant>> participants3 = server3.newClient( TokenRing.class ).getParticipants();
-
-        logger.info( "Found ring participants from server1:" );
-        for( RingParticipant ringParticipant : participants1.get() )
-        {
-            logger.info( ringParticipant.toString() );
-        }
-
-        logger.info( "Found ring participants from server2:" );
-        for( RingParticipant ringParticipant : participants2.get() )
-        {
-            logger.info( ringParticipant.toString() );
-        }
-
-        logger.info( "Found ring participants from server3:" );
-        for( RingParticipant ringParticipant : participants3.get() )
-        {
-            logger.info( ringParticipant.toString() );
-        }
-
         logger.info( "Shutting down" );
         life.shutdown();
+    }
+
+    private void showParticipants( final Server server )
+    {
+        server.addStateTransitionListener( new StateTransitionListener()
+        {
+            @Override
+            public void stateTransition( StateTransition transition )
+            {
+                if (transition.getNewState().equals( transition.getOldState() ))
+                    return;
+
+                if( Specifications.<Object>in( TokenRingState.slave, TokenRingState.master )
+                    .satisfiedBy( transition.getNewState() ) )
+                {
+                    SwingUtilities.invokeLater( new Runnable()
+                    {
+                        @Override
+                        public void run()
+                        {
+                            Future<Iterable<RingParticipant>> participants1 = server.newClient( TokenRing.class )
+                                .getParticipants();
+
+                            logger.info( "Found ring participants from server:" );
+                            try
+                            {
+                                for( RingParticipant ringParticipant : participants1.get() )
+                                {
+                                    logger.info( ringParticipant.toString() );
+                                }
+                            }
+                            catch( InterruptedException e )
+                            {
+                                e.printStackTrace();
+                            }
+                            catch( ExecutionException e )
+                            {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+                }
+            }
+        } );
     }
 }

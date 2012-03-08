@@ -28,5 +28,5 @@ import org.neo4j.com2.message.MessageProcessor;
  */
 public interface State<T, E extends Enum<E>>
 {
-    public State<T,E> receive( T context, Message message, MessageProcessor outgoing ) throws Throwable;
+    public State<T,E> handle( T context, Message message, MessageProcessor outgoing ) throws Throwable;
 }

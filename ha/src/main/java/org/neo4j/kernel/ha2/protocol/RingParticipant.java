@@ -26,7 +26,7 @@ import java.io.Serializable;
  * TODO
  */
 public class RingParticipant
-    implements Serializable
+    implements Serializable, Comparable<RingParticipant>
 {
     private String serverId;
 
@@ -38,6 +38,12 @@ public class RingParticipant
     public String getServerId()
     {
         return serverId;
+    }
+
+    @Override
+    public int compareTo( RingParticipant o )
+    {
+        return serverId.compareTo( o.serverId );
     }
 
     @Override

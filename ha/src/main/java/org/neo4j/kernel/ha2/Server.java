@@ -34,6 +34,7 @@ import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -96,7 +97,7 @@ public class Server
 
         networkedStateMachine = new NetworkedStateMachine( node, node, stateMachine );
         life.add(new TimeoutMessageFailureHandler( networkedStateMachine, networkedStateMachine, node,
-                                                   new FixedTimeoutStrategy(TimeUnit.SECONDS.toMillis( 10 )) ));
+                                                   new FixedTimeoutStrategy(TimeUnit.SECONDS.toMillis( 2 )) ));
 
         life.add( node );
         life.add( networkedStateMachine );
@@ -115,15 +116,7 @@ public class Server
         life.start();
 
         tokenRing = proxyFactory.newProxy( TokenRing.class );
-        tokenRing.start();
-
-        try
-        {
-            Thread.sleep(2000);
-        } catch (InterruptedException e)
-        {
-            e.printStackTrace();
-        }
+        tokenRing.joinRing();
     }
 
     @Override
@@ -138,6 +131,11 @@ public class Server
     public void shutdown()
         throws Throwable
     {
+    }
+
+    public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
+    {
+        stateMachine.addStateTransitionListener( stateTransitionListener );
     }
 
     public <T> T newClient( Class<T> clientProxyInterface )

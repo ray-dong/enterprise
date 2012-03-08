@@ -28,7 +28,7 @@ import org.neo4j.kernel.ha2.protocol.RingParticipant;
  */
 public interface TokenRing
 {
-    void start();
+    void joinRing();
     void leaveRing();
     void sendToken();
     Future<Iterable<RingParticipant>> getParticipants();

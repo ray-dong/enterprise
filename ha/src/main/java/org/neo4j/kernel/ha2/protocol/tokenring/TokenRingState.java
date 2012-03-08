@@ -40,18 +40,18 @@ public enum TokenRingState
 {
     start
             {
-                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context,
-                                                                          Message message,
-                                                                          MessageProcessor outgoing
+                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                                                                         Message message,
+                                                                         MessageProcessor outgoing
                 ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
                     switch(messageType)
                     {
                         // Method call
-                        case start:
+                        case joinRing:
                             outgoing.process( broadcast( discoverRing ) );
-                            return initial;
+                            return joiningRing;
 
                         default:
                             if (!message.hasHeader( Message.TO ))
@@ -61,45 +61,67 @@ public enum TokenRingState
                 }
             },
 
-    initial
+    joiningRing
             {
-                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context,
-                                                                          Message message,
-                                                                          MessageProcessor outgoing
+                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                                                                         Message message,
+                                                                         MessageProcessor outgoing
                 ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
                     switch (messageType)
                     {
+                        case joining:
+                        {
+                            RingParticipant from = new RingParticipant(message.getHeader( FROM ));
+                            context.addJoining(from);
+                            return this;
+                        }
+                    
                         case ringDiscovered:
                         {
                             context.setNeighbours((RingNeighbours)message.getPayload());
                             return slave;
                         }
 
-                        case discoveryTimedOut:
+                        case ringDiscoveryTimedOut:
                         {
-                            context.setNeighbours(context.getMe(), context.getMe());
-                            return master;
-                        }
-
-                        case discoverRing:
-                        {
-                            RingParticipant from = new RingParticipant(message.getHeader( FROM ));
-                            if ( from.getServerId().compareTo( context.getMe().getServerId() )>0)
+                            // Check if we found other joining participants
+                            List<RingParticipant> otherJoining = context.consumeJoining();
+                            if (otherJoining.isEmpty())
                             {
-                                // We're both looking for ring but this server has higher server id so wins
-                                // and switches to master mode
-
-                                context.setNeighbours(from, from);
-                                
-                                outgoing.process( Message.to( ringDiscovered, from, new RingNeighbours(context.getMe(), context.getMe()) ) );
-                                
+                                context.setNeighbours(context.getMe(), context.getMe());
                                 return master;
                             } else
                             {
-                                return this;
+                                // Highest creates ring
+                                otherJoining.add( context.getMe() );
+                                Collections.sort( otherJoining );
+                                if (otherJoining.get( 0 ).equals( context.getMe() ))
+                                {
+                                    // I won - create ring as master and invite others
+                                    for(int i = 1; i < otherJoining.size(); i++)
+                                    {
+                                        RingNeighbours ringNeighbours = new RingNeighbours( otherJoining.get( (i+1)%otherJoining.size() ), otherJoining.get( i-1 ) );
+                                        outgoing.process( Message.to( ringDiscovered, otherJoining.get( i ), ringNeighbours ) );
+                                    }
+
+                                    context.setNeighbours( otherJoining.get( 1 ), otherJoining.get( otherJoining.size()-1 ) );
+
+                                    return master;
+                                } else
+                                    return this; // This is scary - what if we never get a ringDiscovered from the master? Probably need another timeout here
                             }
+                        }
+                        
+                        case discoverRing:
+                        {
+                            // Found other participant that is also joining right now
+                            RingParticipant from = new RingParticipant(message.getHeader( FROM ));
+                            context.addJoining(from);
+                            outgoing.process( Message.to( joining, from, new RingNeighbours(context.getMe(), context.getMe()) ) );
+
+                            return this;
                         }
 
                         default:
@@ -110,9 +132,9 @@ public enum TokenRingState
 
     master
             {
-                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context,
-                                                                          Message message,
-                                                                          MessageProcessor outgoing
+                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                                                                         Message message,
+                                                                         MessageProcessor outgoing
                 ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
@@ -186,7 +208,10 @@ public enum TokenRingState
 
     slave
             {
-                public State<TokenRingContext, TokenRingMessage> receive( TokenRingContext context, Message message, MessageProcessor outgoing ) throws Throwable
+                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                                                                         Message message,
+                                                                         MessageProcessor outgoing
+                ) throws Throwable
                 {
                     TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();
                     switch ( messageType )
@@ -241,7 +266,7 @@ public enum TokenRingState
                     }
                 }
             };
-
+    
     private static void getParticipants( TokenRingContext context, Message message, MessageProcessor outgoing )
     {
         TokenRingMessage messageType = (TokenRingMessage) message.getMessageType();

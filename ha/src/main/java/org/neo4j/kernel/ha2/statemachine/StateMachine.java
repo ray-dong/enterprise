@@ -84,12 +84,12 @@ public class StateMachine<CONTEXT, E extends Enum<E>>
         listeners = newlisteners;
     }
 
-    public synchronized void receive(Message message, MessageProcessor outgoing)
+    public synchronized void handle( Message message, MessageProcessor outgoing )
     {
         try
         {
             State<CONTEXT,E> oldState = state;
-            State<CONTEXT,E> newState = state.receive(context, message, outgoing );
+            State<CONTEXT,E> newState = state.handle( context, message, outgoing );
             state = newState;
 
             StateTransition transition = new StateTransition( oldState, message, newState );
@@ -102,12 +102,10 @@ public class StateMachine<CONTEXT, E extends Enum<E>>
                 catch( Throwable e )
                 {
                     // Ignore
+                    e.printStackTrace(  );
                 }
             }
 
-        } catch (IllegalStateException throwable)
-        {
-            System.out.println(throwable.getMessage());
         } catch (Throwable throwable)
         {
             throwable.printStackTrace();

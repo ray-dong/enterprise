@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
@@ -32,6 +34,8 @@ public class TokenRingContext
 {
     private RingParticipant me;
     private RingNeighbours neighbours;
+    
+    List<RingParticipant> joining = new ArrayList<RingParticipant>(  );
     
     public RingParticipant getMe()
     {
@@ -77,5 +81,25 @@ public class TokenRingContext
     public boolean isAlone()
     {
         return neighbours.getAfter().equals(me);
+    }
+
+    // This is for the join protocol specifically
+    public void addJoining( RingParticipant from )
+    {
+        if (!joining.contains( from ))
+            joining.add(from);
+    }
+
+    public List<RingParticipant> consumeJoining()
+    {
+        try
+        {
+            return joining;
+        }
+        finally
+        {
+            // Clear the list
+            joining = new ArrayList<RingParticipant>(  );
+        }
     }
 }

@@ -101,7 +101,7 @@ public class NetworkedStateMachine
     @Override
     public synchronized void process( Message message )
     {
-        stateMachine.receive( message, outgoing );
+        stateMachine.handle( message, outgoing );
 
         // Process and send messages
         for( Message outgoingMessage : outgoingMessages )
@@ -110,14 +110,28 @@ public class NetworkedStateMachine
 
             for( MessageProcessor outgoingProcessor : outgoingProcessors )
             {
-                outgoingProcessor.process( outgoingMessage );
+                try
+                {
+                    outgoingProcessor.process( outgoingMessage );
+                }
+                catch( Throwable e )
+                {
+                    e.printStackTrace();
+                }
             }
 
             if( outgoingMessage.hasHeader( Message.TO ) )
             {
                 outgoingMessage.setHeader( Message.FROM, me.getServerId() );
 
-                sender.process( outgoingMessage );
+                try
+                {
+                    sender.process( outgoingMessage );
+                }
+                catch( Throwable e )
+                {
+                    e.printStackTrace();
+                }
             }
         }
         outgoingMessages.clear();
