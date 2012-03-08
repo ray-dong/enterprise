@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2;
 
 import java.net.URI;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import org.neo4j.com2.NetworkNode;
 import org.neo4j.kernel.LifeSupport;
@@ -58,12 +59,9 @@ public class Server
 
     private final LifeSupport life = new LifeSupport();
     private TokenRing tokenRing;
-    private Configuration config;
 
     public Server( Configuration config )
     {
-        this.config = config;
-
         context = new TokenRingContext();
         stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
 
@@ -97,7 +95,8 @@ public class Server
         } );
 
         networkedStateMachine = new NetworkedStateMachine( node, node, stateMachine );
-        life.add(new TimeoutMessageFailureHandler( networkedStateMachine, networkedStateMachine, node ));
+        life.add(new TimeoutMessageFailureHandler( networkedStateMachine, networkedStateMachine, node,
+                                                   new FixedTimeoutStrategy(TimeUnit.SECONDS.toMillis( 10 )) ));
 
         life.add( node );
         life.add( networkedStateMachine );
@@ -120,7 +119,7 @@ public class Server
 
         try
         {
-            Thread.sleep(10000);
+            Thread.sleep(2000);
         } catch (InterruptedException e)
         {
             e.printStackTrace();

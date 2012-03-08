@@ -37,7 +37,7 @@ public class Message
 
     public static Message broadcast(MessageType message, Object payload)
     {
-        return new Message(message, payload).setHeader( TO, "*" );
+        return new Message(message, payload).setHeader( TO, BROADCAST );
     }
 
     public static Message to(MessageType message, Object to)
@@ -60,6 +60,8 @@ public class Message
     public static final String CREATED_BY = "created-by";
     public static final String FROM = "from";
     public static final String TO = "to";
+    
+    public static final String BROADCAST = "*";
 
     final private MessageType messageType;
     final private Object payload;
@@ -92,6 +94,16 @@ public class Message
         return headers.containsKey( name );
     }
     
+    public boolean isInternal()
+    {
+        return !headers.containsKey( Message.TO );
+    }
+    
+    public boolean isBroadcast()
+    {
+        return !isInternal() && getHeader( Message.TO ).equals( BROADCAST );
+    }
+    
     public String getHeader(String name)
         throws IllegalArgumentException
     {
@@ -116,6 +128,6 @@ public class Message
     @Override
     public String toString()
     {
-        return messageType.name()+headers;
+        return messageType.name()+headers+(payload != null && payload instanceof String ? ": "+payload : "");
     }
 }

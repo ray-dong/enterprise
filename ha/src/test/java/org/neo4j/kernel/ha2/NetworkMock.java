@@ -85,7 +85,7 @@ public class NetworkMock
         for( Message message : messages )
         {
             String to = message.getHeader( Message.TO );
-            if ( to.equals( "*" ))
+            if ( to.equals( Message.BROADCAST ))
             {
                 for( Map.Entry<String, TestServer> testServer : participants.entrySet() )
                 {

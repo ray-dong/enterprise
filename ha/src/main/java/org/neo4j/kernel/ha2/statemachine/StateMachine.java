@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.statemachine;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Future;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 
@@ -48,13 +49,23 @@ public class StateMachine<CONTEXT, E extends Enum<E>>
     {
         return context;
     }
-    
+
+    public State<CONTEXT, E> getState()
+    {
+        return state;
+    }
+
     public void checkValidProxyInterface(Class<?> proxyInterface)
         throws IllegalArgumentException
     {
         for( Method method : proxyInterface.getMethods() )
         {
             Enum.valueOf( messageEnumType, method.getName() );
+            
+            if (!(method.getReturnType().equals( Void.TYPE ) || method.getReturnType().equals( Future.class )))
+            {
+                throw new IllegalArgumentException( "Methods must return either void or Future" );
+            }
         }
     }
 

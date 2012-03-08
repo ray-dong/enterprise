@@ -68,8 +68,8 @@ public class StateMachineProxyFactory
     {
         String conversationId = conversations.getNextConversationId();
 
-        Enum typeAsEnum = Enum.valueOf( messageTypeEnum, method.getName() );
-        Message message = Message.internal( (MessageType) typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
+        MessageType typeAsEnum = (MessageType)Enum.valueOf( messageTypeEnum, method.getName() );
+        Message message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
 
         if (method.getReturnType().equals( Void.TYPE ))
         {
@@ -78,75 +78,66 @@ public class StateMachineProxyFactory
         }
         else
         {
-            ResponseFuture future = new ResponseFuture(method.getName());
+            ResponseFuture future = new ResponseFuture(typeAsEnum);
             responseFutureMap.put( conversationId, future );
             incoming.process( message );
 
-            try
-            {
-                if (method.getReturnType().equals( Future.class ))
-                {
-                    // Return the future and let client decide on how to wait
-                    return future;
-                }
-                else
-                {
-                    // Wait for response or timeout/failure
-                    return future.get(  );
-                }
-            }
-            catch( InterruptedException e )
-            {
-                throw e;
-            }
-            catch( ExecutionException e )
-            {
-                throw e.getCause();
-            }
+            return future;
         }
     }
 
     @Override
     public void process( Message message )
     {
-        if (!message.hasHeader( Message.TO ) && !responseFutureMap.isEmpty())
+        if (!responseFutureMap.isEmpty())
         {
-            String conversationId = message.getHeader( Message.CONVERSATION_ID );
-            ResponseFuture future = responseFutureMap.get( conversationId );
-            if (future != null && !future.wasInitiatedBy(message.getMessageType().name()))
+            if (message.hasHeader( Message.TO ))
             {
-                future.setResponse( message.getPayload() );
-                responseFutureMap.remove( conversationId );
+                String conversationId = message.getHeader( Message.CONVERSATION_ID );
+                ResponseFuture future = responseFutureMap.get( conversationId );
+                if (future != null && !future.wasInitiatedBy(message.getMessageType().name()))
+                {
+                    future.updateMessage( message );
+                }
+
+            } else
+            {
+                String conversationId = message.getHeader( Message.CONVERSATION_ID );
+                ResponseFuture future = responseFutureMap.get( conversationId );
+                if (future != null && !future.wasInitiatedBy(message.getMessageType().name()))
+                {
+                    future.setResponse( message );
+                    responseFutureMap.remove( conversationId );
+                }
             }
         }
     }
 
     class ResponseFuture
-        implements Future
+        implements Future<Object>
     {
-        private String initiatedByMessageType;
-        private Object response;
-        private Exception exception;
+        private MessageType initiatedByMessageType;
 
-        ResponseFuture( String initiatedByMessageType )
+        private Message response;
+
+        ResponseFuture( MessageType initiatedByMessageType)
         {
             this.initiatedByMessageType = initiatedByMessageType;
         }
 
         public boolean wasInitiatedBy( String name )
         {
-            return initiatedByMessageType.equals( name );
+            return initiatedByMessageType.name().equals( name );
         }
 
-        public synchronized void setResponse( Object response )
+        public synchronized void updateMessage( Message message )
+        {
+            initiatedByMessageType = message.getMessageType();
+        }
+
+        public synchronized void setResponse( Message response )
         {
             this.response = response;
-            this.notifyAll();
-        }
-
-        public synchronized void setException( Exception exception )
-        {
-            this.exception = exception;
             this.notifyAll();
         }
 
@@ -165,7 +156,7 @@ public class StateMachineProxyFactory
         @Override
         public boolean isDone()
         {
-            return response != null || exception != null;
+            return response != null;
         }
 
         @Override
@@ -173,14 +164,40 @@ public class StateMachineProxyFactory
             throws InterruptedException, ExecutionException
         {
             if (response != null)
-                return response;
-            
-            if (exception != null)
-                throw new ExecutionException( exception );
-            
+            {
+                return getResult();
+            }
+
             this.wait();
             
-            return get( );
+            return getResult();
+        }
+
+        private Object getResult()
+            throws InterruptedException, ExecutionException
+        {
+            if (response.getMessageType().equals( initiatedByMessageType.failureMessage() ))
+            {
+                // Call timed out
+                if (response.getPayload() != null)
+                {
+                    if (response.getPayload() instanceof Throwable)
+                    {
+                        throw new ExecutionException( (Throwable) response.getPayload() );
+                    } else
+                    {
+                        throw new InterruptedException( response.getPayload().toString() );
+                    }
+                } else
+                {
+                    // No message specified
+                    throw new InterruptedException(  );
+                }
+            } else
+            {
+                // Return result
+                return response.getPayload();
+            }
         }
 
         @Override
@@ -188,14 +205,13 @@ public class StateMachineProxyFactory
             throws InterruptedException, ExecutionException, TimeoutException
         {
             if (response != null)
-                return response;
+            {
+                getResult();
+            }
 
-            if (exception != null)
-                throw new ExecutionException( exception );
-            
             this.wait(unit.toMillis( timeout ));
             
-            return get( timeout, unit);
+            return getResult();
         }
     }
 }

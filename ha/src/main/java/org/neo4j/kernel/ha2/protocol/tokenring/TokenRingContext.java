@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import java.util.logging.Logger;
+import org.neo4j.com2.message.Message;
 import org.neo4j.kernel.ha2.protocol.RingNeighbours;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
@@ -66,5 +67,15 @@ public class TokenRingContext
     public void newAfter(RingParticipant after)
     {
         setNeighbours(new RingNeighbours(neighbours.getBefore(), after));
+    }
+
+    public boolean isConversationCreatedByMe( Message message )
+    {
+        return me.toString().equals(message.getHeader( Message.CREATED_BY ));
+    }
+
+    public boolean isAlone()
+    {
+        return neighbours.getAfter().equals(me);
     }
 }

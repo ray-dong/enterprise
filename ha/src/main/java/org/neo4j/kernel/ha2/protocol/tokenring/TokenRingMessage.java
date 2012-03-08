@@ -29,12 +29,13 @@ public enum TokenRingMessage
     implements MessageType
 {
     failure,
+    discoveryTimedOut,
     ringDiscovered,
-    discoverRing(failure, ringDiscovered),
+    discoverRing( discoveryTimedOut, ringDiscovered),
     newAfter,newBefore,
     leaveRing,
     becomeMaster, sendToken,
-    getParticipantsResponse,getParticipants(failure, getParticipantsResponse ),
+    getRingParticipantsResponse, getRingParticipants( failure, getRingParticipantsResponse ), getParticipants,
     start;
     
     private TokenRingMessage failureMessage;

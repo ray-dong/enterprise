@@ -35,10 +35,12 @@ public class TimeoutMessageFailureHandler
     implements Lifecycle
 {
     private ScheduledExecutorService expectationScheduler;
-    
-    public TimeoutMessageFailureHandler( MessageProcessor incoming, MessageSource outgoing, MessageSource source )
+    private TimeoutStrategy timeouts;
+
+    public TimeoutMessageFailureHandler( MessageProcessor incoming, MessageSource outgoing, MessageSource source, TimeoutStrategy timeouts )
     {
         super( incoming, outgoing, source );
+        this.timeouts = timeouts;
     }
 
     @Override
@@ -72,6 +74,6 @@ public class TimeoutMessageFailureHandler
     {
         super.expectation( expectationFailure );
 
-        expectationScheduler.schedule( expectationFailure, 3, TimeUnit.SECONDS );
+        expectationScheduler.schedule( expectationFailure, timeouts.timeoutFor( expectationFailure.getMessage()), TimeUnit.MILLISECONDS );
     }
 }

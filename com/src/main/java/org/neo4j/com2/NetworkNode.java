@@ -187,7 +187,7 @@ public class NetworkNode
     {
         String to = message.getHeader( Message.TO );
         
-        if (to.equals( "*" ))
+        if (to.equals( Message.BROADCAST ))
         {
             broadcast( message );
         } else
@@ -216,7 +216,7 @@ public class NetworkNode
         } );
     }
 
-    public void broadcast(Message message)
+    private void broadcast(Message message)
     {
         for (int i = 1234; i < 1234+2; i++)
         {
@@ -230,7 +230,7 @@ public class NetworkNode
         }
     }
 
-    public void send(Message message)
+    private void send(Message message)
     {
         URI to = null;
         try

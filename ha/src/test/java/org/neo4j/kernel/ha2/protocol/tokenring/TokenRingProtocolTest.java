@@ -20,14 +20,6 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import static junit.framework.Assert.assertFalse;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.initial;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.master;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.slave;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.start;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -38,7 +30,6 @@ import java.util.logging.Formatter;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,6 +41,11 @@ import org.neo4j.kernel.ha2.TestServer;
 import org.neo4j.kernel.ha2.Verifier;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.State;
+
+import static junit.framework.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.*;
 
 /**
  * TODO
@@ -132,7 +128,7 @@ public class TokenRingProtocolTest
     {
         TokenRing member1 = newMember( ID1,
                 TokenRingMessage.start, initial,
-                TokenRingMessage.failure, master );
+                TokenRingMessage.discoveryTimedOut, master );
         network.tickUntilDone();
         assertRingParticipants( member1.getParticipants(), ID1 );
         verifyNeighbours( ID1, ID1, ID1 );
@@ -152,7 +148,7 @@ public class TokenRingProtocolTest
     {
         newMember( ID1,
                 TokenRingMessage.start, initial,
-                TokenRingMessage.failure, master );
+                TokenRingMessage.discoveryTimedOut, master );
         network.tickUntilDone();
         newMember( ID2,
                 TokenRingMessage.start, initial,
@@ -171,7 +167,7 @@ public class TokenRingProtocolTest
     {
         newMember( ID1,
                 TokenRingMessage.start, initial,
-                TokenRingMessage.failure, master );
+                TokenRingMessage.discoveryTimedOut, master );
         network.tickUntilDone();
         newMember( ID2,
                 TokenRingMessage.start, initial,
@@ -199,7 +195,7 @@ public class TokenRingProtocolTest
         String server1 = "server1";
         network.addServer( server1).addStateTransitionListener( expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
-            .expect( TokenRingMessage.failure, master )
+            .expect( TokenRingMessage.discoveryTimedOut, master )
             .expect( TokenRingMessage.discoverRing, master )
             .expect( TokenRingMessage.discoverRing, master )
             .expect( TokenRingMessage.leaveRing, start )
@@ -246,7 +242,7 @@ public class TokenRingProtocolTest
         String server1 = "server1";
         network.addServer( server1 ).addStateTransitionListener(expectations.newExpectations().includeUnchangedStates()
             .expect( TokenRingMessage.start, initial )
-            .expect( TokenRingMessage.failure, master )
+            .expect( TokenRingMessage.discoveryTimedOut, master )
             .expect( TokenRingMessage.discoverRing, master )
             .expect( TokenRingMessage.discoverRing, master )
             .expect( TokenRingMessage.newAfter, master )
@@ -289,7 +285,7 @@ public class TokenRingProtocolTest
         String participant1 = "server1";
         TestServer server1 = network.addServer( participant1 ).addStateTransitionListener( expectations.newExpectations()
                                                                                                .expect( TokenRingMessage.start, initial )
-                                                                                               .expect( TokenRingMessage.failure, master )
+                                                                                               .expect( TokenRingMessage.discoveryTimedOut, master )
                                                                                                .expect( TokenRingMessage.sendToken, slave )
                                                                                                .build( participant1 ) );
         server1.newClient( TokenRing.class ).start();
