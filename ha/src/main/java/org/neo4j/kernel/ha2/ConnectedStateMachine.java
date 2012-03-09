@@ -26,8 +26,6 @@ import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
-import org.neo4j.kernel.Lifecycle;
-import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 
 import static org.neo4j.com2.message.Message.*;
@@ -35,13 +33,11 @@ import static org.neo4j.com2.message.Message.*;
 /**
  * TODO
  */
-public class NetworkedStateMachine
-    implements Lifecycle, MessageProcessor, MessageSource
+public class ConnectedStateMachine
+    implements MessageProcessor, MessageSource
 {
-    private Logger logger = Logger.getLogger( NetworkedStateMachine.class.getName() );
+    private Logger logger = Logger.getLogger( ConnectedStateMachine.class.getName() );
     
-    private RingParticipant me;
-    private final MessageSource source;
     private MessageProcessor sender;
     private StateMachine stateMachine;
 
@@ -49,47 +45,16 @@ public class NetworkedStateMachine
     private List<MessageProcessor> outgoingProcessors = new ArrayList<MessageProcessor>(  );
     protected final MessageProcessor outgoing;
 
-    public NetworkedStateMachine( MessageSource source,
+    public ConnectedStateMachine( MessageSource source,
                                   final MessageProcessor sender,
                                   final StateMachine stateMachine
     )
     {
-        this.source = source;
         this.sender = sender;
         this.stateMachine = stateMachine;
 
         outgoing = new OutgoingMessageProcessor();
-    }
-
-    @Override
-    public void init()
-        throws Throwable
-    {
         source.addMessageProcessor( this );
-    }
-
-    @Override
-    public void start()
-        throws Throwable
-    {
-        logger.info( "=== " + me + " starts" );
-    }
-
-    @Override
-    public void stop()
-        throws Throwable
-    {
-    }
-
-    @Override
-    public void shutdown()
-        throws Throwable
-    {
-    }
-    
-    public void setMe(RingParticipant participant)
-    {
-        this.me = participant;
     }
 
     @Override
@@ -116,21 +81,21 @@ public class NetworkedStateMachine
                 }
                 catch( Throwable e )
                 {
-                    e.printStackTrace();
+                    logger.warning( "Outgoing message processor threw exception" );
+                    logger.throwing( ConnectedStateMachine.class.getName(), "process", e );
                 }
             }
 
             if( outgoingMessage.hasHeader( Message.TO ) )
             {
-                outgoingMessage.setHeader( Message.FROM, me.getServerId() );
-
                 try
                 {
                     sender.process( outgoingMessage );
                 }
                 catch( Throwable e )
                 {
-                    e.printStackTrace();
+                    logger.warning( "Message sending threw exception" );
+                    logger.throwing( ConnectedStateMachine.class.getName(), "process", e );
                 }
             }
         }

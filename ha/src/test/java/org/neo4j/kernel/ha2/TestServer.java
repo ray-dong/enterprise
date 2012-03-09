@@ -31,13 +31,7 @@ import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.protocol.tokenring.ServerIdRingParticipantComparator;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState;
-import org.neo4j.kernel.ha2.statemachine.StateMachine;
-import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
-import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
-import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 
 /**
  * TODO
@@ -45,50 +39,34 @@ import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 public class TestServer
     implements MessageProcessor
 {
-    protected final StateMachine<TokenRingContext, TokenRingMessage> stateMachine;
-    protected final StateMachineConversations conversations;
-    protected final TokenRingContext context;
     protected final TestMessageSource receiver;
     protected final TestMessageSender sender;
-    protected final StateMachineProxyFactory proxyFactory;
-    protected final NetworkedStateMachine networkedStateMachine;
-    protected final TestMessageFailureHandler failureHandler;
+    protected TestMessageFailureHandler failureHandler;
 
     private Logger logger = Logger.getLogger( getClass().getName() );
 
     private final LifeSupport life = new LifeSupport();
+    protected final Server server;
+    protected final TokenRingContext tokenRingContext;
 
     public TestServer( String serverId )
     {
         RingParticipant participant = new RingParticipant( serverId );
         
-        context = new TokenRingContext(new ServerIdRingParticipantComparator());
-        stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
-        conversations = new StateMachineConversations(serverId);
-
         this.receiver = new TestMessageSource();
         this.sender = new TestMessageSender();
-        networkedStateMachine = new NetworkedStateMachine( receiver, sender, stateMachine );
 
-        stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger() ) );
-
-        proxyFactory = new StateMachineProxyFactory( serverId, TokenRingMessage.class, stateMachine, networkedStateMachine, conversations );
-        networkedStateMachine.addMessageProcessor( proxyFactory );
-
-        failureHandler = new TestMessageFailureHandler(networkedStateMachine, networkedStateMachine, receiver);
+        tokenRingContext = new TokenRingContext(new ServerIdRingParticipantComparator());
+        server = new Server( tokenRingContext, receiver, sender, new TestFailureHandlerFactory() );
         
-        context.setMe( participant );
-        networkedStateMachine.setMe( participant );
+        server.listeningAt( participant );
 
-        
-        life.add( networkedStateMachine );
-
-        start();
+        life.add( server );
     }
     
     public void verifyState( Verifier<TokenRingContext> verifier )
     {
-        verifier.verify( context );
+        verifier.verify( tokenRingContext );
     }
 
     @Override
@@ -115,12 +93,12 @@ public class TestServer
 
     public <T> T newClient( Class<T> clientProxyInterface )
     {
-        return proxyFactory.newProxy(clientProxyInterface);
+        return server.newClient( clientProxyInterface );
     }
     
     public TestServer addStateTransitionListener(StateTransitionListener listener)
     {
-        stateMachine.addStateTransitionListener( listener );
+        server.addStateTransitionListener( listener );
         return this;
     }
 
@@ -182,6 +160,19 @@ public class TestServer
             {
                 expectationFailure.run();
             }
+        }
+    }
+
+    private class TestFailureHandlerFactory
+        implements AbstractMessageFailureHandler.Factory
+    {
+        @Override
+        public AbstractMessageFailureHandler newMessageFailureHandler( MessageProcessor incoming,
+                                                                       MessageSource outgoing,
+                                                                       MessageSource source
+        )
+        {
+            return failureHandler = new TestMessageFailureHandler( incoming, outgoing, receiver);
         }
     }
 }

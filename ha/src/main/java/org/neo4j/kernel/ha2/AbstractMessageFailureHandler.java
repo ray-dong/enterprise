@@ -34,6 +34,11 @@ import static org.neo4j.com2.message.Message.*;
  */
 public class AbstractMessageFailureHandler
 {
+    public interface Factory
+    {
+        AbstractMessageFailureHandler newMessageFailureHandler(MessageProcessor incoming, MessageSource outgoing, MessageSource source);
+    }
+
     private MessageProcessor incoming;
     protected Map<String, ExpectationFailure> expectations;
 

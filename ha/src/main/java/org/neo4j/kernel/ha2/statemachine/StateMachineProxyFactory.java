@@ -63,6 +63,11 @@ public class StateMachineProxyFactory
         return proxyInterface.cast( Proxy.newProxyInstance( proxyInterface.getClassLoader(), new Class<?>[]{ proxyInterface }, new StateMachineProxyHandler( this ) ) );
     }
 
+    public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
+    {
+        stateMachine.addStateTransitionListener( stateTransitionListener );
+    }
+
     Object invoke( Method method, Object arg )
         throws Throwable
     {

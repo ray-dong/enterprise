@@ -31,8 +31,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.helpers.Specifications;
 import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
+import org.neo4j.kernel.ha2.NetworkedServerFactory;
 import org.neo4j.kernel.ha2.Server;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.statemachine.StateTransition;
@@ -83,20 +83,23 @@ public class TokenRingNetworkTest
     {
         Map<String, String> config = MapUtil.stringMap( "port", "1234-1244" );
 
-        Server.Configuration configuration = ConfigProxy.config( config, Server.Configuration.class );
         LifeSupport life = new LifeSupport();
-        final Server server1 = new Server( configuration );
-        life.add( server1 );
-        Server server2 = new Server( configuration );
-        life.add( server2 );
-        Server server3 = new Server( configuration );
-        life.add( server3 );
+        NetworkedServerFactory serverFactory = new NetworkedServerFactory( life );
 
-        showParticipants( server1 );
-        showParticipants( server2 );
-        showParticipants( server3 );
+        final Server server1 = serverFactory.newNetworkedServer( config );
+        final Server server2 = serverFactory.newNetworkedServer( config );
+        final Server server3 = serverFactory.newNetworkedServer( config );
+
+        onJoinShowParticipants( server1 );
+        onJoinShowParticipants( server2 );
+        onJoinShowParticipants( server3 );
 
         life.start();
+
+        server1.newClient( TokenRing.class ).joinRing();
+        server2.newClient( TokenRing.class ).joinRing();
+        server3.newClient( TokenRing.class ).joinRing();
+
 
         try
         {
@@ -111,7 +114,7 @@ public class TokenRingNetworkTest
         life.shutdown();
     }
 
-    private void showParticipants( final Server server )
+    private void onJoinShowParticipants( final Server server )
     {
         server.addStateTransitionListener( new StateTransitionListener()
         {

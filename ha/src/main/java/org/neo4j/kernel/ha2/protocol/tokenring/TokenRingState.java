@@ -33,7 +33,7 @@ import static org.neo4j.com2.message.Message.*;
 import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
 
 /**
- * TODO
+ * State machine for the Token Ring cluster management protocol.
  */
 public enum TokenRingState
         implements State<TokenRingContext, TokenRingMessage>

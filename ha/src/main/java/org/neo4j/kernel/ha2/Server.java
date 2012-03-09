@@ -20,14 +20,13 @@
 
 package org.neo4j.kernel.ha2;
 
-import java.net.URI;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import org.neo4j.com2.NetworkNode;
-import org.neo4j.kernel.LifeSupport;
+import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageSource;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
-import org.neo4j.kernel.ha2.protocol.tokenring.ServerIdRingParticipantComparator;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
@@ -37,7 +36,6 @@ import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
-import org.neo4j.kernel.impl.util.StringLogger;
 
 /**
  * TODO
@@ -45,12 +43,10 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public class Server
     implements Lifecycle
 {
-
     protected final StateMachine<TokenRingContext, TokenRingMessage> stateMachine;
     protected final TokenRingContext context;
-    protected final NetworkNode node;
     protected StateMachineProxyFactory proxyFactory;
-    protected final NetworkedStateMachine networkedStateMachine;
+    protected final ConnectedStateMachine connectedStateMachine;
 
     public interface Configuration
         extends NetworkNode.Configuration
@@ -59,51 +55,15 @@ public class Server
 
     private Logger logger = Logger.getLogger( getClass().getName() );
 
-    private final LifeSupport life = new LifeSupport();
-    private TokenRing tokenRing;
-
-    public Server( Configuration config )
+    public Server( TokenRingContext context, MessageSource input, MessageProcessor output, AbstractMessageFailureHandler.Factory failureHandlerFactory )
     {
-        context = new TokenRingContext(new ServerIdRingParticipantComparator());
+        this.context = context;
         stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
-
-        node = new NetworkNode( config, StringLogger.SYSTEM );
-        node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
-        {
-            @Override
-            public void listeningAt( URI me )
-            {
-                RingParticipant participant = new RingParticipant( me.toString() );
-                context.setMe( participant );
-                networkedStateMachine.setMe( participant );
-
-                stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger() ) );
-
-                StateMachineConversations conversations = new StateMachineConversations(participant.getServerId());
-                proxyFactory = new StateMachineProxyFactory( participant.getServerId(), TokenRingMessage.class, stateMachine, networkedStateMachine, conversations );
-                networkedStateMachine.addMessageProcessor( proxyFactory );
-
-            }
-
-            @Override
-            public void channelOpened( URI to )
-            {
-            }
-
-            @Override
-            public void channelClosed( URI to )
-            {
-            }
-        } );
-
-        networkedStateMachine = new NetworkedStateMachine( node, node, stateMachine );
-        life.add(new TimeoutMessageFailureHandler( networkedStateMachine, networkedStateMachine, node,
-                                                   new FixedTimeoutStrategy(TimeUnit.SECONDS.toMillis( 2 )) ));
-
-        life.add( node );
-        life.add( networkedStateMachine );
+        connectedStateMachine = new ConnectedStateMachine( input, output, stateMachine );
+        connectedStateMachine.addMessageProcessor( new FromHeaderMessageProcessor() );
+        failureHandlerFactory.newMessageFailureHandler( connectedStateMachine, connectedStateMachine, input );
     }
-
+    
     @Override
     public void init()
         throws Throwable
@@ -114,9 +74,7 @@ public class Server
     public void start()
         throws Throwable
     {
-        life.start();
-
-        tokenRing = proxyFactory.newProxy( TokenRing.class );
+        TokenRing tokenRing = proxyFactory.newProxy( TokenRing.class );
         tokenRing.joinRing();
     }
 
@@ -125,7 +83,6 @@ public class Server
         throws Throwable
     {
         logger.info( "Stop server" );
-        life.stop();
     }
 
     @Override
@@ -133,6 +90,21 @@ public class Server
         throws Throwable
     {
     }
+    
+    public void listeningAt( RingParticipant participant )
+    {
+        logger.info( "=== " + participant + " starts" );
+
+        context.setMe( participant );
+
+        stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger() ) );
+
+        StateMachineConversations conversations = new StateMachineConversations(participant.getServerId());
+        proxyFactory = new StateMachineProxyFactory( participant.getServerId(), TokenRingMessage.class, stateMachine, connectedStateMachine, conversations );
+        connectedStateMachine.addMessageProcessor( proxyFactory );
+
+    }
+    
 
     public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
     {
@@ -142,5 +114,18 @@ public class Server
     public <T> T newClient( Class<T> clientProxyInterface )
     {
         return proxyFactory.newProxy(clientProxyInterface);
+    }
+
+    private class FromHeaderMessageProcessor
+        implements MessageProcessor
+    {
+        @Override
+        public void process( Message message )
+        {
+            if( message.hasHeader( Message.TO ) )
+            {
+                message.setHeader( Message.FROM, context.getMe().getServerId() );
+            }
+        }
     }
 }
