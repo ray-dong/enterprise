@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
@@ -32,11 +33,18 @@ import org.neo4j.kernel.ha2.protocol.RingParticipant;
  */
 public class TokenRingContext
 {
+    private Comparator<RingParticipant> participantComparator;
+
     private RingParticipant me;
     private RingNeighbours neighbours;
-    
+
     List<RingParticipant> joining = new ArrayList<RingParticipant>(  );
-    
+
+    public TokenRingContext( Comparator<RingParticipant> participantComparator )
+    {
+        this.participantComparator = participantComparator;
+    }
+
     public RingParticipant getMe()
     {
         return me;
@@ -101,5 +109,10 @@ public class TokenRingContext
             // Clear the list
             joining = new ArrayList<RingParticipant>(  );
         }
+    }
+
+    public Comparator<RingParticipant> getParticipantComparator()
+    {
+        return participantComparator;
     }
 }

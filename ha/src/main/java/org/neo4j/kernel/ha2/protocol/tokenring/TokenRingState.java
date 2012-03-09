@@ -94,9 +94,9 @@ public enum TokenRingState
                                 return master;
                             } else
                             {
-                                // Highest creates ring
+                                // Find winner
                                 otherJoining.add( context.getMe() );
-                                Collections.sort( otherJoining );
+                                Collections.sort( otherJoining, context.getParticipantComparator() );
                                 if (otherJoining.get( 0 ).equals( context.getMe() ))
                                 {
                                     // I won - create ring as master and invite others

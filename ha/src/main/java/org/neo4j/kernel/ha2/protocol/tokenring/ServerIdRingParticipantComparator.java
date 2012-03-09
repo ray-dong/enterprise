@@ -18,50 +18,20 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol;
+package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import java.io.Serializable;
+import java.util.Comparator;
+import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
- * TODO
+ * RingParticipant comparator that compares server id's
  */
-public class RingParticipant
-    implements Serializable
+public class ServerIdRingParticipantComparator
+    implements Comparator<RingParticipant>
 {
-    private String serverId;
-
-    public RingParticipant(String serverId)
-    {
-        this.serverId = serverId;
-    }
-
-    public String getServerId()
-    {
-        return serverId;
-    }
-
     @Override
-    public boolean equals(Object o)
+    public int compare( RingParticipant o1, RingParticipant o2 )
     {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        RingParticipant that = (RingParticipant) o;
-
-        if (serverId != null ? !serverId.equals(that.serverId) : that.serverId != null) return false;
-
-        return true;
-    }
-
-    @Override
-    public int hashCode()
-    {
-        return serverId != null ? serverId.hashCode() : 0;
-    }
-
-    @Override
-    public String toString()
-    {
-        return serverId;
+        return o1.getServerId().compareTo( o2.getServerId() );
     }
 }

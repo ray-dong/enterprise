@@ -29,7 +29,7 @@ import org.neo4j.com2.message.MessageSource;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
+import org.neo4j.kernel.ha2.protocol.tokenring.ServerIdRingParticipantComparator;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState;
@@ -57,15 +57,12 @@ public class TestServer
     private Logger logger = Logger.getLogger( getClass().getName() );
 
     private final LifeSupport life = new LifeSupport();
-    private TokenRing tokenRing;
-    
-    Iterable<MessageProcessor> listeners = Listeners.newListeners();
 
     public TestServer( String serverId )
     {
         RingParticipant participant = new RingParticipant( serverId );
         
-        context = new TokenRingContext();
+        context = new TokenRingContext(new ServerIdRingParticipantComparator());
         stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
         conversations = new StateMachineConversations(serverId);
 

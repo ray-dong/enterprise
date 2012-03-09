@@ -27,6 +27,7 @@ import org.neo4j.com2.NetworkNode;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
+import org.neo4j.kernel.ha2.protocol.tokenring.ServerIdRingParticipantComparator;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage;
@@ -63,7 +64,7 @@ public class Server
 
     public Server( Configuration config )
     {
-        context = new TokenRingContext();
+        context = new TokenRingContext(new ServerIdRingParticipantComparator());
         stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
 
         node = new NetworkNode( config, StringLogger.SYSTEM );
