@@ -64,6 +64,4 @@ public enum TokenRingMessage
     {
         return failureMessage;
     }
-
-
 }

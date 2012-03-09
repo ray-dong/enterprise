@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2;
 
 import java.util.logging.Logger;
+
 import org.neo4j.com2.NetworkNode;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
@@ -105,6 +106,13 @@ public class Server
 
     }
     
+    /**
+     * Ok to have this accessible like this?
+     */
+    public String getServerId()
+    {
+        return context.getMe().getServerId();
+    }
 
     public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
     {

@@ -26,6 +26,7 @@ import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
 import org.neo4j.com2.message.MessageType;
+import org.neo4j.helpers.Specifications;
 
 import static org.neo4j.com2.message.Message.*;
 
@@ -80,9 +81,12 @@ public class AbstractMessageFailureHandler
         @Override
         public void process( Message message )
         {
-            ExpectationFailure expectationFailure = expectations.remove( message.getHeader( CONVERSATION_ID ) );
-            if( expectationFailure != null )
+            String conversationId = message.getHeader( CONVERSATION_ID );
+            ExpectationFailure expectationFailure = expectations.get( conversationId );
+            if ( expectationFailure != null &&
+                    Specifications.in( expectationFailure.getMessage().getMessageType().next() ).satisfiedBy( message.getMessageType() ) )
             {
+                expectations.remove( conversationId );
                 expectationFailure.cancel();
             }
         }

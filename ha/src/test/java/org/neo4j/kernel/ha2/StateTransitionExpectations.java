@@ -25,6 +25,7 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Logger;
+
 import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.StateTransition;
@@ -42,9 +43,12 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
     
     private final List<ExpectingStateTransitionListener> expectations = new ArrayList<ExpectingStateTransitionListener>();
     
-    public ExpectationsBuilder newExpectations()
+    public ExpectationsBuilder newExpectations( Enum<?>... initialAlternatingExpectedMessageAndState )
     {
-        return new ExpectationsBuilder();
+        ExpectationsBuilder builder = new ExpectationsBuilder();
+        for ( int i = 0; i < initialAlternatingExpectedMessageAndState.length; i++ )
+            builder.expect( (MessageType) initialAlternatingExpectedMessageAndState[i++], (State<CONTEXT,E>) initialAlternatingExpectedMessageAndState[i] );
+        return builder;
     }
     
     public void verify()
@@ -57,6 +61,14 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
         {
             throw new IllegalStateException( "Failed expectations:"+builder.toString() );
         }
+    }
+    
+    public boolean areFulfilled()
+    {
+        for ( ExpectingStateTransitionListener listener : expectations )
+            if ( !listener.isFulfilled() )
+                return false;
+        return true;
     }
 
     public void printRemaining( Logger logger )
@@ -170,6 +182,11 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
             {
                 builder.append( transition.toString() ).append( "\n" );
             }
+        }
+        
+        public boolean isFulfilled()
+        {
+            return valid && transitions.isEmpty();
         }
     }
     
