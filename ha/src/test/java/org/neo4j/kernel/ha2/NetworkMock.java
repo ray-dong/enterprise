@@ -35,7 +35,19 @@ import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
 public class NetworkMock
 {
     Map<String, TestServer> participants = new HashMap<String, TestServer>();
-    
+
+    private final NetworkFailureStrategy failureStrategy;
+
+    public NetworkMock()
+    {
+        this(new PerfectNetworkStrategy());
+    }
+
+    public NetworkMock( NetworkFailureStrategy failureStrategy )
+    {
+        this.failureStrategy = failureStrategy;
+    }
+
     public TestServer addServer( String serverId )
     {
         TestServer server = new TestServer( serverId );
@@ -91,17 +103,30 @@ public class NetworkMock
                 {
                     if (!testServer.getKey().equals( message.getHeader( Message.FROM ) ))
                     {
-                        Logger.getLogger("").info( "Broadcast to "+testServer.getKey()+": "+message);
-                        testServer.getValue().process( message );
-                        nrOfReceivedMessages++;
+                        if (failureStrategy.isLost( message, testServer.getKey() ))
+                        {
+                            Logger.getLogger("").info( "Broadcasted message to "+testServer.getKey()+" was lost");
+
+                        } else
+                        {
+                            Logger.getLogger("").info( "Broadcast to "+testServer.getKey()+": "+message);
+                            testServer.getValue().process( message );
+                            nrOfReceivedMessages++;
+                        }
                     }
                 }
             } else
             {
-                TestServer server = participants.get( to );
-                Logger.getLogger("").info( "Send to "+to+": "+message);
-                server.process( message );
-                nrOfReceivedMessages++;
+                if (failureStrategy.isLost( message, to ))
+                {
+                    Logger.getLogger("").info( "Send message to "+to+" was lost");
+                } else
+                {
+                    TestServer server = participants.get( to );
+                    Logger.getLogger("").info( "Send to "+to+": "+message);
+                    server.process( message );
+                    nrOfReceivedMessages++;
+                }
             }
         }
         return nrOfReceivedMessages;
