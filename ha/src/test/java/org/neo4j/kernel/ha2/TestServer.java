@@ -63,7 +63,12 @@ public class TestServer
 
         life.add( server );
     }
-    
+
+    public Server getServer()
+    {
+        return server;
+    }
+
     public void verifyState( Verifier<TokenRingContext> verifier )
     {
         verifier.verify( tokenRingContext );

@@ -29,7 +29,7 @@ public class PerfectNetworkStrategy
     implements NetworkFailureStrategy
 {
     @Override
-    public boolean isLost( Message message, String serverIdTo )
+    public boolean isLost( Message<?> message, String serverIdTo )
     {
         return false;
     }

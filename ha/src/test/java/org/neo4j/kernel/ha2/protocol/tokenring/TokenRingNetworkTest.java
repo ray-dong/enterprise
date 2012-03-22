@@ -20,11 +20,6 @@
 
 package org.neo4j.kernel.ha2.protocol.tokenring;
 
-import static org.junit.Assert.assertTrue;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.joiningRing;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.master;
-import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.slave;
-
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -34,7 +29,6 @@ import java.util.concurrent.Future;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,6 +44,9 @@ import org.neo4j.kernel.ha2.StateTransitionExpectations;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.impl.util.StringLogger;
 
+import static org.junit.Assert.*;
+import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.*;
+
 /**
  * TODO share expected conditions or even more with {@link TokenRingProtocolTest}
  */
@@ -63,8 +60,8 @@ public class TokenRingNetworkTest
     private LifeSupport life;
     private NetworkedServerFactory serverFactory;
     private Map<String,Pair<Server,TokenRing>> members = new HashMap<String, Pair<Server,TokenRing>>();
-    private StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations =
-            new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
+    private StateTransitionExpectations<TokenRingContext, TokenRingMessage, TokenRingState> expectations =
+            new StateTransitionExpectations<TokenRingContext, TokenRingMessage, TokenRingState>();
     private Goal goal = new Goal( 10000, 1000 );
     
     @Before

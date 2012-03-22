@@ -21,13 +21,14 @@
 package org.neo4j.kernel.ha2.statemachine;
 
 import java.util.logging.Logger;
+import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
  * TODO
  */
-public class StateTransitionLogger
-        implements StateTransitionListener
+public class StateTransitionLogger<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
+        implements StateTransitionListener<MESSAGETYPE>
 {
     private RingParticipant participant;
     private Logger logger;

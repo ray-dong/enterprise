@@ -20,10 +20,12 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
+import org.neo4j.com2.message.MessageType;
+
 /**
  * TODO
  */
-public interface StateTransitionListener
+public interface StateTransitionListener<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
 {
-    void stateTransition(StateTransition transition);
+    void stateTransition(StateTransition<MESSAGETYPE> transition);
 }

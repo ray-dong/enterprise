@@ -21,17 +21,18 @@
 package org.neo4j.kernel.ha2.statemachine;
 
 import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO
  */
-public class StateTransition
+public class StateTransition<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
 {
     private Object oldState;
-    private Message message;
+    private Message<MESSAGETYPE> message;
     private Object newState;
 
-    public StateTransition( Object oldState, Message message, Object newState )
+    public StateTransition( Object oldState, Message<MESSAGETYPE> message, Object newState )
     {
         this.oldState = oldState;
         this.message = message;
@@ -43,7 +44,7 @@ public class StateTransition
         return oldState;
     }
 
-    public Message getMessage()
+    public Message<MESSAGETYPE> getMessage()
     {
         return message;
     }

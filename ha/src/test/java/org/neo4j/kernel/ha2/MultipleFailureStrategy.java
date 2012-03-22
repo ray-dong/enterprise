@@ -18,16 +18,32 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.statemachine;
+package org.neo4j.kernel.ha2;
 
 import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageType;
 
 /**
- * TODO
+ * Ask a set of failure strategies if a message is lost. Anyone says yes, then it is lost.
  */
-public interface State<CONTEXT, MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>>
+public class MultipleFailureStrategy
+    implements NetworkFailureStrategy
 {
-    public STATE handle( CONTEXT context, Message<MESSAGETYPE> message, MessageProcessor outgoing ) throws Throwable;
+    private final NetworkFailureStrategy[] failureStrategies;
+
+    public MultipleFailureStrategy( NetworkFailureStrategy... failureStrategies )
+    {
+        this.failureStrategies = failureStrategies;
+    }
+
+    @Override
+    public boolean isLost( Message<?> message, String serverIdTo )
+    {
+        for( NetworkFailureStrategy failureStrategy : failureStrategies )
+        {
+            if (failureStrategy.isLost( message, serverIdTo ))
+                return true;
+        }
+        
+        return false;
+    }
 }

@@ -38,7 +38,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public class NetworkSendReceiveTest
 {
     public enum TestMessage
-        implements MessageType
+        implements MessageType<TestMessage>
     {
         helloWorld;
 
@@ -49,7 +49,7 @@ public class NetworkSendReceiveTest
         }
 
         @Override
-        public MessageType failureMessage()
+        public TestMessage failureMessage()
         {
             return null;
         }
@@ -110,7 +110,7 @@ public class NetworkSendReceiveTest
                     node.addMessageProcessor( new MessageProcessor()
                     {
                         @Override
-                        public void process( Message message )
+                        public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
                         {
                             System.out.println( message );
                         }

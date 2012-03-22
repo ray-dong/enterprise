@@ -26,7 +26,7 @@ import org.neo4j.com2.message.MessageType;
  * TODO
  */
 public enum TokenRingMessage
-    implements MessageType
+    implements MessageType<TokenRingMessage>
 {
     failure,
     ringDiscoveryTimedOut,
@@ -40,14 +40,14 @@ public enum TokenRingMessage
     joinRing;
     
     private TokenRingMessage failureMessage;
-    private TokenRingMessage[] next;
+    private MessageType[] next;
 
     private TokenRingMessage()
     {
         next = new TokenRingMessage[0];
     }
 
-    private TokenRingMessage( TokenRingMessage failureMessage, TokenRingMessage... next )
+    private TokenRingMessage( TokenRingMessage failureMessage, MessageType... next )
     {
         this.failureMessage = failureMessage;
         this.next = next;
@@ -60,7 +60,7 @@ public enum TokenRingMessage
     }
 
     @Override
-    public MessageType failureMessage()
+    public TokenRingMessage failureMessage()
     {
         return failureMessage;
     }

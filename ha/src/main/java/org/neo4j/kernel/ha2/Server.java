@@ -21,7 +21,6 @@
 package org.neo4j.kernel.ha2;
 
 import java.util.logging.Logger;
-
 import org.neo4j.com2.NetworkNode;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
@@ -44,10 +43,10 @@ import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 public class Server
     implements Lifecycle
 {
-    protected final StateMachine<TokenRingContext, TokenRingMessage> stateMachine;
+    protected final StateMachine<TokenRingContext, TokenRingMessage, TokenRingState> stateMachine;
     protected final TokenRingContext context;
-    protected StateMachineProxyFactory proxyFactory;
-    protected final ConnectedStateMachine connectedStateMachine;
+    protected StateMachineProxyFactory<TokenRingMessage> proxyFactory;
+    protected final ConnectedStateMachines connectedStateMachines;
 
     public interface Configuration
         extends NetworkNode.Configuration
@@ -59,10 +58,11 @@ public class Server
     public Server( TokenRingContext context, MessageSource input, MessageProcessor output, AbstractMessageFailureHandler.Factory failureHandlerFactory )
     {
         this.context = context;
-        stateMachine = new StateMachine<TokenRingContext, TokenRingMessage>( context, TokenRingMessage.class, TokenRingState.start );
-        connectedStateMachine = new ConnectedStateMachine( input, output, stateMachine );
-        connectedStateMachine.addMessageProcessor( new FromHeaderMessageProcessor() );
-        failureHandlerFactory.newMessageFailureHandler( connectedStateMachine, connectedStateMachine, input );
+        stateMachine = new StateMachine<TokenRingContext, TokenRingMessage, TokenRingState>( context, TokenRingMessage.class, TokenRingState.start );
+        connectedStateMachines = new ConnectedStateMachines( input, output );
+        connectedStateMachines.addMessageProcessor( new FromHeaderMessageProcessor() );
+        connectedStateMachines.addStateMachine( stateMachine );
+        failureHandlerFactory.newMessageFailureHandler( connectedStateMachines, connectedStateMachines, input );
     }
     
     @Override
@@ -75,7 +75,8 @@ public class Server
     public void start()
         throws Throwable
     {
-        TokenRing tokenRing = proxyFactory.newProxy( TokenRing.class );
+        Class<TokenRing> proxyInterface = TokenRing.class;
+        TokenRing tokenRing = proxyFactory.newProxy( proxyInterface );
         tokenRing.joinRing();
     }
 
@@ -98,20 +99,31 @@ public class Server
 
         context.setMe( participant );
 
-        stateMachine.addStateTransitionListener( new StateTransitionLogger( participant, Logger.getAnonymousLogger() ) );
+        stateMachine.addStateTransitionListener( new StateTransitionLogger<TokenRingMessage>( participant, Logger.getAnonymousLogger() ) );
 
         StateMachineConversations conversations = new StateMachineConversations(participant.getServerId());
-        proxyFactory = new StateMachineProxyFactory( participant.getServerId(), TokenRingMessage.class, stateMachine, connectedStateMachine, conversations );
-        connectedStateMachine.addMessageProcessor( proxyFactory );
+        proxyFactory = new StateMachineProxyFactory<TokenRingMessage>( participant.getServerId(), TokenRingMessage.class, stateMachine, connectedStateMachines, conversations );
+        connectedStateMachines.addMessageProcessor( proxyFactory );
 
     }
     
     /**
      * Ok to have this accessible like this?
+     * @return server id
      */
     public String getServerId()
     {
         return context.getMe().getServerId();
+    }
+
+    public TokenRingContext getContext()
+    {
+        return context;
+    }
+
+    public TokenRingState getState()
+    {
+        return stateMachine.getState();
     }
 
     public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
@@ -121,7 +133,7 @@ public class Server
 
     public <T> T newClient( Class<T> clientProxyInterface )
     {
-        return proxyFactory.newProxy(clientProxyInterface);
+        return proxyFactory.newProxy( clientProxyInterface );
     }
 
     private class FromHeaderMessageProcessor

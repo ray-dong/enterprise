@@ -38,7 +38,8 @@ public class TokenRingContext
     private RingParticipant me;
     private RingNeighbours neighbours;
 
-    List<RingParticipant> joining = new ArrayList<RingParticipant>(  );
+    List<RingParticipant> standbyMonitors = new ArrayList<RingParticipant>(  );
+    private boolean hasToken = false;
 
     public TokenRingContext( Comparator<RingParticipant> participantComparator )
     {
@@ -92,27 +93,62 @@ public class TokenRingContext
     }
 
     // This is for the join protocol specifically
-    public void addJoining( RingParticipant from )
+    public void addStandbyMonitor( RingParticipant from )
     {
-        if (!joining.contains( from ))
-            joining.add(from);
+        if (!standbyMonitors.contains( from ))
+            standbyMonitors.add(from);
     }
 
-    public List<RingParticipant> consumeJoining()
+    public List<RingParticipant> getStandbyMonitors()
     {
-        try
+        return standbyMonitors;
+    }
+
+    public RingParticipant getRingInsertionPoint()
+    {
+        // TODO - if we have participated in ring before, we could
+        // opt to insert at the same point as before, if possible
+
+        RingParticipant insertionPoint = null;
+        for( RingParticipant standbyMonitor : standbyMonitors )
         {
-            return joining;
+            if (participantComparator.compare( me, standbyMonitor ) > 0)
+            {
+                insertionPoint = standbyMonitor;
+            }
         }
-        finally
+
+        if (insertionPoint == null && standbyMonitors.size() > 0)
         {
-            // Clear the list
-            joining = new ArrayList<RingParticipant>(  );
+            insertionPoint = standbyMonitors.get( standbyMonitors.size()-1 );
         }
+
+        return insertionPoint;
+    }
+
+    public void clearStandbyMonitors()
+    {
+        standbyMonitors.clear();
     }
 
     public Comparator<RingParticipant> getParticipantComparator()
     {
         return participantComparator;
+    }
+    
+    // Token management
+    public boolean hasToken()
+    {
+        return hasToken;
+    }
+
+    public void claimedToken()
+    {
+        hasToken = true;
+    }
+
+    public void sentToken()
+    {
+        hasToken = false;
     }
 }

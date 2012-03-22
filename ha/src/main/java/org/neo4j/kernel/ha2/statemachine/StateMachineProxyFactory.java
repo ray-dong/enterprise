@@ -35,19 +35,19 @@ import org.neo4j.com2.message.MessageType;
 /**
  * TODO
  */
-public class StateMachineProxyFactory
+public class StateMachineProxyFactory<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
     implements MessageProcessor
 {
-    private StateMachine stateMachine;
+    private StateMachine<?,MESSAGETYPE,?> stateMachine;
     private MessageProcessor incoming;
     private StateMachineConversations conversations;
     private String serverId;
-    private Class<? extends Enum> messageTypeEnum;
+    private Class<MESSAGETYPE> messageTypeEnum;
 
     private Map<String, ResponseFuture> responseFutureMap = new ConcurrentHashMap<String, ResponseFuture>(  );
     
     
-    public StateMachineProxyFactory(String serverId, Class<? extends Enum> messageTypeEnum, StateMachine stateMachine, MessageProcessor incoming, StateMachineConversations conversations )
+    public StateMachineProxyFactory(String serverId, Class<MESSAGETYPE> messageTypeEnum, StateMachine<?,MESSAGETYPE,?> stateMachine, MessageProcessor incoming, StateMachineConversations conversations )
     {
         this.serverId = serverId;
         this.messageTypeEnum = messageTypeEnum;
@@ -56,14 +56,14 @@ public class StateMachineProxyFactory
         this.conversations = conversations;
     }
     
-    public <T> T newProxy(Class<T> proxyInterface)
+    public <CLIENT> CLIENT newProxy(Class<CLIENT> proxyInterface)
     {
         stateMachine.checkValidProxyInterface( proxyInterface );
 
         return proxyInterface.cast( Proxy.newProxyInstance( proxyInterface.getClassLoader(), new Class<?>[]{ proxyInterface }, new StateMachineProxyHandler( this ) ) );
     }
 
-    public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
+    public void addStateTransitionListener( StateTransitionListener<MESSAGETYPE> stateTransitionListener )
     {
         stateMachine.addStateTransitionListener( stateTransitionListener );
     }
@@ -73,8 +73,8 @@ public class StateMachineProxyFactory
     {
         String conversationId = conversations.getNextConversationId();
 
-        MessageType typeAsEnum = (MessageType)Enum.valueOf( messageTypeEnum, method.getName() );
-        Message message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
+        MESSAGETYPE typeAsEnum = Enum.valueOf( messageTypeEnum, method.getName() );
+        Message<MESSAGETYPE> message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
 
         if (method.getReturnType().equals( Void.TYPE ))
         {
@@ -83,7 +83,7 @@ public class StateMachineProxyFactory
         }
         else
         {
-            ResponseFuture future = new ResponseFuture(typeAsEnum);
+            ResponseFuture future = new ResponseFuture( typeAsEnum );
             responseFutureMap.put( conversationId, future );
             incoming.process( message );
 
@@ -137,7 +137,7 @@ public class StateMachineProxyFactory
 
         public synchronized void updateMessage( Message message )
         {
-            initiatedByMessageType = message.getMessageType();
+            initiatedByMessageType = MessageType.class.cast(message.getMessageType());
         }
 
         public synchronized void setResponse( Message response )

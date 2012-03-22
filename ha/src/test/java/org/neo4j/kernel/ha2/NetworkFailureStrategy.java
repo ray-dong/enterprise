@@ -27,5 +27,5 @@ import org.neo4j.com2.message.Message;
  */
 public interface NetworkFailureStrategy
 {
-    boolean isLost( Message message, String serverIdTo );
+    boolean isLost( Message<?> message, String serverIdTo );
 }

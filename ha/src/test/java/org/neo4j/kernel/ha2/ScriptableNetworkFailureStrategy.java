@@ -61,7 +61,7 @@ public class ScriptableNetworkFailureStrategy
     }
     
     @Override
-    public boolean isLost( Message message, String serverIdTo )
+    public boolean isLost( Message<?> message, String serverIdTo )
     {
         return nodesDown.contains( serverIdTo ) || linksDown.contains( new String[]{message.getHeader( Message.FROM ),serverIdTo} );
     }

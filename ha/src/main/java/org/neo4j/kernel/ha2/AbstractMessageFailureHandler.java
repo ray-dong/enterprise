@@ -41,17 +41,17 @@ public class AbstractMessageFailureHandler
     }
 
     private MessageProcessor incoming;
-    protected Map<String, ExpectationFailure> expectations;
+    protected Map<String, ExpectationFailure<?>> expectations;
 
     public AbstractMessageFailureHandler( MessageProcessor incoming, MessageSource outgoing, MessageSource source )
     {
-        expectations = new ConcurrentHashMap<String, ExpectationFailure>();
+        expectations = new ConcurrentHashMap<String, ExpectationFailure<?>>();
         this.incoming = incoming;
         source.addMessageProcessor( new CancelTimeouts() );
         outgoing.addMessageProcessor( new ExpectationTimeouts() );
     }
     
-    protected void expectation(ExpectationFailure expectationFailure)
+    protected void expectation(ExpectationFailure<?> expectationFailure)
     {
         expectations.put( expectationFailure.getMessage().getHeader( Message.CONVERSATION_ID ), expectationFailure );
     }
@@ -60,14 +60,14 @@ public class AbstractMessageFailureHandler
         implements MessageProcessor
     {
         @Override
-        public void process( Message message )
+        public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
         {
             if (message.hasHeader( Message.TO ))
             {
                 MessageType messageType = message.getMessageType();
                 if( messageType.failureMessage() != null )
                 {
-                    ExpectationFailure expectationFailure = new ExpectationFailure( message );
+                    ExpectationFailure<?> expectationFailure = new ExpectationFailure<MESSAGETYPE>( message );
                     
                     expectation( expectationFailure );
                 }
@@ -79,12 +79,13 @@ public class AbstractMessageFailureHandler
         implements MessageProcessor
     {
         @Override
-        public void process( Message message )
+        public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
         {
             String conversationId = message.getHeader( CONVERSATION_ID );
             ExpectationFailure expectationFailure = expectations.get( conversationId );
             if ( expectationFailure != null &&
-                    Specifications.in( expectationFailure.getMessage().getMessageType().next() ).satisfiedBy( message.getMessageType() ) )
+                    Specifications.in( ((MESSAGETYPE)expectationFailure.getMessage().getMessageType()).next() ).satisfiedBy( message
+                                                                                                                                 .getMessageType() ) )
             {
                 expectations.remove( conversationId );
                 expectationFailure.cancel();
@@ -92,18 +93,18 @@ public class AbstractMessageFailureHandler
         }
     }
 
-    class ExpectationFailure
+    class ExpectationFailure<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
         implements Runnable
     {
         private boolean cancelled = false;
-        private Message message;
+        private Message<MESSAGETYPE> message;
 
-        public ExpectationFailure( Message message )
+        public ExpectationFailure( Message<MESSAGETYPE> message )
         {
             this.message = message;
         }
 
-        public Message getMessage()
+        public Message<MESSAGETYPE> getMessage()
         {
             return message;
         }
@@ -120,8 +121,7 @@ public class AbstractMessageFailureHandler
 
             if( !cancelled )
             {
-                incoming.process( message.copyHeadersTo( Message.internal( message.getMessageType()
-                                                                               .failureMessage(), "Timed out" ), CONVERSATION_ID ) );
+                incoming.process( message.copyHeadersTo( Message.internal( (MESSAGETYPE) message.getMessageType().failureMessage(), "Timed out" ), CONVERSATION_ID ) );
             }
         }
     }

@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Formatter;
 import java.util.logging.Handler;
@@ -33,8 +34,12 @@ import java.util.logging.Logger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.neo4j.helpers.collection.Visitor;
+import org.neo4j.kernel.ha2.MultipleFailureStrategy;
 import org.neo4j.kernel.ha2.NetworkMock;
+import org.neo4j.kernel.ha2.RandomDropNetworkFailureStrategy;
 import org.neo4j.kernel.ha2.ScriptableNetworkFailureStrategy;
+import org.neo4j.kernel.ha2.Server;
 import org.neo4j.kernel.ha2.StateTransitionExpectations;
 import org.neo4j.kernel.ha2.StateTransitionExpectations.ExpectationsBuilder;
 import org.neo4j.kernel.ha2.TestServer;
@@ -43,7 +48,9 @@ import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 import static junit.framework.Assert.assertFalse;
 import static junit.framework.Assert.assertNotNull;
+import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 import static org.junit.Assert.assertTrue;
 import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingState.*;
 
@@ -58,9 +65,13 @@ public class TokenRingProtocolTest
     private static final String ID4 = "4";
     
     private NetworkMock network;
-    private StateTransitionExpectations<TokenRingContext, TokenRingMessage> expectations;
+    private StateTransitionExpectations<TokenRingContext, TokenRingMessage, TokenRingState> expectations;
     protected Logger logger;
     protected ScriptableNetworkFailureStrategy failures;
+    protected RandomDropNetworkFailureStrategy randomFailures;
+    protected TokenRing member1;
+    protected TokenRing member2;
+    protected TokenRing member3;
 
     @Before
     public void setupLogging()
@@ -89,14 +100,32 @@ public class TokenRingProtocolTest
     public void setupEnvironment()
     {
         failures = new ScriptableNetworkFailureStrategy();
-        network = new NetworkMock( failures );
-        expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage>();
+        randomFailures = new RandomDropNetworkFailureStrategy( 0, 1.0f );
+        network = new NetworkMock( new MultipleFailureStrategy( failures, randomFailures ) );
+        expectations = new StateTransitionExpectations<TokenRingContext, TokenRingMessage, TokenRingState>();
     }
     
     @After
     public void verifyWhatHappened()
     {
-        expectations.verify();
+        if (expectations != null)
+            expectations.verify();
+        
+        // Verify that max 1 token exists
+        final AtomicInteger tokenCount = new AtomicInteger(  );
+        network.visitServers( new Visitor<Server>()
+        {
+            @Override
+            public boolean visit( Server element )
+            {
+                if (element.getState().equals( TokenRingState.master ))
+                    tokenCount.set( tokenCount.get()+1 );
+                
+                return true;
+            }
+        } );
+        
+        assertThat( tokenCount.get(), anyOf( is( 0 ), is( 1 ) ) );
     }
     
     /* TODO TESTS TO WRITE
@@ -125,29 +154,29 @@ public class TokenRingProtocolTest
     @Test
     public void whenEveryoneStartsAtTheSameTimeTheRingIsFormedByConsensus() throws Exception
     {
-        TokenRing member1 = newMember( ID1,
+        member1 = newMember( ID1,
                 TokenRingMessage.joinRing, joiningRing,
                 // Becomes master since the one with the lowest server id will take on the role as master in
                 // the scenario where there are many confused participants trying to form a ring.
                 TokenRingMessage.ringDiscoveryTimedOut, master );
-        TokenRing member2 = newMember( ID2,
+        member2 = newMember( ID2,
                 TokenRingMessage.joinRing, joiningRing,
                 TokenRingMessage.ringDiscovered, slave );
-        TokenRing member3 = newMember( ID3,
+        member3 = newMember( ID3,
                 TokenRingMessage.joinRing, joiningRing,
                 TokenRingMessage.ringDiscovered, slave );
         network.tickUntilDone();
         
-        assertRingParticipants( member1, ID1, ID2, ID3 ); 
-        assertRingParticipants( member2, ID1, ID2, ID3 ); 
-        assertRingParticipants( member3, ID1, ID2, ID3 ); 
+        assertRingParticipants( member1, ID1, ID2, ID3 );
+        assertRingParticipants( member2, ID1, ID2, ID3 );
+        assertRingParticipants( member3, ID1, ID2, ID3 );
         verifyRingSizeThreeNeighbors( ID1, ID2, ID3 );
     }
     
     @Test
     public void whenEveryoneStartsAtTheSameTimeTheRingIsFormedByConsensusVerbose() throws Exception
     {
-        TokenRing member1 = newMember( ID1, true,
+        member1 = newMember( ID1, true,
                 TokenRingMessage.joinRing, joiningRing,
                 TokenRingMessage.discoverRing, joiningRing,
                 TokenRingMessage.discoverRing, joiningRing,
@@ -160,7 +189,7 @@ public class TokenRingProtocolTest
                 TokenRingMessage.getRingParticipantsResponse, master,
                 TokenRingMessage.getRingParticipants, master,
                 TokenRingMessage.getRingParticipantsResponse, master );
-        TokenRing member2 = newMember( ID2, true,
+        member2 = newMember( ID2, true,
                 TokenRingMessage.joinRing, joiningRing,
                 TokenRingMessage.discoverRing, joiningRing,
                 TokenRingMessage.discoverRing, joiningRing,
@@ -172,7 +201,7 @@ public class TokenRingProtocolTest
                 TokenRingMessage.getParticipants, slave,
                 TokenRingMessage.getRingParticipantsResponse, slave,
                 TokenRingMessage.getRingParticipants, slave );
-        TokenRing member3 = newMember( ID3, true,
+        member3 = newMember( ID3, true,
                 TokenRingMessage.joinRing, joiningRing,
                 TokenRingMessage.discoverRing, joiningRing,
                 TokenRingMessage.discoverRing, joiningRing,
@@ -383,6 +412,36 @@ public class TokenRingProtocolTest
         tokenRing2.sendToken();
 
         network.tickUntilDone();
+    }
+
+    @Test
+    public void testXyz()
+        throws Exception
+    {
+        whenEveryoneStartsAtTheSameTimeTheRingIsFormedByConsensus();
+
+        expectations = null;
+        
+        // Not all messages will go through
+//        randomFailures.setRate( 0.8 );
+        
+        for (int i = 0; i < 100; i++)
+        {
+            network.visitServers(new Visitor<Server>()
+            {
+                @Override
+                public boolean visit( Server server )
+                {
+                    if (server.getState().equals( TokenRingState.master ))
+                    {
+                        server.newClient( TokenRing.class ).sendToken();
+                        return false;
+                    }
+                    return true;
+                }
+            });
+            network.tickUntilDone();
+        }
     }
 
     private void verifyNeighbours( final String before, final String me, final String after )

@@ -36,11 +36,11 @@ import static org.neo4j.kernel.ha2.protocol.tokenring.TokenRingMessage.*;
  * State machine for the Token Ring cluster management protocol.
  */
 public enum TokenRingState
-        implements State<TokenRingContext, TokenRingMessage>
+        implements State<TokenRingContext, TokenRingMessage, TokenRingState>
 {
     start
             {
-                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                public TokenRingState handle( TokenRingContext context,
                                                                          Message message,
                                                                          MessageProcessor outgoing
                 ) throws Throwable
@@ -63,7 +63,7 @@ public enum TokenRingState
 
     joiningRing
             {
-                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                public TokenRingState handle( TokenRingContext context,
                                                                          Message message,
                                                                          MessageProcessor outgoing
                 ) throws Throwable
@@ -74,7 +74,7 @@ public enum TokenRingState
                         case joining:
                         {
                             RingParticipant from = new RingParticipant(message.getHeader( FROM ));
-                            context.addJoining(from);
+                            context.addStandbyMonitor( from );
                             return this;
                         }
                     
@@ -87,7 +87,8 @@ public enum TokenRingState
                         case ringDiscoveryTimedOut:
                         {
                             // Check if we found other joining participants
-                            List<RingParticipant> otherJoining = context.consumeJoining();
+                            List<RingParticipant> otherJoining = new ArrayList<RingParticipant>(context.getStandbyMonitors());
+                            context.clearStandbyMonitors();
                             if (otherJoining.isEmpty())
                             {
                                 context.setNeighbours(context.getMe(), context.getMe());
@@ -118,7 +119,7 @@ public enum TokenRingState
                         {
                             // Found other participant that is also joining right now
                             RingParticipant from = new RingParticipant(message.getHeader( FROM ));
-                            context.addJoining(from);
+                            context.addStandbyMonitor( from );
                             outgoing.process( Message.to( joining, from, new RingNeighbours(context.getMe(), context.getMe()) ) );
 
                             return this;
@@ -132,7 +133,7 @@ public enum TokenRingState
 
     master
             {
-                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                public TokenRingState handle( TokenRingContext context,
                                                                          Message message,
                                                                          MessageProcessor outgoing
                 ) throws Throwable
@@ -208,7 +209,7 @@ public enum TokenRingState
 
     slave
             {
-                public State<TokenRingContext, TokenRingMessage> handle( TokenRingContext context,
+                public TokenRingState handle( TokenRingContext context,
                                                                          Message message,
                                                                          MessageProcessor outgoing
                 ) throws Throwable

@@ -25,18 +25,17 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Logger;
-
 import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.StateTransition;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 
-public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
+public class StateTransitionExpectations<CONTEXT,MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>>
 {
-    public static final StateTransitionListener NO_EXPECTATIONS = new StateTransitionListener()
+    public final StateTransitionListener<MESSAGETYPE> NO_EXPECTATIONS = new StateTransitionListener<MESSAGETYPE>()
     {
         @Override
-        public void stateTransition( StateTransition transition )
+        public void stateTransition( StateTransition<MESSAGETYPE> messagetypeStateTransition )
         {
         }
     };
@@ -47,7 +46,7 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
     {
         ExpectationsBuilder builder = new ExpectationsBuilder();
         for ( int i = 0; i < initialAlternatingExpectedMessageAndState.length; i++ )
-            builder.expect( (MessageType) initialAlternatingExpectedMessageAndState[i++], (State<CONTEXT,E>) initialAlternatingExpectedMessageAndState[i] );
+            builder.expect( (MessageType) initialAlternatingExpectedMessageAndState[i++], (STATE) initialAlternatingExpectedMessageAndState[i] );
         return builder;
     }
     
@@ -87,7 +86,7 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
         private final Deque<ExpectedTransition> transitions = new LinkedList<ExpectedTransition>();
         private boolean includeUnchanged;
         
-        public ExpectationsBuilder expect( MessageType messageToGetHere, State<CONTEXT,E> state )
+        public ExpectationsBuilder expect( MessageType messageToGetHere, STATE state )
         {
             transitions.add( new ExpectedTransition( messageToGetHere, state ) );
             return this;
@@ -193,9 +192,9 @@ public class StateTransitionExpectations<CONTEXT,E extends Enum<E>>
     private class ExpectedTransition
     {
         private final MessageType messageToGetHere;
-        private final State<CONTEXT,E> state;
+        private final STATE state;
         
-        ExpectedTransition( MessageType messageToGetHere, State<CONTEXT, E> state )
+        ExpectedTransition( MessageType messageToGetHere, STATE state )
         {
             this.messageToGetHere = messageToGetHere;
             this.state = state;

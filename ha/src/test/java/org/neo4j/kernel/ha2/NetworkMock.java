@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
+import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
 
@@ -151,5 +152,14 @@ public class NetworkMock
         if ( participant == null ) 
             throw new IllegalArgumentException( "Unknown server id '" + serverId + "'" );
         participant.verifyState( verifier );
+    }
+
+    public void visitServers( Visitor<Server> visitor )
+    {
+        for( TestServer testServer : participants.values() )
+        {
+            if (!visitor.visit( testServer.getServer() ))
+                return;
+        }
     }
 }

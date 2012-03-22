@@ -30,22 +30,27 @@ public class RandomDropNetworkFailureStrategy
     implements NetworkFailureStrategy
 {
     Random random;
-    private float rate;
+    private double rate;
 
     /**
      *
      * @param seed Provide a seed for the Random, in order to produce repeatable tests.
      * @param rate 1.0=no dropped messages, 0.0=all messages are lost
      */
-    public RandomDropNetworkFailureStrategy( long seed, float rate )
+    public RandomDropNetworkFailureStrategy( long seed, double rate )
     {
-        this.rate = rate;
+        setRate( rate );
         this.random = new Random( seed );
     }
 
-    @Override
-    public boolean isLost( Message message, String serverIdTo )
+    public void setRate( double rate )
     {
-        return random.nextFloat() > rate;
+        this.rate = rate;
+    }
+
+    @Override
+    public boolean isLost( Message<?> message, String serverIdTo )
+    {
+        return random.nextDouble() > rate;
     }
 }

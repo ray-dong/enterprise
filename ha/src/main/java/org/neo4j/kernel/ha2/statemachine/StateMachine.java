@@ -26,23 +26,29 @@ import java.util.List;
 import java.util.concurrent.Future;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO
  */
-public class StateMachine<CONTEXT, E extends Enum<E>>
+public class StateMachine<CONTEXT, MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>>
 {
     private CONTEXT context;
-    private Class<E> messageEnumType;
-    private State<CONTEXT,E> state;
+    private Class<MESSAGETYPE> messageEnumType;
+    private STATE state;
 
-    private List<StateTransitionListener> listeners = new ArrayList<StateTransitionListener>();
+    private List<StateTransitionListener<MESSAGETYPE>> listeners = new ArrayList<StateTransitionListener<MESSAGETYPE>>();
 
-    public StateMachine(CONTEXT context, Class<E> messageEnumType, State<CONTEXT,E> state)
+    public StateMachine(CONTEXT context, Class<MESSAGETYPE> messageEnumType, STATE state)
     {
         this.context = context;
         this.messageEnumType = messageEnumType;
         this.state = state;
+    }
+
+    public Class<MESSAGETYPE> getMessageType()
+    {
+        return messageEnumType;
     }
 
     public CONTEXT getContext()
@@ -50,7 +56,7 @@ public class StateMachine<CONTEXT, E extends Enum<E>>
         return context;
     }
 
-    public State<CONTEXT, E> getState()
+    public STATE getState()
     {
         return state;
     }
@@ -69,31 +75,31 @@ public class StateMachine<CONTEXT, E extends Enum<E>>
         }
     }
 
-    public void addStateTransitionListener( StateTransitionListener listener
+    public void addStateTransitionListener( StateTransitionListener<MESSAGETYPE> listener
     )
     {
-        List<StateTransitionListener> newlisteners = new ArrayList<StateTransitionListener>(listeners);
+        List<StateTransitionListener<MESSAGETYPE>> newlisteners = new ArrayList<StateTransitionListener<MESSAGETYPE>>(listeners);
         newlisteners.add( listener );
         listeners = newlisteners;
     }
 
-    public void removeStateTransitionListener(StateTransitionListener listener)
+    public void removeStateTransitionListener(StateTransitionListener<MESSAGETYPE> listener)
     {
-        List<StateTransitionListener> newlisteners = new ArrayList<StateTransitionListener>(listeners);
+        List<StateTransitionListener<MESSAGETYPE>> newlisteners = new ArrayList<StateTransitionListener<MESSAGETYPE>>(listeners);
         newlisteners.remove(listener);
         listeners = newlisteners;
     }
 
-    public synchronized void handle( Message message, MessageProcessor outgoing )
+    public synchronized void handle( Message<MESSAGETYPE> message, MessageProcessor outgoing )
     {
         try
         {
-            State<CONTEXT,E> oldState = state;
-            State<CONTEXT,E> newState = state.handle( context, message, outgoing );
+            STATE oldState = state;
+            STATE newState = state.handle( context, message, outgoing );
             state = newState;
 
-            StateTransition transition = new StateTransition( oldState, message, newState );
-            for (StateTransitionListener listener : listeners)
+            StateTransition<MESSAGETYPE> transition = new StateTransition<MESSAGETYPE>( oldState, message, newState );
+            for (StateTransitionListener<MESSAGETYPE> listener : listeners)
             {
                 try
                 {

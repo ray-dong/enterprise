@@ -23,9 +23,9 @@ package org.neo4j.com2.message;
 /**
  * TODO
  */
-public interface MessageType
+public interface MessageType<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
 {
     String name();
     MessageType[] next();
-    MessageType failureMessage();
+    MESSAGETYPE failureMessage();
 }

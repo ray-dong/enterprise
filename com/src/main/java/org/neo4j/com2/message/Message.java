@@ -27,32 +27,32 @@ import java.util.Map;
 /**
  * Message for state machines which can be sent out in the cluster as well.
  */
-public class Message
+public class Message<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
     implements Serializable
 {
-    public static Message broadcast(MessageType message)
+    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message)
     {
         return broadcast(message, null);
     }
 
-    public static Message broadcast(MessageType message, Object payload)
+    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message, Object payload)
     {
-        return new Message(message, payload).setHeader( TO, BROADCAST );
+        return new Message<MESSAGETYPE>(message, payload).setHeader( TO, BROADCAST );
     }
 
-    public static Message to(MessageType message, Object to)
+    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to)
     {
         return to( message, to, null );
     }
     
-    public static Message to(MessageType message, Object to, Object payload)
+    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to, Object payload)
     {
-        return new Message(message, payload).setHeader( TO, to.toString() );
+        return new Message<MESSAGETYPE>(message, payload).setHeader( TO, to.toString() );
     }
     
-    public static Message internal(MessageType message, Object payload)
+    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message, Object payload)
     {
-        return new Message( message, payload );
+        return new Message<MESSAGETYPE>( message, payload );
     }
     
     // Standard headers
@@ -63,17 +63,17 @@ public class Message
     
     public static final String BROADCAST = "*";
 
-    final private MessageType messageType;
+    final private MESSAGETYPE messageType;
     final private Object payload;
     final private Map<String,String> headers = new HashMap<String, String>(  );
 
-    protected Message( MessageType messageType, Object payload )
+    protected Message( MESSAGETYPE messageType, Object payload )
     {
         this.messageType = messageType;
         this.payload = payload;
     }
 
-    public MessageType getMessageType()
+    public MESSAGETYPE getMessageType()
     {
         return messageType;
     }
@@ -83,7 +83,7 @@ public class Message
         return payload;
     }
     
-    public Message setHeader(String name, String value)
+    public Message<MESSAGETYPE> setHeader(String name, String value)
     {
         headers.put( name, value );
         return this;
@@ -113,7 +113,7 @@ public class Message
         return value;
     }
 
-    public Message copyHeadersTo( Message message, String... names )
+    public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> copyHeadersTo( Message<MESSAGETYPE> message, String... names )
     {
         for( String name : names )
         {
