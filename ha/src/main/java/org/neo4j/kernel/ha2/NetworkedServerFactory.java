@@ -28,9 +28,12 @@ import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
+import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
+import org.neo4j.kernel.ha2.failure.TimeoutMessageFailureHandler;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.protocol.tokenring.ServerIdRingParticipantComparator;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
+import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 /**

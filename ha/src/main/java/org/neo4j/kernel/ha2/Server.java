@@ -26,6 +26,7 @@ import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
 import org.neo4j.kernel.Lifecycle;
+import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
 import org.neo4j.kernel.ha2.protocol.RingParticipant;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
 import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;

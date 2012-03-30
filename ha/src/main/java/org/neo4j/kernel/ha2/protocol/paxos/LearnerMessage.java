@@ -18,14 +18,48 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2;
+package org.neo4j.kernel.ha2.protocol.paxos;
 
-import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO
  */
-public interface TimeoutStrategy
+public enum LearnerMessage
+    implements MessageType<LearnerMessage>
 {
-    long timeoutFor(Message message);
+    failure,
+    join,
+
+    set,get,exists,
+
+    learned,learn(failure, learned),
+    prepared, prepare(failure,prepared),
+    accepted, accept(failure, accepted);
+
+    private LearnerMessage failureMessage;
+    private MessageType[] next;
+
+    private LearnerMessage()
+    {
+        next = new LearnerMessage[0];
+    }
+
+    private LearnerMessage( LearnerMessage failureMessage, MessageType... next )
+    {
+        this.failureMessage = failureMessage;
+        this.next = next;
+    }
+
+    @Override
+    public MessageType[] next()
+    {
+        return next;
+    }
+
+    @Override
+    public LearnerMessage failureMessage()
+    {
+        return failureMessage;
+    }
 }

@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2;
+package org.neo4j.kernel.ha2.failure;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,7 +93,7 @@ public class AbstractMessageFailureHandler
         }
     }
 
-    class ExpectationFailure<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
+    public class ExpectationFailure<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
         implements Runnable
     {
         private boolean cancelled = false;

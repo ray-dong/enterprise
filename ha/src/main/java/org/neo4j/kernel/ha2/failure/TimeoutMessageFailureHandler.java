@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2;
+package org.neo4j.kernel.ha2.failure;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
 import org.neo4j.kernel.Lifecycle;
+import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 
 /**
  * TODO

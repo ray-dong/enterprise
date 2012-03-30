@@ -45,7 +45,7 @@ public class ConnectedStateMachines
     private final Logger logger = Logger.getLogger( ConnectedStateMachines.class.getName() );
     
     private final MessageProcessor sender;
-    private final Map<Class<? extends Enum<?>>,StateMachine> stateMachines = new HashMap<Class<? extends Enum<?>>, StateMachine>(  );
+    private final Map<Class<? extends Enum<?>>,StateMachine<?,?,?>> stateMachines = new HashMap<Class<? extends Enum<?>>, StateMachine<?,?,?>>(  );
 
     private final List<MessageProcessor> outgoingProcessors = new ArrayList<MessageProcessor>(  );
     private final OutgoingMessageProcessor outgoing;
@@ -79,7 +79,7 @@ public class ConnectedStateMachines
     @Override
     public synchronized <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
     {
-        StateMachine stateMachine = stateMachines.get( message.getMessageType().getClass() );
+        StateMachine<?,MESSAGETYPE,?> stateMachine = (StateMachine<?, MESSAGETYPE, ?>) stateMachines.get( message.getMessageType().getClass() );
         if (stateMachine == null)
             return; // No StateMachine registered for this MessageType type - Ignore this
 
@@ -119,10 +119,10 @@ public class ConnectedStateMachines
             } else
             {
                 // Deliver internally if possible
-                StateMachine internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
+                StateMachine<?,?,?> internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
                 if (internalStatemachine == null && stateMachine != internalStatemachine )
                 {
-                    internalStatemachine.handle( outgoingMessage, outgoing );
+                    internalStatemachine.handle( (Message)outgoingMessage, outgoing );
                 }
             }
         }

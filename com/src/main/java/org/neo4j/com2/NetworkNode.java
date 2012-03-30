@@ -364,7 +364,7 @@ public class NetworkNode
         private void addSerialization(ChannelPipeline pipeline, int frameLength)
         {
             pipeline.addLast( "frameDecoder",
-                    new ObjectDecoder(1024*1000, getClass().getClassLoader() ) );
+                    new ObjectDecoder(1024*1000, NetworkNodePipelineFactory.this.getClass().getClassLoader() ) );
             pipeline.addLast( "frameEncoder", new ObjectEncoder());
         }
     }
