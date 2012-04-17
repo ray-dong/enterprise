@@ -36,6 +36,7 @@ import java.util.Set;
 import org.neo4j.com.SlaveContext.Tx;
 import org.neo4j.graphdb.event.ErrorState;
 import org.neo4j.helpers.Exceptions;
+import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Predicate;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.helpers.collection.ClosableIterable;
@@ -49,6 +50,7 @@ import org.neo4j.kernel.impl.transaction.xaframework.InMemoryLogBuffer;
 import org.neo4j.kernel.impl.transaction.xaframework.LogBuffer;
 import org.neo4j.kernel.impl.transaction.xaframework.LogExtractor;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
+import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLog;
 
 public class MasterUtil
 {
@@ -457,5 +459,46 @@ public class MasterUtil
             {   // Do nothing
             }
         };
+    }
+    
+    public static SlaveContext getSlaveContext( XaDataSourceManager dsManager, long sessionId, int machineId, int eventIdentifier )
+    {
+        try
+        {
+            Collection<XaDataSource> dataSources = dsManager.getAllRegisteredDataSources();
+            Tx[] txs = new Tx[dataSources.size()];
+            int i = 0;
+            Pair<Integer,Long> master = null;
+            for ( XaDataSource dataSource : dataSources )
+            {
+                long txId = dataSource.getLastCommittedTxId();
+                if( dataSource.getName().equals( Config.DEFAULT_DATA_SOURCE_NAME ) )
+                {
+                    master = dataSource.getMasterForCommittedTx( txId );
+                }
+                txs[i++] = SlaveContext.lastAppliedTx( dataSource.getName(), txId );
+            }
+            return new SlaveContext( sessionId, machineId, eventIdentifier, txs, master.first(), master.other() );
+        }
+        catch ( IOException e )
+        {
+            throw new RuntimeException( e );
+        }
+    }
+
+    public static SlaveContext getSlaveContext( XaDataSource dataSource, long sessionId, int machineId, int eventIdentifier )
+    {
+        try
+        {
+            long txId = dataSource.getLastCommittedTxId();
+            Tx[] txs = new Tx[] { SlaveContext.lastAppliedTx( dataSource.getName(), txId ) };
+            Pair<Integer,Long> master = dataSource.getName().equals( Config.DEFAULT_DATA_SOURCE_NAME ) ?
+                    dataSource.getMasterForCommittedTx( txId ) : Pair.of( XaLogicalLog.MASTER_ID_REPRESENTING_NO_MASTER, 0L );
+            return new SlaveContext( sessionId, machineId, eventIdentifier, txs, master.first(), master.other() );
+        }
+        catch ( IOException e )
+        {
+            throw new RuntimeException( e );
+        }
     }
 }

@@ -1,0 +1,334 @@
+/**
+ * Copyright (c) 2002-2012 "Neo Technology,"
+ * Network Engine for Objects in Lund AB [http://neotechnology.com]
+ *
+ * This file is part of Neo4j.
+ *
+ * Neo4j is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+package org.neo4j.kernel.haonefive;
+
+import java.util.EnumMap;
+import java.util.Map;
+
+import org.neo4j.com.ComException;
+import org.neo4j.com.Response;
+import org.neo4j.kernel.DefaultIdGeneratorFactory;
+import org.neo4j.kernel.IdGeneratorFactory;
+import org.neo4j.kernel.IdType;
+import org.neo4j.kernel.ha.IdAllocation;
+import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
+import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
+import org.neo4j.kernel.impl.nioneo.store.IdRange;
+
+public class HaIdGeneratorFactory implements IdGeneratorFactory
+{
+    private final HaServiceSupplier stuff;
+    private final Map<IdType, HaIdGenerator> generators =
+            new EnumMap<IdType, HaIdGenerator>( IdType.class );
+    private final IdGeneratorFactory localFactory = new DefaultIdGeneratorFactory();
+
+    public HaIdGeneratorFactory( HaServiceSupplier stuff )
+    {
+        this.stuff = stuff;
+    }
+
+    @Override
+    public IdGenerator open( FileSystemAbstraction fs, String fileName, int grabSize, IdType idType,
+            long highestIdInUse, boolean startup )
+    {
+        IdGenerator initialIdGenerator = localFactory.open( fs, fileName, grabSize, idType, highestIdInUse, startup );
+        HaIdGenerator haIdGenerator = new HaIdGenerator( initialIdGenerator, fs, fileName, grabSize, idType );
+        generators.put( idType, haIdGenerator );
+        return haIdGenerator;
+    }
+
+    @Override
+    public void create( FileSystemAbstraction fs, String fileName )
+    {
+        localFactory.create( fs, fileName );
+    }
+
+    @Override
+    public IdGenerator get( IdType idType )
+    {
+        return generators.get( idType );
+    }
+
+    public void masterChanged( Master master, int masterServerId )
+    {
+        for ( HaIdGenerator generator : generators.values() )
+            generator.masterChanged( master, masterServerId );
+    }
+
+    private static final long VALUE_REPRESENTING_NULL = -1;
+    
+    private class HaIdGenerator implements IdGenerator
+    {
+        private volatile boolean firstDecisionMade;
+        private IdGenerator delegate;
+        private final FileSystemAbstraction fs;
+        private final String fileName;
+        private final int grabSize;
+        private final IdType idType;
+        
+        HaIdGenerator( IdGenerator initialDelegate, FileSystemAbstraction fs, String fileName, int grabSize, IdType idType )
+        {
+            delegate = initialDelegate;
+            this.fs = fs;
+            this.fileName = fileName;
+            this.grabSize = grabSize;
+            this.idType = idType;
+        }
+        
+        public void masterChanged( Master master, int masterServerId )
+        {
+            boolean isBecomingMaster = masterServerId == stuff.getServerId();
+            
+            if ( isBecomingMaster )
+            {
+                if ( delegate instanceof SlaveIdGenerator )
+                {
+                    // TODO Switch to master
+                    delegate.close( false );
+                    delegate = localFactory.open( fs, fileName, grabSize, idType, grabSize, false );
+                }
+                else
+                {
+                    // Don't do anything. Why was this called if I was already master btw?
+                }
+            }
+            else
+            {
+                if ( delegate instanceof SlaveIdGenerator )
+                {
+                    // I'm already slave, just forget about ids from the previous master
+                    ((SlaveIdGenerator) delegate).forgetIdAllocationFromMaster( master );
+                }
+                else if ( !firstDecisionMade )
+                {
+                    // TODO Switch to slave
+                    long highId = delegate.getHighId();
+                    delegate.close( false );
+                    delegate.delete();
+                    delegate = new SlaveIdGenerator( idType, highId, master );
+                }
+            }
+            firstDecisionMade = true;
+        }
+        
+        public String toString()
+        {
+            return delegate.toString();
+        }
+
+        public final boolean equals( Object other )
+        {
+            return delegate.equals( other );
+        }
+
+        public final int hashCode()
+        {
+            return delegate.hashCode();
+        }
+
+        public long nextId()
+        {
+            return delegate.nextId();
+        }
+
+        public IdRange nextIdBatch( int size )
+        {
+            return delegate.nextIdBatch( size );
+        }
+
+        public void setHighId( long id )
+        {
+            delegate.setHighId( id );
+        }
+
+        public long getHighId()
+        {
+            return delegate.getHighId();
+        }
+
+        public void freeId( long id )
+        {
+            delegate.freeId( id );
+        }
+
+        public void close( boolean shutdown )
+        {
+            delegate.close( shutdown );
+        }
+
+        public long getNumberOfIdsInUse()
+        {
+            return delegate.getNumberOfIdsInUse();
+        }
+
+        public long getDefragCount()
+        {
+            return delegate.getDefragCount();
+        }
+
+        public void delete()
+        {
+            delegate.delete();
+        }
+    }
+    
+    private class SlaveIdGenerator implements IdGenerator
+    {
+        private volatile long highestIdInUse;
+        private volatile long defragCount;
+        private volatile IdRangeIterator idQueue = EMPTY_ID_RANGE_ITERATOR;
+        private volatile Master master;
+        private final IdType idType;
+        
+        SlaveIdGenerator( IdType idType, long highId, Master master )
+        {
+            this.idType = idType;
+            this.highestIdInUse = highId;
+            this.master = master;
+        }
+        
+        void forgetIdAllocationFromMaster( Master master )
+        {
+            if ( this.master.equals( master ) )
+                return;
+            
+            this.idQueue = EMPTY_ID_RANGE_ITERATOR;
+            this.master = null;
+            this.master = master;
+        }
+
+        @Override
+        public void close( boolean shutdown )
+        {
+        }
+
+        public void freeId( long id )
+        {
+        }
+
+        public long getHighId()
+        {
+            return highestIdInUse;
+        }
+
+        public long getNumberOfIdsInUse()
+        {
+            return highestIdInUse-defragCount;
+        }
+
+        public synchronized long nextId()
+        {
+            long nextId = nextLocalId();
+            if ( nextId == VALUE_REPRESENTING_NULL )
+            {
+                // If we dont have anymore grabbed ids from master, grab a bunch
+                master = stuff.getMaster();
+                Response<IdAllocation> response = master.allocateIds( idType );
+                IdAllocation allocation = response.response();
+                response.close();
+                nextId = storeLocally( allocation );
+            }
+            // TODO necessary check?
+            else if ( !master.equals( stuff.getMaster() ) )
+                throw new ComException( "Master changed" );
+            return nextId;
+        }
+
+        public IdRange nextIdBatch( int size )
+        {
+            throw new UnsupportedOperationException( "Should never be called" );
+        }
+
+        private long storeLocally( IdAllocation allocation )
+        {
+            this.highestIdInUse = allocation.getHighestIdInUse();
+            this.defragCount = allocation.getDefragCount();
+            this.idQueue = new IdRangeIterator( allocation.getIdRange() );
+            return idQueue.next();
+        }
+
+        private long nextLocalId()
+        {
+            return this.idQueue.next();
+        }
+
+        public void setHighId( long id )
+        {
+            // TODO Check for if it's lower than what I have?
+            this.highestIdInUse = id;
+        }
+
+        public long getDefragCount()
+        {
+            return this.defragCount;
+        }
+
+        @Override
+        public void delete()
+        {
+        }
+    }
+
+    private static class IdRangeIterator
+    {
+        private int position = 0;
+        private final long[] defrag;
+        private final long start;
+        private final int length;
+
+        IdRangeIterator( IdRange idRange )
+        {
+            this.defrag = idRange.getDefragIds();
+            this.start = idRange.getRangeStart();
+            this.length = idRange.getRangeLength();
+        }
+
+        long next()
+        {
+            try
+            {
+                if ( position < defrag.length )
+                {
+                    return defrag[position];
+                }
+                else
+                {
+                    int offset = position - defrag.length;
+                    return ( offset < length ) ? ( start + offset ) : VALUE_REPRESENTING_NULL;
+                }
+            }
+            finally
+            {
+                ++position;
+            }
+        }
+    }
+
+    private static IdRangeIterator EMPTY_ID_RANGE_ITERATOR =
+            new IdRangeIterator( new IdRange( new long[0], 0, 0 ) )
+    {
+        @Override
+        long next()
+        {
+            return VALUE_REPRESENTING_NULL;
+        };
+    };
+}

@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.ha;
 
+import java.util.List;
+
 import javax.transaction.Transaction;
 
 import org.neo4j.com.Response;
@@ -30,21 +32,25 @@ import org.neo4j.kernel.impl.core.GraphProperties;
 import org.neo4j.kernel.impl.core.NodeManager.IndexLock;
 import org.neo4j.kernel.impl.transaction.IllegalResourceException;
 import org.neo4j.kernel.impl.transaction.LockManager;
+import org.neo4j.kernel.impl.transaction.LockManagerImpl;
+import org.neo4j.kernel.impl.transaction.LockNotFoundException;
 import org.neo4j.kernel.impl.transaction.RagManager;
 import org.neo4j.kernel.impl.transaction.TxHook;
 import org.neo4j.kernel.impl.transaction.TxManager;
+import org.neo4j.kernel.info.LockInfo;
 
-public class SlaveLockManager extends LockManager
+public class SlaveLockManager implements LockManager
 {
     private final Broker broker;
     private final TxManager tm;
     private final SlaveDatabaseOperations databaseOperations;
     private final TxHook txHook;
+    private final LockManager local;
 
     public SlaveLockManager( RagManager ragManager, TxManager tm, TxHook txHook, Broker broker,
             SlaveDatabaseOperations databaseOperations )
     {
-        super( ragManager );
+        this.local = new LockManagerImpl( ragManager );
         this.tm = tm;
         this.txHook = txHook;
         this.broker = broker;
@@ -54,6 +60,48 @@ public class SlaveLockManager extends LockManager
     private int getLocalTxId()
     {
         return tm.getEventIdentifier();
+    }
+
+    public long getDetectedDeadlockCount()
+    {
+        return local.getDetectedDeadlockCount();
+    }
+
+    public void releaseReadLock( Object resource, Transaction tx ) throws LockNotFoundException,
+            IllegalResourceException
+    {
+        local.releaseReadLock( resource, tx );
+    }
+
+    public void releaseWriteLock( Object resource, Transaction tx ) throws LockNotFoundException,
+            IllegalResourceException
+    {
+        local.releaseWriteLock( resource, tx );
+    }
+
+    public void dumpLocksOnResource( Object resource )
+    {
+        local.dumpLocksOnResource( resource );
+    }
+
+    public List<LockInfo> getAllLocks()
+    {
+        return local.getAllLocks();
+    }
+
+    public List<LockInfo> getAwaitedLocks( long minWaitTime )
+    {
+        return local.getAwaitedLocks( minWaitTime );
+    }
+
+    public void dumpRagStack()
+    {
+        local.dumpRagStack();
+    }
+
+    public void dumpAllLocks()
+    {
+        local.dumpAllLocks();
     }
 
     @Override
@@ -70,7 +118,7 @@ public class SlaveLockManager extends LockManager
         {
             if ( grabber == null )
             {
-                super.getReadLock( resource );
+                local.getReadLock( resource );
                 return;
             }
 
@@ -84,7 +132,7 @@ public class SlaveLockManager extends LockManager
                 switch ( result.getStatus() )
                 {
                 case OK_LOCKED:
-                    super.getReadLock( resource );
+                    local.getReadLock( resource );
                     return;
                 case DEAD_LOCKED:
                     throw new DeadlockDetectedException( result.getDeadlockMessage() );
@@ -122,7 +170,7 @@ public class SlaveLockManager extends LockManager
         {
             if ( grabber == null )
             {
-                super.getWriteLock( resource );
+                local.getWriteLock( resource );
                 return;
             }
 
@@ -136,7 +184,7 @@ public class SlaveLockManager extends LockManager
                 switch ( result.getStatus() )
                 {
                 case OK_LOCKED:
-                    super.getWriteLock( resource );
+                    local.getWriteLock( resource );
                     return;
                 case DEAD_LOCKED:
                     throw new DeadlockDetectedException( result.getDeadlockMessage() );
