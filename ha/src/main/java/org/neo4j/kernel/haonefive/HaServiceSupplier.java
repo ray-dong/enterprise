@@ -28,6 +28,7 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
 /**
  * Supplies HA services (for example lock manager, tx hook, etc.) with information they need.
+ * An exhaustive, unorganized list of what all HA services need altogether.
  */
 public interface HaServiceSupplier
 {

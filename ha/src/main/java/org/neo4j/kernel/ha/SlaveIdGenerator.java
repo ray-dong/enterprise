@@ -53,6 +53,7 @@ public class SlaveIdGenerator implements IdGenerator
             this.databaseOperations = databaseOperations;
         }
 
+        @Override
         public IdGenerator open( FileSystemAbstraction fs, String fileName, int grabSize, IdType idType, long highestIdInUse, boolean startup )
         {
             if ( startup ) new File( fileName ).delete();
@@ -64,9 +65,10 @@ public class SlaveIdGenerator implements IdGenerator
             return generator;
         }
 
-        public void create( FileSystemAbstraction fs, String fileName )
+        @Override
+        public void create( FileSystemAbstraction fs, String fileName, long highId )
         {
-            localFactory.create( fs, fileName );
+            localFactory.create( fs, fileName, highId );
         }
 
         public IdGenerator get( IdType idType )

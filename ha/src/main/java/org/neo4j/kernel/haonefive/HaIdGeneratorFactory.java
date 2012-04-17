@@ -56,9 +56,9 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
     }
 
     @Override
-    public void create( FileSystemAbstraction fs, String fileName )
+    public void create( FileSystemAbstraction fs, String fileName, long highId )
     {
-        localFactory.create( fs, fileName );
+        localFactory.create( fs, fileName, highId );
     }
 
     @Override

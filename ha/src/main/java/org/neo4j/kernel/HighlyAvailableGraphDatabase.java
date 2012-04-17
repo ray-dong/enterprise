@@ -138,7 +138,7 @@ public class HighlyAvailableGraphDatabase
     private Iterable<IndexProvider> indexProviders;
     private Iterable<KernelExtension> kernelExtensions;
     private Iterable<CacheProvider> cacheProviders;
-    private final StringLogger messageLog;
+    final StringLogger messageLog;
     private volatile AbstractGraphDatabase internalGraphDatabase;
     private NodeProxy.NodeLookup nodeLookup;
     private RelationshipProxy.RelationshipLookups relationshipLookups;
@@ -1555,178 +1555,13 @@ public class HighlyAvailableGraphDatabase
         return localGraph().getKernelPanicGenerator();
     }
 
-    public static enum BranchedDataPolicy
-    {
-        keep_all
-        {
-            @Override
-            void handle( HighlyAvailableGraphDatabase db )
-            {
-                moveAwayDb( db, newBranchedDataDir( db ) );
-            }
-        },
-        keep_last
-        {
-            @Override
-            void handle( HighlyAvailableGraphDatabase db )
-            {
-                File branchedDataDir = newBranchedDataDir( db );
-                moveAwayDb( db, branchedDataDir );
-                for ( File file : getBranchedDataRootDirectory( db.getStoreDir() ).listFiles() )
-                {
-                    if ( isBranchedDataDirectory( file ) && !file.equals( branchedDataDir ) )
-                    {
-                        try
-                        {
-                            FileUtils.deleteRecursively( file );
-                        }
-                        catch ( IOException e )
-                        {
-                            db.messageLog.logMessage( "Couldn't delete old branched data directory " + file, e );
-                        }
-                    }
-                }
-            }
-        },
-        keep_none
-        {
-            @Override
-            void handle( HighlyAvailableGraphDatabase db )
-            {
-                for ( File file : relevantDbFiles( db ) )
-                {
-                    try
-                    {
-                        FileUtils.deleteRecursively( file );
-                    }
-                    catch ( IOException e )
-                    {
-                        db.messageLog.logMessage( "Couldn't delete file " + file, e );
-                    }
-                }
-            }
-        },
-        shutdown
-        {
-            @Override
-            void handle( HighlyAvailableGraphDatabase db )
-            {
-                db.shutdown();
-            }
-        };
-
-        // Branched directories will end up in <dbStoreDir>/branched/<timestamp>/
-        static String BRANCH_SUBDIRECTORY = "branched";
-
-        abstract void handle( HighlyAvailableGraphDatabase db );
-
-        protected void moveAwayDb( HighlyAvailableGraphDatabase db, File branchedDataDir )
-        {
-            for ( File file : relevantDbFiles( db ) )
-            {
-                try
-                {
-                    FileUtils.moveFileToDirectory( file, branchedDataDir );
-                }
-                catch ( IOException e )
-                {
-                    db.messageLog.logMessage( "Couldn't move " + file.getPath() );
-                }
-            }
-        }
-
-        File newBranchedDataDir( HighlyAvailableGraphDatabase db )
-        {
-            File result = getBranchedDataDirectory( db.getStoreDir(), System.currentTimeMillis() );
-            result.mkdirs();
-            return result;
-        }
-
-        File[] relevantDbFiles( HighlyAvailableGraphDatabase db )
-        {
-            if (!new File( db.getStoreDir() ).exists())
-                return new File[0];
-
-            return new File( db.getStoreDir() ).listFiles( new FileFilter()
-            {
-                @Override
-                public boolean accept( File file )
-                {
-                    return !file.getName().equals( StringLogger.DEFAULT_NAME ) && !isBranchedDataRootDirectory( file );
-                }
-            } );
-        }
-
-        public static boolean isBranchedDataRootDirectory( File directory )
-        {
-            return directory.isDirectory() && directory.getName().equals( BRANCH_SUBDIRECTORY );
-        }
-
-        public static boolean isBranchedDataDirectory( File directory )
-        {
-            return directory.isDirectory() && directory.getParentFile().getName().equals( BRANCH_SUBDIRECTORY ) &&
-                    isAllDigits( directory.getName() );
-        }
-
-        private static boolean isAllDigits( String string )
-        {
-            for ( char c : string.toCharArray() )
-                if ( !Character.isDigit( c ) )
-                    return false;
-            return true;
-        }
-
-        public static File getBranchedDataRootDirectory( String dbStoreDir )
-        {
-            return new File( dbStoreDir, BRANCH_SUBDIRECTORY );
-        }
-
-        public static File getBranchedDataDirectory( String dbStoreDir, long timestamp )
-        {
-            return new File( getBranchedDataRootDirectory( dbStoreDir ), "" + timestamp );
-        }
-
-        public static File[] listBranchedDataDirectories( String storeDir )
-        {
-            return getBranchedDataRootDirectory( storeDir ).listFiles( new FileFilter()
-            {
-                @Override
-                public boolean accept( File directory )
-                {
-                    return isBranchedDataDirectory( directory );
-                }
-            } );
-        }
-    }
-
     class LocalDatabaseOperations implements SlaveDatabaseOperations, ClusterEventReceiver
     {
         @Override
         public SlaveContext getSlaveContext( int eventIdentifier )
         {
             // Constructs a slave context from scratch.
-            try
-            {
-                XaDataSourceManager localDataSourceManager = getXaDataSourceManager();
-                Collection<XaDataSource> dataSources = localDataSourceManager.getAllRegisteredDataSources();
-                Tx[] txs = new Tx[dataSources.size()];
-                int i = 0;
-                Pair<Integer,Long> master = null;
-                for ( XaDataSource dataSource : dataSources )
-                {
-                    long txId = dataSource.getLastCommittedTxId();
-                    if( dataSource.getName().equals( Config.DEFAULT_DATA_SOURCE_NAME ) )
-                    {
-                        master = dataSource.getMasterForCommittedTx( txId );
-                    }
-                    txs[i++] = SlaveContext.lastAppliedTx( dataSource.getName(), txId );
-                }
-                return new SlaveContext( startupTime, machineId, eventIdentifier, txs, master.first(), master.other() );
-            }
-            catch ( IOException e )
-            {
-                throw new RuntimeException( e );
-            }
+            return MasterUtil.getSlaveContext( getXaDataSourceManager(), startupTime, machineId, eventIdentifier );
         }
 
         @Override

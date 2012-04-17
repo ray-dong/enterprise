@@ -27,9 +27,9 @@ import java.io.File;
 
 import org.junit.Test;
 import org.neo4j.graphdb.Transaction;
+import org.neo4j.kernel.BranchedDataPolicy;
 import org.neo4j.kernel.EmbeddedGraphDatabase;
 import org.neo4j.kernel.HighlyAvailableGraphDatabase;
-import org.neo4j.kernel.HighlyAvailableGraphDatabase.BranchedDataPolicy;
 import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterClient;
 import org.neo4j.kernel.ha.FakeClusterClient;

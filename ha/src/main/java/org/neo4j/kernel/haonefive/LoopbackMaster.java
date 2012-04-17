@@ -33,19 +33,40 @@ import org.neo4j.kernel.ha.IdAllocation;
 import org.neo4j.kernel.ha.LockResult;
 import org.neo4j.kernel.ha.LockStatus;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.impl.core.RelationshipTypeCreator;
+import org.neo4j.kernel.impl.core.RelationshipTypeHolder;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
+import org.neo4j.kernel.impl.persistence.EntityIdGenerator;
+import org.neo4j.kernel.impl.persistence.PersistenceManager;
+import org.neo4j.kernel.impl.transaction.TxManager;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
 
+/**
+ * Acts as a {@link Master} for when the master is myself, i.e. it delegates back
+ * to default behavior of services calling these methods.
+ */
 public class LoopbackMaster implements Master
 {
     private final StoreId storeId;
     private final XaDataSourceManager dsManager;
+    private final RelationshipTypeCreator relationshipTypeCreator;
+    private final TxManager txManager;
+    private final EntityIdGenerator entityIdGenerator;
+    private final PersistenceManager persistenceManager;
+    private final RelationshipTypeHolder relationshipTypeHolder;
 
-    public LoopbackMaster( StoreId storeId, XaDataSourceManager dsManager )
+    public LoopbackMaster( StoreId storeId, XaDataSourceManager dsManager, RelationshipTypeCreator relationshipTypeCreator,
+            TxManager txManager, EntityIdGenerator entityIdGenerator, PersistenceManager persistenceManager,
+            RelationshipTypeHolder relationshipTypeHolder )
     {
         this.storeId = storeId;
         this.dsManager = dsManager;
+        this.relationshipTypeCreator = relationshipTypeCreator;
+        this.txManager = txManager;
+        this.entityIdGenerator = entityIdGenerator;
+        this.persistenceManager = persistenceManager;
+        this.relationshipTypeHolder = relationshipTypeHolder;
     }
     
     @Override
@@ -57,8 +78,8 @@ public class LoopbackMaster implements Master
     @Override
     public Response<Integer> createRelationshipType( SlaveContext context, String name )
     {
-        // TODO Auto-generated method stub
-        return null;
+        int id = relationshipTypeCreator.getOrCreate( txManager, entityIdGenerator, persistenceManager, relationshipTypeHolder, name );
+        return emptyResponse( id );
     }
 
     @Override
