@@ -36,7 +36,7 @@ public interface HaServiceSupplier
 
     SlaveContext getSlaveContext( int eventIdentifier );
 
-    SlaveContext getSlaveContext( int identifier, XaDataSource dataSource );
+    SlaveContext getSlaveContext( XaDataSource dataSource );
     
     SlaveContext getSlaveContext();
     
@@ -45,6 +45,8 @@ public interface HaServiceSupplier
     boolean hasAnyLocks( Transaction tx );
 
     int getMasterServerId();
-
+    
+    void makeSureTxHasBeenInitialized();
+    
     // ...
 }

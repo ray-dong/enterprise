@@ -36,7 +36,6 @@ public class HaTxHook implements TxHook
     @Override
     public void initializeTransaction( int eventIdentifier )
     {
-        // TODO Auto-generated method stub
         Response<Void> response = stuff.getMaster().initializeTx( stuff.getSlaveContext( eventIdentifier ) );
         stuff.receive( response );
     }

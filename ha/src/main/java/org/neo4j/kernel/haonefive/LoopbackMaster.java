@@ -33,12 +33,13 @@ import org.neo4j.kernel.ha.IdAllocation;
 import org.neo4j.kernel.ha.LockResult;
 import org.neo4j.kernel.ha.LockStatus;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.impl.core.DefaultRelationshipTypeCreator;
 import org.neo4j.kernel.impl.core.RelationshipTypeCreator;
 import org.neo4j.kernel.impl.core.RelationshipTypeHolder;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.persistence.EntityIdGenerator;
 import org.neo4j.kernel.impl.persistence.PersistenceManager;
-import org.neo4j.kernel.impl.transaction.TxManager;
+import org.neo4j.kernel.impl.transaction.AbstractTransactionManager;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
 
@@ -51,18 +52,18 @@ public class LoopbackMaster implements Master
     private final StoreId storeId;
     private final XaDataSourceManager dsManager;
     private final RelationshipTypeCreator relationshipTypeCreator;
-    private final TxManager txManager;
+    private final AbstractTransactionManager txManager;
     private final EntityIdGenerator entityIdGenerator;
     private final PersistenceManager persistenceManager;
     private final RelationshipTypeHolder relationshipTypeHolder;
 
-    public LoopbackMaster( StoreId storeId, XaDataSourceManager dsManager, RelationshipTypeCreator relationshipTypeCreator,
-            TxManager txManager, EntityIdGenerator entityIdGenerator, PersistenceManager persistenceManager,
+    public LoopbackMaster( StoreId storeId, XaDataSourceManager dsManager,
+            AbstractTransactionManager txManager, EntityIdGenerator entityIdGenerator, PersistenceManager persistenceManager,
             RelationshipTypeHolder relationshipTypeHolder )
     {
         this.storeId = storeId;
         this.dsManager = dsManager;
-        this.relationshipTypeCreator = relationshipTypeCreator;
+        this.relationshipTypeCreator = new DefaultRelationshipTypeCreator();
         this.txManager = txManager;
         this.entityIdGenerator = entityIdGenerator;
         this.persistenceManager = persistenceManager;

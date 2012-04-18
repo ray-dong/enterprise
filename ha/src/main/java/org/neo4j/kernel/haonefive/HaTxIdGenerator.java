@@ -43,7 +43,7 @@ public class HaTxIdGenerator implements TxIdGenerator
     public long generate( XaDataSource dataSource, int identifier )
     {
         Response<Long> response = stuff.getMaster().commitSingleResourceTransaction(
-                stuff.getSlaveContext( identifier, dataSource ), dataSource.getName(),
+                stuff.getSlaveContext( dataSource ), dataSource.getName(),
                 myPreparedTransactionToCommit( dataSource, identifier ) );
         stuff.receive( response );
         return response.response().longValue();

@@ -67,14 +67,17 @@ public class HaLockManager implements LockManager
         Response<LockResult> response = null;
         if ( resource instanceof Node )
         {
+            stuff.makeSureTxHasBeenInitialized();
             response = stuff.getMaster().acquireNodeReadLock( stuff.getSlaveContext(), ((Node)resource).getId() );
         }
         else if ( resource instanceof Relationship )
         {
+            stuff.makeSureTxHasBeenInitialized();
             response = stuff.getMaster().acquireRelationshipReadLock( stuff.getSlaveContext(), ((Relationship)resource).getId() );
         }
         else if ( resource instanceof GraphProperties )
         {
+            stuff.makeSureTxHasBeenInitialized();
             response = stuff.getMaster().acquireGraphReadLock( stuff.getSlaveContext() );
         }
         else
@@ -111,20 +114,23 @@ public class HaLockManager implements LockManager
             local.getWriteLock( resource );
         }
     }
-
+    
     private boolean getWriteLockOnMaster( Object resource )
     {
         Response<LockResult> response = null;
         if ( resource instanceof Node )
         {
+            stuff.makeSureTxHasBeenInitialized();
             response = stuff.getMaster().acquireNodeWriteLock( stuff.getSlaveContext(), ((Node)resource).getId() );
         }
         else if ( resource instanceof Relationship )
         {
+            stuff.makeSureTxHasBeenInitialized();
             response = stuff.getMaster().acquireRelationshipWriteLock( stuff.getSlaveContext(), ((Relationship)resource).getId() );
         }
         else if ( resource instanceof GraphProperties )
         {
+            stuff.makeSureTxHasBeenInitialized();
             response = stuff.getMaster().acquireGraphWriteLock( stuff.getSlaveContext() );
         }
         else

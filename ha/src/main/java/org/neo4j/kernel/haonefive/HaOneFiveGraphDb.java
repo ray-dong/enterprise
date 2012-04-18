@@ -20,13 +20,19 @@
 package org.neo4j.kernel.haonefive;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Map;
 
+import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 
+import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
+import org.neo4j.com.StoreIdGetter;
+import org.neo4j.com.TxChecksumVerifier;
 import org.neo4j.graphdb.index.IndexProvider;
 import org.neo4j.helpers.Service;
 import org.neo4j.kernel.AbstractGraphDatabase;
@@ -35,8 +41,12 @@ import org.neo4j.kernel.KernelExtension;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
+import org.neo4j.kernel.ha.MasterClient;
+import org.neo4j.kernel.ha.MasterImpl;
+import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.impl.cache.CacheProvider;
 import org.neo4j.kernel.impl.core.RelationshipTypeCreator;
+import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.TxHook;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
@@ -47,9 +57,22 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     private final HaServiceSupplier stuff;
     private final int serverId;
     private volatile long sessionTimestamp;
+    private volatile long lastUpdated;
     
     private volatile Master master;
     private volatile int masterServerId;
+    private volatile DatabaseState databaseState = DatabaseState.TBD;
+    private volatile MasterServer server;
+    
+    // TODO This is an artifact of integrating with legacy code (MasterClient should change to not use this).
+    private final StoreIdGetter storeIdGetter = new StoreIdGetter()
+    {
+        @Override
+        public StoreId get()
+        {
+            return storeId;
+        }
+    };
     
     public HaOneFiveGraphDb( String storeDir, Map<String, String> params )
     {
@@ -57,7 +80,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 Service.load( KernelExtension.class ), Service.load( CacheProvider.class ) );
         
         serverId = new Config( params ).getInteger( HaSettings.server_id );
-        
+        sessionTimestamp = System.currentTimeMillis();
         stuff = new HaServiceSupplier()
         {
             @Override
@@ -66,7 +89,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 try
                 {
                     MasterUtil.applyReceivedTransactions( response, HaOneFiveGraphDb.this, MasterUtil.NO_ACTION );
-                    sessionTimestamp = System.currentTimeMillis();
+                    lastUpdated = System.currentTimeMillis();
                 }
                 catch ( IOException e )
                 {
@@ -87,9 +110,9 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             }
             
             @Override
-            public SlaveContext getSlaveContext( int identifier, XaDataSource dataSource )
+            public SlaveContext getSlaveContext( XaDataSource dataSource )
             {
-                return MasterUtil.getSlaveContext( dataSource, sessionTimestamp, serverId, identifier );
+                return MasterUtil.getSlaveContext( dataSource, sessionTimestamp, serverId, txManager.getEventIdentifier() );
             }
             
             @Override
@@ -107,11 +130,22 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             @Override
             public Master getMaster()
             {
-                if ( master == null )
-                {
-                    // TODO Block in wait of new master?
-                }
                 return master;
+            }
+
+            @Override
+            public void makeSureTxHasBeenInitialized()
+            {
+                try
+                {
+                    Transaction tx = txManager.getTransaction();
+                    int eventIdentifier = txManager.getEventIdentifier();
+                    if ( !hasAnyLocks( tx ) ) txHook.initializeTransaction( eventIdentifier );
+                }
+                catch ( SystemException e )
+                {
+                    throw new RuntimeException( e );
+                }
             }
         };
         
@@ -153,10 +187,27 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     {
         // TODO Block incoming transactions and rollback active ones or something.
         
+        URL url;
+        try
+        {
+            url = new URL( masterId );
+        }
+        catch ( MalformedURLException e )
+        {
+            throw new RuntimeException( e );
+        }
+        
         boolean iAmToBecomeMaster = masterServerId == this.serverId;
-        this.master = iAmToBecomeMaster ?
-                new LoopbackMaster( storeId, xaDataSourceManager, relationshipTypeCreator, null, persistenceSource, persistenceManager, relationshipTypeHolder ) :
-                null; // TODO instantiate master from masterId
+        if ( iAmToBecomeMaster )
+        {
+            databaseState.becomeMaster( this, url.getPort() );
+            databaseState = DatabaseState.MASTER;
+        }
+        else
+        {
+            databaseState.becomeSlave( this, url.getHost(), url.getPort() );
+            databaseState = DatabaseState.SLAVE;
+        }
         this.masterServerId = masterServerId;
         ((HaIdGeneratorFactory) idGeneratorFactory).masterChanged( master, masterServerId );
     }
@@ -165,5 +216,100 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     public void masterChanged( String masterId )
     {
         // TODO Remove blockade
+    }
+
+    enum DatabaseState
+    {
+        TBD
+        {
+            @Override
+            void handleWriteOperation( HaOneFiveGraphDb db )
+            {
+                // TODO Block and wait for db to decide role a while and return
+                // If it couldn't be decided throw exception
+            }
+
+            @Override
+            void becomeMaster( HaOneFiveGraphDb db, int port )
+            {
+                db.server = newServer( db, port );
+                db.master = newLoopbackMaster( db );
+            }
+
+            @Override
+            void becomeSlave( final HaOneFiveGraphDb db, String masterIp, int masterPort )
+            {
+                db.master = newClient( db, masterIp, masterPort );
+            }
+        },
+        MASTER
+        {
+            @Override
+            void handleWriteOperation( HaOneFiveGraphDb db )
+            {
+            }
+
+            @Override
+            void becomeMaster( HaOneFiveGraphDb db, int port )
+            {
+                // Do nothing, I'm already master
+            }
+
+            @Override
+            void becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort )
+            {
+                // TODO Switch to slave
+                db.server.shutdown();
+                db.server = null;
+                db.master.shutdown();
+                db.master = newClient( db, masterIp, masterPort );
+            }
+        },
+        SLAVE
+        {
+            @Override
+            void handleWriteOperation( HaOneFiveGraphDb db )
+            {
+            }
+
+            @Override
+            void becomeMaster( HaOneFiveGraphDb db, int port )
+            {
+                db.server = newServer( db, port );
+                db.master.shutdown();
+                db.master = newLoopbackMaster( db );
+            }
+
+            @Override
+            void becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort )
+            {
+                db.master.shutdown();
+                db.master = newClient( db, masterIp, masterPort );
+            }
+        };
+        
+        abstract void becomeMaster( HaOneFiveGraphDb db, int port );
+        
+        protected Master newLoopbackMaster( HaOneFiveGraphDb db )
+        {
+            return new LoopbackMaster( db.storeId, db.xaDataSourceManager,
+                    db.txManager, db.persistenceSource, db.persistenceManager, db.relationshipTypeHolder );
+        }
+
+        protected MasterServer newServer( HaOneFiveGraphDb db, int port )
+        {
+            return new MasterServer( new MasterImpl( db, 20 ), port, db.getMessageLog(),
+                    20, 20, TxChecksumVerifier.ALWAYS_MATCH );
+        }
+
+        protected Master newClient( HaOneFiveGraphDb db, String masterIp, int masterPort )
+        {
+            return new MasterClient( masterIp, masterPort, db.getMessageLog(), db.storeIdGetter,
+                    ConnectionLostHandler.NO_ACTION, 20, 20, 20 );
+        }
+
+        abstract void becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort );
+        
+        abstract void handleWriteOperation( HaOneFiveGraphDb db );
     }
 }
