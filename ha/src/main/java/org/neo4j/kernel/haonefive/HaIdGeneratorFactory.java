@@ -22,7 +22,6 @@ package org.neo4j.kernel.haonefive;
 import java.util.EnumMap;
 import java.util.Map;
 
-import org.neo4j.com.ComException;
 import org.neo4j.com.Response;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.IdGeneratorFactory;
@@ -77,14 +76,19 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
 
     private static final long VALUE_REPRESENTING_NULL = -1;
     
+    private enum State
+    {
+        TBD, SLAVE, MASTER;
+    }
+    
     private class HaIdGenerator implements IdGenerator
     {
-        private volatile boolean firstDecisionMade;
         private IdGenerator delegate;
         private final FileSystemAbstraction fs;
         private final String fileName;
         private final int grabSize;
         private final IdType idType;
+        private volatile State state = State.TBD;
         
         HaIdGenerator( IdGenerator initialDelegate, FileSystemAbstraction fs, String fileName, int grabSize, IdType idType )
         {
@@ -98,37 +102,34 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
         public void masterChanged( Master master, int masterServerId )
         {
             boolean isBecomingMaster = masterServerId == serverId;
-            
+            long highId = delegate.getHighId();
             if ( isBecomingMaster )
             {
-                if ( delegate instanceof SlaveIdGenerator )
+                if ( state == State.SLAVE )
                 {
-                    // TODO Switch to master
                     delegate.close( false );
+                    if ( !fs.fileExists( fileName ) )
+                        localFactory.create( fs, fileName, highId );
                     delegate = localFactory.open( fs, fileName, grabSize, idType, grabSize, false );
                 }
-                else
-                {
-                    // Don't do anything. Why was this called if I was already master btw?
-                }
+                // Otherwise we're master or TBD (initial state) which is the same
+                state = State.MASTER;
             }
-            else
+            else // becoming a slave
             {
-                if ( delegate instanceof SlaveIdGenerator )
+                if ( state == State.SLAVE )
                 {
                     // I'm already slave, just forget about ids from the previous master
                     ((SlaveIdGenerator) delegate).forgetIdAllocationFromMaster( master );
                 }
-                else if ( !firstDecisionMade )
+                else
                 {
-                    // TODO Switch to slave
-                    long highId = delegate.getHighId();
                     delegate.close( false );
                     delegate.delete();
                     delegate = new SlaveIdGenerator( idType, highId, master );
                 }
+                state = State.SLAVE;
             }
-            firstDecisionMade = true;
         }
         
         public String toString()
@@ -192,7 +193,7 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
         }
     }
     
-    private class SlaveIdGenerator implements IdGenerator
+    private static class SlaveIdGenerator implements IdGenerator
     {
         private volatile long highestIdInUse;
         private volatile long defragCount;
@@ -242,15 +243,14 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
             if ( nextId == VALUE_REPRESENTING_NULL )
             {
                 // If we dont have anymore grabbed ids from master, grab a bunch
-                master = stuff.getMaster();
                 Response<IdAllocation> response = master.allocateIds( idType );
                 IdAllocation allocation = response.response();
                 response.close();
                 nextId = storeLocally( allocation );
             }
             // TODO necessary check?
-            else if ( !master.equals( stuff.getMaster() ) )
-                throw new ComException( "Master changed" );
+//            else if ( !master.equals( stuff.getMaster() ) )
+//                throw new ComException( "Master changed" );
             return nextId;
         }
 

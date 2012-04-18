@@ -28,7 +28,6 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -52,17 +51,11 @@ public class TestCreateNode
     {
         PATH = TargetDirectory.forTest( getClass() );
     }
-
-    @After
-    public void after() throws Exception
-    {
-
-    }
     
     @Test
     public void createHighlyAvailableNode() throws Exception
     {
-        // Prepare dbs
+        // Prepare dbs (create one and copy to the other location)
         File db1Path = PATH.directory( "1", true );
         File db2Path = PATH.directory( "2", true );
         new HaOneFiveGraphDb( db1Path.getAbsolutePath(), stringMap( "ha.server_id", "1" ) ).shutdown();
@@ -73,30 +66,48 @@ public class TestCreateNode
         HaOneFiveGraphDb db2 = new HaOneFiveGraphDb( db2Path.getAbsolutePath(), stringMap( "ha.server_id", "2" ) );
         
         // Fake master election
-        db1.newMasterElected( "http://localhost:6361", 1 );
-        db2.newMasterElected( "http://localhost:6361", 1 );
-        db1.masterChanged( "http://localhost:6361" );
-        db1.masterChanged( "http://localhost:6361" );
+        electNewMaster( 1, db1, db2 );
         
-        // Create node on master, then on slave
-        createNode( db1, "yo" );
-        createNode( db2, "ya" );
+        createNode( db1, "yo" ); // master
+        createNode( db2, "ya" ); // slave
         
-        // Verify that both nodes are in both dbs
+        // Verify that all nodes are in both dbs
         for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
             assertNodesExists( db, "yo", "ya" );
+        
+        // Elect new master
+        electNewMaster( 2, db1, db2 );
+
+        // Create node on master, then on slave
+        createNode( db2, "ye" ); // master
+        createNode( db1, "yi" ); // slave
+        
+        // Verify that all nodes are in both dbs
+        for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
+            assertNodesExists( db, "yo", "ya", "yi", "ye" );
         
         // Shut down
         db1.shutdown();
         db2.shutdown();
     }
 
+    private void electNewMaster( int id, HaOneFiveGraphDb... dbsToTell )
+    {
+        for ( HaOneFiveGraphDb db : dbsToTell )
+            db.newMasterElected( "http://localhost:" + (6361 + id), id );
+        for ( HaOneFiveGraphDb db : dbsToTell )
+            db.masterChanged( "http://localhost:" + (6361 + id) );
+    }
+
     private void assertNodesExists( HaOneFiveGraphDb db, String... names )
     {
         Set<String> expectation = new HashSet<String>( asList( names ) );
         for ( Relationship rel : db.getReferenceNode().getRelationships() )
-            assertTrue( expectation.remove( rel.getEndNode().getProperty( "name" ) ) );
-        assertTrue( expectation.isEmpty() );
+        {
+            String name = (String) rel.getEndNode().getProperty( "name" );
+            assertTrue( "Found unexpected name " + name, expectation.remove( name ) );
+        }
+        assertTrue( "Expected entries not encountered: " + expectation, expectation.isEmpty() );
     }
 
     private void createNode( GraphDatabaseService db, String name )

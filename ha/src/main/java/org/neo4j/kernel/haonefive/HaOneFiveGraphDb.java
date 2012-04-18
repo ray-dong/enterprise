@@ -217,6 +217,12 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     {
         // TODO Remove blockade
     }
+    
+    public void pullUpdates()
+    {
+        Response<Void> response = master.pullUpdates( stuff.getSlaveContext() );
+        stuff.receive( response );
+    }
 
     enum DatabaseState
     {
@@ -311,5 +317,11 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         abstract void becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort );
         
         abstract void handleWriteOperation( HaOneFiveGraphDb db );
+    }
+    
+    @Override
+    public String toString()
+    {
+        return getClass().getSimpleName() + "[" + serverId + ", " + storeDir + "]";
     }
 }
