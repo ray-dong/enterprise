@@ -19,9 +19,17 @@
  */
 package org.neo4j.kernel.haonefive;
 
-import org.neo4j.kernel.ha.Master;
-
 public interface MasterChangeListener
 {
-    void masterChanged( Master master, int masterServerId );
+    /**
+     * Called when new master has been elected. The new master may not be available a.t.m.
+     * A call to {@link #masterChanged(String)} will confirm that the master given in
+     * the most recent {@link #newMasterElected(String, int)} call is up and running as master.
+     * 
+     * @param masterId the connection information to the master.
+     * @param masterServerId the server id of the master (TODO remove)
+     */
+    void newMasterElected( String masterId, int masterServerId /*Here because other legacy HA code relies on it*/ );
+    
+    void masterChanged( String masterId );
 }

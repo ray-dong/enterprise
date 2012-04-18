@@ -39,10 +39,12 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
     private final Map<IdType, HaIdGenerator> generators =
             new EnumMap<IdType, HaIdGenerator>( IdType.class );
     private final IdGeneratorFactory localFactory = new DefaultIdGeneratorFactory();
+    private final int serverId;
 
-    public HaIdGeneratorFactory( HaServiceSupplier stuff )
+    public HaIdGeneratorFactory( HaServiceSupplier stuff, int serverId )
     {
         this.stuff = stuff;
+        this.serverId = serverId;
     }
 
     @Override
@@ -95,7 +97,7 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
         
         public void masterChanged( Master master, int masterServerId )
         {
-            boolean isBecomingMaster = masterServerId == stuff.getServerId();
+            boolean isBecomingMaster = masterServerId == serverId;
             
             if ( isBecomingMaster )
             {

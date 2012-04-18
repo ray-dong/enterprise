@@ -19,265 +19,151 @@
  */
 package org.neo4j.kernel.haonefive;
 
-import java.util.Collection;
-import java.util.HashMap;
+import java.io.IOException;
 import java.util.Map;
 
-import javax.transaction.TransactionManager;
+import javax.transaction.Transaction;
 
-import org.neo4j.backup.OnlineBackupSettings;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.Relationship;
-import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.graphdb.Transaction;
-import org.neo4j.graphdb.event.KernelEventHandler;
-import org.neo4j.graphdb.event.TransactionEventHandler;
-import org.neo4j.graphdb.factory.GraphDatabaseSettings;
-import org.neo4j.graphdb.index.IndexManager;
-import org.neo4j.kernel.GraphDatabaseAPI;
+import org.neo4j.com.MasterUtil;
+import org.neo4j.com.Response;
+import org.neo4j.com.SlaveContext;
+import org.neo4j.graphdb.index.IndexProvider;
+import org.neo4j.helpers.Service;
+import org.neo4j.kernel.AbstractGraphDatabase;
 import org.neo4j.kernel.IdGeneratorFactory;
-import org.neo4j.kernel.KernelData;
-import org.neo4j.kernel.TransactionBuilder;
+import org.neo4j.kernel.KernelExtension;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.configuration.ConfigurationDefaults;
-import org.neo4j.kernel.guard.Guard;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
-import org.neo4j.kernel.impl.core.KernelPanicEventGenerator;
-import org.neo4j.kernel.impl.core.LockReleaser;
-import org.neo4j.kernel.impl.core.NodeManager;
-import org.neo4j.kernel.impl.core.RelationshipTypeHolder;
-import org.neo4j.kernel.impl.nioneo.store.StoreId;
-import org.neo4j.kernel.impl.persistence.PersistenceSource;
+import org.neo4j.kernel.impl.cache.CacheProvider;
+import org.neo4j.kernel.impl.core.RelationshipTypeCreator;
 import org.neo4j.kernel.impl.transaction.LockManager;
-import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
-import org.neo4j.kernel.impl.util.StringLogger;
-import org.neo4j.kernel.info.DiagnosticsManager;
+import org.neo4j.kernel.impl.transaction.TxHook;
+import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
+import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
-public class HaOneFiveGraphDb implements GraphDatabaseAPI, MasterChangeListener
+public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterChangeListener
 {
-    private final Config config;
-    private volatile InternalHaOneFiveGraphDb delegate;
-    private HashMap<String, String> params;
+    private final HaServiceSupplier stuff;
+    private final int serverId;
+    private volatile long sessionTimestamp;
     
-    public HaOneFiveGraphDb( String storeDir, Map<String, String> inputParams )
+    private volatile Master master;
+    private volatile int masterServerId;
+    
+    public HaOneFiveGraphDb( String storeDir, Map<String, String> params )
     {
-        config = createConfig( inputParams );
+        super( storeDir, params, Service.load( IndexProvider.class ),
+                Service.load( KernelExtension.class ), Service.load( CacheProvider.class ) );
         
-        // Here we're in a state awaiting a call from master change listener...
-    }
-
-    private Config createConfig( Map<String, String> inputParams )
-    {
-        HashMap<String, String> params = new HashMap<String, String>( inputParams );
-        new ConfigurationDefaults( GraphDatabaseSettings.class, HaSettings.class, OnlineBackupSettings.class ).apply( params );
-        this.params = params;
-        return new Config( params );
-    }
-
-    private InternalHaOneFiveGraphDb delegate()
-    {
-        // TODO if delegate not available wait until it's available
-        return delegate;
-    }
-
-    public void masterChanged( Master master, int masterServerId )
-    {
-        if ( delegate == null )
+        serverId = new Config( params ).getInteger( HaSettings.server_id );
+        
+        stuff = new HaServiceSupplier()
         {
-            // TODO Copy store if needed
-            // TODO Check consistency with master
-            delegate = new InternalHaOneFiveGraphDb( getStoreDir(), params, master, masterServerId );
-        }
-        else
-        {
-            // TODO Check consistency with master
-            delegate.masterChanged( master, masterServerId );
-        }
+            @Override
+            public void receive( Response<?> response )
+            {
+                try
+                {
+                    MasterUtil.applyReceivedTransactions( response, HaOneFiveGraphDb.this, MasterUtil.NO_ACTION );
+                    sessionTimestamp = System.currentTimeMillis();
+                }
+                catch ( IOException e )
+                {
+                    throw new RuntimeException( e );
+                }
+            }
+            
+            @Override
+            public boolean hasAnyLocks( Transaction tx )
+            {
+                return lockReleaser.hasLocks( tx );
+            }
+            
+            @Override
+            public SlaveContext getSlaveContext()
+            {
+                return getSlaveContext( txManager.getEventIdentifier() );
+            }
+            
+            @Override
+            public SlaveContext getSlaveContext( int identifier, XaDataSource dataSource )
+            {
+                return MasterUtil.getSlaveContext( dataSource, sessionTimestamp, serverId, identifier );
+            }
+            
+            @Override
+            public SlaveContext getSlaveContext( int eventIdentifier )
+            {
+                return MasterUtil.getSlaveContext( xaDataSourceManager, sessionTimestamp, serverId, eventIdentifier );
+            }
+            
+            @Override
+            public int getMasterServerId()
+            {
+                return masterServerId;
+            }
+            
+            @Override
+            public Master getMaster()
+            {
+                if ( master == null )
+                {
+                    // TODO Block in wait of new master?
+                }
+                return master;
+            }
+        };
+        
+        run();
+    }
+    
+    @Override
+    protected TxHook createTxHook()
+    {
+        return new HaTxHook( stuff );
+    }
+    
+    @Override
+    protected TxIdGenerator createTxIdGenerator()
+    {
+        return new HaTxIdGenerator( stuff, serverId );
+    }
+    
+    @Override
+    protected IdGeneratorFactory createIdGeneratorFactory()
+    {
+        return new HaIdGeneratorFactory( stuff, serverId );
+    }
+    
+    @Override
+    protected LockManager createLockManager()
+    {
+        return new HaLockManager( stuff, ragManager );
+    }
+    
+    @Override
+    protected RelationshipTypeCreator createRelationshipTypeCreator()
+    {
+        return new HaRelationshipTypeCreator( stuff );
     }
 
-    public void shutdown()
+    @Override
+    public void newMasterElected( String masterId, int masterServerId )
     {
-        delegate().shutdown();
+        // TODO Block incoming transactions and rollback active ones or something.
+        
+        boolean iAmToBecomeMaster = masterServerId == this.serverId;
+        this.master = iAmToBecomeMaster ?
+                new LoopbackMaster( storeId, xaDataSourceManager, relationshipTypeCreator, null, persistenceSource, persistenceManager, relationshipTypeHolder ) :
+                null; // TODO instantiate master from masterId
+        this.masterServerId = masterServerId;
+        ((HaIdGeneratorFactory) idGeneratorFactory).masterChanged( master, masterServerId );
     }
 
-    public final String getStoreDir()
+    @Override
+    public void masterChanged( String masterId )
     {
-        return delegate().getStoreDir();
-    }
-
-    public StoreId getStoreId()
-    {
-        return delegate().getStoreId();
-    }
-
-    public Transaction beginTx()
-    {
-        return delegate().beginTx();
-    }
-
-    public boolean transactionRunning()
-    {
-        return delegate().transactionRunning();
-    }
-
-    public final <T> T getManagementBean( Class<T> type )
-    {
-        return delegate().getManagementBean( type );
-    }
-
-    public final <T> T getSingleManagementBean( Class<T> type )
-    {
-        return delegate().getSingleManagementBean( type );
-    }
-
-    public String toString()
-    {
-        return delegate().toString();
-    }
-
-    public Iterable<Node> getAllNodes()
-    {
-        return delegate().getAllNodes();
-    }
-
-    public Iterable<RelationshipType> getRelationshipTypes()
-    {
-        return delegate().getRelationshipTypes();
-    }
-
-    public KernelEventHandler registerKernelEventHandler( KernelEventHandler handler )
-    {
-        return delegate().registerKernelEventHandler( handler );
-    }
-
-    public <T> TransactionEventHandler<T> registerTransactionEventHandler( TransactionEventHandler<T> handler )
-    {
-        return delegate().registerTransactionEventHandler( handler );
-    }
-
-    public KernelEventHandler unregisterKernelEventHandler( KernelEventHandler handler )
-    {
-        return delegate().unregisterKernelEventHandler( handler );
-    }
-
-    public <T> TransactionEventHandler<T> unregisterTransactionEventHandler( TransactionEventHandler<T> handler )
-    {
-        return delegate().unregisterTransactionEventHandler( handler );
-    }
-
-    public Node createNode()
-    {
-        return delegate().createNode();
-    }
-
-    public Node getNodeById( long id )
-    {
-        return delegate().getNodeById( id );
-    }
-
-    public Relationship getRelationshipById( long id )
-    {
-        return delegate().getRelationshipById( id );
-    }
-
-    public Node getReferenceNode()
-    {
-        return delegate().getReferenceNode();
-    }
-
-    public TransactionBuilder tx()
-    {
-        return delegate().tx();
-    }
-
-    public Guard getGuard()
-    {
-        return delegate().getGuard();
-    }
-
-    public <T> Collection<T> getManagementBeans( Class<T> beanClass )
-    {
-        return delegate().getManagementBeans( beanClass );
-    }
-
-    public KernelData getKernelData()
-    {
-        return delegate().getKernelData();
-    }
-
-    public IndexManager index()
-    {
-        return delegate().index();
-    }
-
-    public Config getConfig()
-    {
-        return delegate().getConfig();
-    }
-
-    public NodeManager getNodeManager()
-    {
-        return delegate().getNodeManager();
-    }
-
-    public LockReleaser getLockReleaser()
-    {
-        return delegate().getLockReleaser();
-    }
-
-    public LockManager getLockManager()
-    {
-        return delegate().getLockManager();
-    }
-
-    public XaDataSourceManager getXaDataSourceManager()
-    {
-        return delegate().getXaDataSourceManager();
-    }
-
-    public TransactionManager getTxManager()
-    {
-        return delegate().getTxManager();
-    }
-
-    public RelationshipTypeHolder getRelationshipTypeHolder()
-    {
-        return delegate().getRelationshipTypeHolder();
-    }
-
-    public IdGeneratorFactory getIdGeneratorFactory()
-    {
-        return delegate().getIdGeneratorFactory();
-    }
-
-    public DiagnosticsManager getDiagnosticsManager()
-    {
-        return delegate().getDiagnosticsManager();
-    }
-
-    public PersistenceSource getPersistenceSource()
-    {
-        return delegate().getPersistenceSource();
-    }
-
-    public final StringLogger getMessageLog()
-    {
-        return delegate().getMessageLog();
-    }
-
-    public KernelPanicEventGenerator getKernelPanicGenerator()
-    {
-        return delegate().getKernelPanicGenerator();
-    }
-
-    public boolean equals( Object o )
-    {
-        return delegate().equals( o );
-    }
-
-    public int hashCode()
-    {
-        return delegate().hashCode();
+        // TODO Remove blockade
     }
 }

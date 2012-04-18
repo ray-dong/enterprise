@@ -31,10 +31,12 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 public class HaTxIdGenerator implements TxIdGenerator
 {
     private final HaServiceSupplier stuff;
+    private final int serverId;
 
-    public HaTxIdGenerator( HaServiceSupplier stuff )
+    public HaTxIdGenerator( HaServiceSupplier stuff, int serverId )
     {
         this.stuff = stuff;
+        this.serverId = serverId;
     }
 
     @Override
@@ -81,6 +83,6 @@ public class HaTxIdGenerator implements TxIdGenerator
     @Override
     public int getMyId()
     {
-        return stuff.getServerId();
+        return serverId;
     }
 }

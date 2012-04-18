@@ -38,15 +38,13 @@ public interface HaServiceSupplier
 
     SlaveContext getSlaveContext( int identifier, XaDataSource dataSource );
     
+    SlaveContext getSlaveContext();
+    
     void receive( Response<?> response );
 
     boolean hasAnyLocks( Transaction tx );
 
     int getMasterServerId();
 
-    int getServerId();
-
-    SlaveContext getSlaveContext();
-    
     // ...
 }
