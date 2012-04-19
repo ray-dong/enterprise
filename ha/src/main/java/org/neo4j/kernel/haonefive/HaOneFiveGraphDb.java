@@ -31,11 +31,14 @@ import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
+import org.neo4j.com.SlaveContext.Tx;
 import org.neo4j.com.StoreIdGetter;
+import org.neo4j.com.ToFileStoreWriter;
 import org.neo4j.com.TxChecksumVerifier;
 import org.neo4j.graphdb.index.IndexProvider;
 import org.neo4j.helpers.Service;
 import org.neo4j.kernel.AbstractGraphDatabase;
+import org.neo4j.kernel.BranchedDataPolicy;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.KernelExtension;
 import org.neo4j.kernel.configuration.Config;
@@ -119,6 +122,12 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             public SlaveContext getSlaveContext( int eventIdentifier )
             {
                 return MasterUtil.getSlaveContext( xaDataSourceManager, sessionTimestamp, serverId, eventIdentifier );
+            }
+            
+            @Override
+            public SlaveContext getEmptySlaveContext()
+            {
+                return new SlaveContext( 0, serverId, 0, new Tx[0], 0, 0 );
             }
             
             @Override
@@ -246,6 +255,17 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             void becomeSlave( final HaOneFiveGraphDb db, String masterIp, int masterPort )
             {
                 db.master = newClient( db, masterIp, masterPort );
+                db.life.stop();
+                try
+                {
+                    BranchedDataPolicy.keep_none.handle( db ); // Will delete the relevant store files
+                    Response<Void> response = db.master.copyStore( db.stuff.getEmptySlaveContext(), new ToFileStoreWriter( db.storeDir ) );
+                    db.stuff.receive( response );
+                }
+                finally
+                {
+                    db.life.start();
+                }
             }
         },
         MASTER

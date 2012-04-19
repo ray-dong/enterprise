@@ -22,7 +22,6 @@ package org.neo4j.kernel.haonefive;
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertTrue;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.impl.util.FileUtils.copyRecursively;
 
 import java.io.File;
 import java.util.HashSet;
@@ -49,23 +48,19 @@ public class TestCreateNode
     @Before
     public void before() throws Exception
     {
-        PATH = TargetDirectory.forTest( getClass() );
+        PATH = TargetDirectory.forTest( getClass() ).cleanup();
     }
     
     @Test
     public void createHighlyAvailableNode() throws Exception
     {
-        // Prepare dbs (create one and copy to the other location)
-        File db1Path = PATH.directory( "1", true );
-        File db2Path = PATH.directory( "2", true );
-        new HaOneFiveGraphDb( db1Path.getAbsolutePath(), stringMap( "ha.server_id", "1" ) ).shutdown();
-        copyRecursively( db1Path, db2Path );
-        
         // Start them
+        File db1Path = path( 1 );
+        File db2Path = path( 2 );
         HaOneFiveGraphDb db1 = new HaOneFiveGraphDb( db1Path.getAbsolutePath(), stringMap( "ha.server_id", "1" ) );
         HaOneFiveGraphDb db2 = new HaOneFiveGraphDb( db2Path.getAbsolutePath(), stringMap( "ha.server_id", "2" ) );
         
-        // Fake master election
+        // Elect 1 as master
         electNewMaster( 1, db1, db2 );
         
         createNode( db1, "yo" ); // master
@@ -75,7 +70,7 @@ public class TestCreateNode
         for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
             assertNodesExists( db, "yo", "ya" );
         
-        // Elect new master
+        // Elect 2 as new master
         electNewMaster( 2, db1, db2 );
 
         // Create node on master, then on slave
@@ -85,10 +80,21 @@ public class TestCreateNode
         // Verify that all nodes are in both dbs
         for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
             assertNodesExists( db, "yo", "ya", "yi", "ye" );
+
+        createNode( db2, "yu" ); // master
+        db1.pullUpdates();
+        
+        for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
+            assertNodesExists( db, "yo", "ya", "yi", "ye", "yu" );
         
         // Shut down
         db1.shutdown();
         db2.shutdown();
+    }
+
+    private File path( int serverId )
+    {
+        return PATH.directory( "" + serverId, false );
     }
 
     private void electNewMaster( int id, HaOneFiveGraphDb... dbsToTell )

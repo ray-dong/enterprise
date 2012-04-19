@@ -40,6 +40,8 @@ public interface HaServiceSupplier
     
     SlaveContext getSlaveContext();
     
+    SlaveContext getEmptySlaveContext();
+    
     void receive( Response<?> response );
 
     boolean hasAnyLocks( Transaction tx );
@@ -47,6 +49,6 @@ public interface HaServiceSupplier
     int getMasterServerId();
     
     void makeSureTxHasBeenInitialized();
-    
+
     // ...
 }

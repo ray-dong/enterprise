@@ -31,7 +31,7 @@ public enum BranchedDataPolicy
     keep_all
     {
         @Override
-        void handle( HighlyAvailableGraphDatabase db )
+        public void handle( GraphDatabaseAPI db )
         {
             moveAwayDb( db, newBranchedDataDir( db ) );
         }
@@ -39,7 +39,7 @@ public enum BranchedDataPolicy
     keep_last
     {
         @Override
-        void handle( HighlyAvailableGraphDatabase db )
+        public void handle( GraphDatabaseAPI db )
         {
             File branchedDataDir = newBranchedDataDir( db );
             moveAwayDb( db, branchedDataDir );
@@ -53,7 +53,7 @@ public enum BranchedDataPolicy
                     }
                     catch ( IOException e )
                     {
-                        db.messageLog.logMessage( "Couldn't delete old branched data directory " + file, e );
+                        db.getMessageLog().logMessage( "Couldn't delete old branched data directory " + file, e );
                     }
                 }
             }
@@ -62,7 +62,7 @@ public enum BranchedDataPolicy
     keep_none
     {
         @Override
-        void handle( HighlyAvailableGraphDatabase db )
+        public void handle( GraphDatabaseAPI db )
         {
             for ( File file : relevantDbFiles( db ) )
             {
@@ -72,7 +72,7 @@ public enum BranchedDataPolicy
                 }
                 catch ( IOException e )
                 {
-                    db.messageLog.logMessage( "Couldn't delete file " + file, e );
+                    db.getMessageLog().logMessage( "Couldn't delete file " + file, e );
                 }
             }
         }
@@ -80,7 +80,7 @@ public enum BranchedDataPolicy
     shutdown
     {
         @Override
-        void handle( HighlyAvailableGraphDatabase db )
+        public void handle( GraphDatabaseAPI db )
         {
             db.shutdown();
         }
@@ -89,9 +89,9 @@ public enum BranchedDataPolicy
     // Branched directories will end up in <dbStoreDir>/branched/<timestamp>/
     static String BRANCH_SUBDIRECTORY = "branched";
 
-    abstract void handle( HighlyAvailableGraphDatabase db );
+    public abstract void handle( GraphDatabaseAPI db );
 
-    protected void moveAwayDb( HighlyAvailableGraphDatabase db, File branchedDataDir )
+    protected void moveAwayDb( GraphDatabaseAPI db, File branchedDataDir )
     {
         for ( File file : relevantDbFiles( db ) )
         {
@@ -101,19 +101,19 @@ public enum BranchedDataPolicy
             }
             catch ( IOException e )
             {
-                db.messageLog.logMessage( "Couldn't move " + file.getPath() );
+                db.getMessageLog().logMessage( "Couldn't move " + file.getPath() );
             }
         }
     }
 
-    File newBranchedDataDir( HighlyAvailableGraphDatabase db )
+    File newBranchedDataDir( GraphDatabaseAPI db )
     {
         File result = getBranchedDataDirectory( db.getStoreDir(), System.currentTimeMillis() );
         result.mkdirs();
         return result;
     }
 
-    File[] relevantDbFiles( HighlyAvailableGraphDatabase db )
+    File[] relevantDbFiles( GraphDatabaseAPI db )
     {
         if (!new File( db.getStoreDir() ).exists())
             return new File[0];
