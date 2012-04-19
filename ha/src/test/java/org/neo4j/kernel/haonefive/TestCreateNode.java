@@ -23,10 +23,10 @@ import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertTrue;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 
-import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -39,6 +39,7 @@ import org.neo4j.test.TargetDirectory;
 public class TestCreateNode
 {
     private TargetDirectory PATH;
+    private HaOneFiveGraphDb[] dbs;
     
     private enum Types implements RelationshipType
     {
@@ -51,57 +52,78 @@ public class TestCreateNode
         PATH = TargetDirectory.forTest( getClass() ).cleanup();
     }
     
+    @After
+    public void after() throws Exception
+    {
+        for ( HaOneFiveGraphDb db : dbs )
+            db.shutdown();
+    }
+    
     @Test
     public void createHighlyAvailableNode() throws Exception
     {
         // Start them
-        File db1Path = path( 1 );
-        File db2Path = path( 2 );
-        HaOneFiveGraphDb db1 = new HaOneFiveGraphDb( db1Path.getAbsolutePath(), stringMap( "ha.server_id", "1" ) );
-        HaOneFiveGraphDb db2 = new HaOneFiveGraphDb( db2Path.getAbsolutePath(), stringMap( "ha.server_id", "2" ) );
+        startDbs( 2 );
         
-        // Elect 1 as master
-        electNewMaster( 1, db1, db2 );
+        electNewMaster( 0 );
         
-        createNode( db1, "yo" ); // master
-        createNode( db2, "ya" ); // slave
+        createNode( dbs[0], "yo" ); // master
+        createNode( dbs[1], "ya" ); // slave
         
         // Verify that all nodes are in both dbs
-        for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
+        for ( HaOneFiveGraphDb db : dbs )
             assertNodesExists( db, "yo", "ya" );
         
-        // Elect 2 as new master
-        electNewMaster( 2, db1, db2 );
+        electNewMaster( 1 );
 
         // Create node on master, then on slave
-        createNode( db2, "ye" ); // master
-        createNode( db1, "yi" ); // slave
+        createNode( dbs[1], "ye" ); // master
+        createNode( dbs[0], "yi" ); // slave
         
         // Verify that all nodes are in both dbs
-        for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
+        for ( HaOneFiveGraphDb db : dbs )
             assertNodesExists( db, "yo", "ya", "yi", "ye" );
 
-        createNode( db2, "yu" ); // master
-        db1.pullUpdates();
+        createNode( dbs[1], "yu" ); // master
+        dbs[0].pullUpdates();
         
-        for ( HaOneFiveGraphDb db : new HaOneFiveGraphDb[] { db1, db2 } )
+        for ( HaOneFiveGraphDb db : dbs )
             assertNodesExists( db, "yo", "ya", "yi", "ye", "yu" );
+    }
+
+    private HaOneFiveGraphDb startDb( int serverId )
+    {
+        return new HaOneFiveGraphDb( path( serverId ), stringMap( "ha.server_id", "" + serverId ) );
+    }
+    
+    private void startDbs( int count )
+    {
+        dbs = new HaOneFiveGraphDb[count];
+        for ( int i = 0; i < count; i++ )
+            dbs[i] = startDb( i );
+    }
+    
+    @Test
+    public void slaveBecomesAwareOfChangedMaster() throws Exception
+    {
+        startDbs( 3 );
+        electNewMaster( 0 );
         
-        // Shut down
-        db1.shutdown();
-        db2.shutdown();
+        // do something on master and verify that pull will get it
+        electNewMaster( 1 );
+        // do something on master and verify that pull will get it
     }
 
-    private File path( int serverId )
+    private String path( int serverId )
     {
-        return PATH.directory( "" + serverId, false );
+        return PATH.directory( "" + serverId, false ).getAbsolutePath();
     }
 
-    private void electNewMaster( int id, HaOneFiveGraphDb... dbsToTell )
+    private void electNewMaster( int id )
     {
-        for ( HaOneFiveGraphDb db : dbsToTell )
+        for ( HaOneFiveGraphDb db : dbs )
             db.newMasterElected( "http://localhost:" + (6361 + id), id );
-        for ( HaOneFiveGraphDb db : dbsToTell )
+        for ( HaOneFiveGraphDb db : dbs )
             db.masterChanged( "http://localhost:" + (6361 + id) );
     }
 
