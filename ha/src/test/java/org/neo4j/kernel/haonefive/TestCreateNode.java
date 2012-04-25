@@ -49,7 +49,8 @@ public class TestCreateNode
     @Before
     public void before() throws Exception
     {
-        PATH = TargetDirectory.forTest( getClass() ).cleanup();
+        PATH = TargetDirectory.forTest( getClass() );
+        PATH.cleanup();
     }
     
     @After
