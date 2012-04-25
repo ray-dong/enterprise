@@ -19,6 +19,9 @@
  */
 package org.neo4j.kernel.haonefive;
 
+import static java.lang.System.currentTimeMillis;
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -36,12 +39,14 @@ import org.neo4j.com.StoreIdGetter;
 import org.neo4j.com.ToFileStoreWriter;
 import org.neo4j.com.TxChecksumVerifier;
 import org.neo4j.graphdb.index.IndexProvider;
+import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Service;
 import org.neo4j.kernel.AbstractGraphDatabase;
 import org.neo4j.kernel.BranchedDataPolicy;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.KernelExtension;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.ha.MasterClient;
@@ -50,6 +55,7 @@ import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.impl.cache.CacheProvider;
 import org.neo4j.kernel.impl.core.RelationshipTypeCreator;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
+import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.TxHook;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
@@ -57,7 +63,7 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
 public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterChangeListener
 {
-    private final HaServiceSupplier stuff;
+    final HaServiceSupplier stuff;
     private final int serverId;
     private volatile long sessionTimestamp;
     private volatile long lastUpdated;
@@ -66,6 +72,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     private volatile int masterServerId;
     private volatile DatabaseState databaseState = DatabaseState.TBD;
     private volatile MasterServer server;
+    final MasterElectionClient masterElectionClient;
     
     // TODO This is an artifact of integrating with legacy code (MasterClient should change to not use this).
     private final StoreIdGetter storeIdGetter = new StoreIdGetter()
@@ -79,7 +86,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     
     public HaOneFiveGraphDb( String storeDir, Map<String, String> params )
     {
-        super( storeDir, params, Service.load( IndexProvider.class ),
+        super( storeDir, (params = withDefaults( params )), Service.load( IndexProvider.class ),
                 Service.load( KernelExtension.class ), Service.load( CacheProvider.class ) );
         
         serverId = new Config( params ).getInteger( HaSettings.server_id );
@@ -139,6 +146,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             @Override
             public Master getMaster()
             {
+                databaseState.beforeGetMaster( HaOneFiveGraphDb.this );
                 return master;
             }
 
@@ -156,9 +164,38 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                     throw new RuntimeException( e );
                 }
             }
+
+            @Override
+            public int getMasterIdForTx( long tx )
+            {
+                try
+                {
+                    return getXaDataSourceManager().getNeoStoreDataSource().getMasterForCommittedTx( tx ).first().intValue();
+                }
+                catch ( IOException e )
+                {
+                    throw new RuntimeException( e );
+                }
+            }
         };
         
         run();
+        
+        masterElectionClient = createMasterElectionClient();
+        masterElectionClient.addListener( this );
+        masterElectionClient.initialJoin();
+    }
+    
+    private static Map<String, String> withDefaults( Map<String, String> params )
+    {
+        params = new ConfigurationDefaults( HaSettings.class ).apply( params );
+        params.put( Config.KEEP_LOGICAL_LOGS, "true" );
+        return params;
+    }
+
+    protected MasterElectionClient createMasterElectionClient()
+    {
+        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
     }
     
     @Override
@@ -192,14 +229,14 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     }
 
     @Override
-    public void newMasterElected( String masterId, int masterServerId )
+    public void newMasterElected( String masterUrl, int masterServerId, MasterBecameAvailableCallback callback )
     {
         // TODO Block incoming transactions and rollback active ones or something.
         
         URL url;
         try
         {
-            url = new URL( masterId );
+            url = new URL( masterUrl );
         }
         catch ( MalformedURLException e )
         {
@@ -219,14 +256,33 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         }
         this.masterServerId = masterServerId;
         ((HaIdGeneratorFactory) idGeneratorFactory).masterChanged( master, masterServerId );
+        
+        if ( iAmToBecomeMaster )
+            callback.iAmMasterNowAndReady();
     }
 
     @Override
-    public void masterChanged( String masterId )
+    public void newMasterBecameAvailable( String masterUrl )
     {
         // TODO Remove blockade
     }
     
+    @Override
+    public MasterElectionInput askForMasterElectionInput()
+    {
+        try
+        {
+            NeoStoreXaDataSource neoStoreDataSource = getXaDataSourceManager().getNeoStoreDataSource();
+            long tx = neoStoreDataSource.getLastCommittedTxId();
+            Pair<Integer, Long> masterInfo = neoStoreDataSource.getMasterForCommittedTx( tx );
+            return new MasterElectionInput( tx, masterInfo.first() );
+        }
+        catch ( IOException e )
+        {
+            throw new RuntimeException( e );
+        }
+    }
+
     public void pullUpdates()
     {
         Response<Void> response = master.pullUpdates( stuff.getSlaveContext() );
@@ -267,6 +323,28 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                     db.life.start();
                 }
             }
+
+            @Override
+            void beforeGetMaster( HaOneFiveGraphDb db )
+            {
+                // Wait for a master/slave decision
+                long endTime = currentTimeMillis() + SECONDS.toMillis( 5 );
+                try
+                {
+                    while ( currentTimeMillis() < endTime )
+                    {
+                        if ( db.databaseState != this )
+                            return;
+                        Thread.sleep( 1 );
+                    }
+                    throw new RuntimeException( "No role decision was made" );
+                }
+                catch ( InterruptedException e )
+                {
+                    Thread.interrupted();
+                    throw new RuntimeException( e );
+                }
+            }
         },
         MASTER
         {
@@ -290,6 +368,11 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 db.master.shutdown();
                 db.master = newClient( db, masterIp, masterPort );
             }
+
+            @Override
+            void beforeGetMaster( HaOneFiveGraphDb db )
+            {
+            }
         },
         SLAVE
         {
@@ -312,10 +395,17 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 db.master.shutdown();
                 db.master = newClient( db, masterIp, masterPort );
             }
+
+            @Override
+            void beforeGetMaster( HaOneFiveGraphDb db )
+            {
+            }
         };
         
         abstract void becomeMaster( HaOneFiveGraphDb db, int port );
         
+        abstract void beforeGetMaster( HaOneFiveGraphDb db );
+
         protected Master newLoopbackMaster( HaOneFiveGraphDb db )
         {
             return new LoopbackMaster( db.storeId, db.xaDataSourceManager,

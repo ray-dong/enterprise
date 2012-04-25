@@ -458,7 +458,7 @@ public abstract class AbstractZooKeeperManager
         return servers;
     }
 
-    protected static final Master NO_MASTER = new Master()
+    public static final Master NO_MASTER = new Master()
     {
         @Override
         public void shutdown() {}

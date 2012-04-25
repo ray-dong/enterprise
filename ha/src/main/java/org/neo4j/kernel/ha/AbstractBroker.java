@@ -56,6 +56,12 @@ public abstract class AbstractBroker implements Broker
     {
         // Do nothing
     }
+    
+    @Override
+    public void callForData()
+    {
+        // Do nothing
+    }
 
     public void shutdown()
     {

@@ -129,6 +129,15 @@ public class ZooKeeperBroker extends AbstractBroker
     {
         return getZooClient().getClusterStoreId( firstTime ? WaitMode.STARTUP : WaitMode.SESSION );
     }
+    
+    @Override
+    public void callForData()
+    {
+        // Change the call-for-data value in ZK so that all clients gets a NodeChangedEvent
+        // for that path and updates ZK.
+        zooClient.triggerDataChangeWatcher( ZooClient.CALL_FOR_DATA );
+        zooClient.updateLastCommittedTx();
+    }
 
     @Override
     public void setConnectionInformation( KernelData kernel )

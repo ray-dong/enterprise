@@ -49,6 +49,8 @@ public interface HaServiceSupplier
     int getMasterServerId();
     
     void makeSureTxHasBeenInitialized();
+    
+    int getMasterIdForTx( long tx );
 
     // ...
 }

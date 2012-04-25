@@ -35,9 +35,11 @@ import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.test.TargetDirectory;
+import org.neo4j.test.ha.LocalhostZooKeeperCluster;
 
 public class TestCreateNode
 {
+    private LocalhostZooKeeperCluster zoo;
     private TargetDirectory PATH;
     private HaOneFiveGraphDb[] dbs;
     
@@ -49,6 +51,7 @@ public class TestCreateNode
     @Before
     public void before() throws Exception
     {
+        zoo = LocalhostZooKeeperCluster.singleton().clearDataAndVerifyConnection();
         PATH = TargetDirectory.forTest( getClass() );
         PATH.cleanup();
     }
@@ -66,7 +69,7 @@ public class TestCreateNode
         // Start them
         startDbs( 2 );
         
-        electNewMaster( 0 );
+        electNewMaster();
         
         createNode( dbs[0], "yo" ); // master
         createNode( dbs[1], "ya" ); // slave
@@ -75,7 +78,9 @@ public class TestCreateNode
         for ( HaOneFiveGraphDb db : dbs )
             assertNodesExists( db, "yo", "ya" );
         
-        electNewMaster( 1 );
+        shutdownDb( 0 );
+        electNewMaster();
+        startDb( 0 );
 
         // Create node on master, then on slave
         createNode( dbs[1], "ye" ); // master
@@ -92,26 +97,50 @@ public class TestCreateNode
             assertNodesExists( db, "yo", "ya", "yi", "ye", "yu" );
     }
 
+    private void shutdownDb( int i )
+    {
+        dbs[i].shutdown();
+        dbs[i] = null;
+    }
+
     private HaOneFiveGraphDb startDb( int serverId )
     {
-        return new HaOneFiveGraphDb( path( serverId ), stringMap( "ha.server_id", "" + serverId ) );
+        HaOneFiveGraphDb db = new HaOneFiveGraphDb( path( serverId ), stringMap(
+                "ha.server_id", "" + serverId,
+                "ha.coordinators", zoo.getConnectionString() ) );
+        dbs[serverId] = db;
+        registerListeners();
+        return db;
     }
     
     private void startDbs( int count )
     {
         dbs = new HaOneFiveGraphDb[count];
         for ( int i = 0; i < count; i++ )
-            dbs[i] = startDb( i );
+            startDb( i );
     }
     
+    private void registerListeners()
+    {
+        for ( HaOneFiveGraphDb to : dbs )
+        {
+            if ( to == null )
+                continue;
+            to.masterElectionClient.clearListeners();
+            for ( HaOneFiveGraphDb db : dbs )
+                if ( db != null )
+                    to.masterElectionClient.addListener( db );
+        }
+    }
+
     @Test
     public void slaveBecomesAwareOfChangedMaster() throws Exception
     {
         startDbs( 3 );
-        electNewMaster( 0 );
+        electNewMaster();
         
         // do something on master and verify that pull will get it
-        electNewMaster( 1 );
+        electNewMaster();
         // do something on master and verify that pull will get it
     }
 
@@ -120,12 +149,16 @@ public class TestCreateNode
         return PATH.directory( "" + serverId, false ).getAbsolutePath();
     }
 
-    private void electNewMaster( int id )
+    private void electNewMaster()
     {
         for ( HaOneFiveGraphDb db : dbs )
-            db.newMasterElected( "http://localhost:" + (6361 + id), id );
-        for ( HaOneFiveGraphDb db : dbs )
-            db.masterChanged( "http://localhost:" + (6361 + id) );
+        {
+            if ( db != null )
+            {
+                db.masterElectionClient.bluntlyForceMasterElection();
+                break;
+            }
+        }
     }
 
     private void assertNodesExists( HaOneFiveGraphDb db, String... names )

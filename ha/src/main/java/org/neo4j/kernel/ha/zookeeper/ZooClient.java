@@ -39,6 +39,7 @@ import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Random;
 
 import javax.management.remote.JMXServiceURL;
 
@@ -50,6 +51,8 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.neo4j.backup.OnlineBackupSettings;
+import org.neo4j.com.SlaveContext;
+import org.neo4j.com.SlaveContext.Tx;
 import org.neo4j.com.StoreIdGetter;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
@@ -75,6 +78,7 @@ public class ZooClient extends AbstractZooKeeperManager
 {
     static final String MASTER_NOTIFY_CHILD = "master-notify";
     static final String MASTER_REBOUND_CHILD = "master-rebound";
+    static final String CALL_FOR_DATA = "call-for-data";
 
     private final ZooKeeper zooKeeper;
     private final int machineId;
@@ -262,8 +266,13 @@ public class ZooClient extends AbstractZooKeeperManager
             throw new ZooKeeperException( "Interrupted", e );
         }
     }
+    
+    protected void triggerDataChangeWatcher( String child )
+    {
+        while ( !setDataChangeWatcher( child, new Random().nextInt() ) );
+    }
 
-    protected void setDataChangeWatcher( String child, int currentMasterId )
+    protected boolean setDataChangeWatcher( String child, int value )
     {
         try
         {
@@ -276,10 +285,10 @@ public class ZooClient extends AbstractZooKeeperManager
                 data = zooKeeper.getData( path, true, null );
                 exists = true;
 
-                if ( ByteBuffer.wrap( data ).getInt() == currentMasterId )
+                if ( ByteBuffer.wrap( data ).getInt() == value )
                 {
-                    msgLog.logMessage( child + " not set, is already " + currentMasterId );
-                    return;
+                    msgLog.logMessage( child + " not set, is already " + value );
+                    return false;
                 }
             }
             catch ( KeeperException e )
@@ -294,17 +303,17 @@ public class ZooClient extends AbstractZooKeeperManager
             try
             {
                 data = new byte[4];
-                ByteBuffer.wrap( data ).putInt( currentMasterId );
+                ByteBuffer.wrap( data ).putInt( value );
                 if ( !exists )
                 {
                     zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE,
                             CreateMode.PERSISTENT );
-                    msgLog.logMessage( child + " created with " + currentMasterId );
+                    msgLog.logMessage( child + " created with " + value );
                 }
-                else if ( currentMasterId != -1 )
+                else if ( value != -1 )
                 {
                     zooKeeper.setData( path, data, -1 );
-                    msgLog.logMessage( child + " set to " + currentMasterId );
+                    msgLog.logMessage( child + " set to " + value );
                 }
 
                 // Add a watch for it
@@ -317,6 +326,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     throw new ZooKeeperException( "Couldn't set master notify node", e );
                 }
             }
+            return true;
         }
         catch ( InterruptedException e )
         {
@@ -387,7 +397,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 {   // We have a local store, use and verify against it
                     NeoStoreUtil store = new NeoStoreUtil( storeDir );
                     committedTx = store.getLastCommittedTx();
-                    if ( !storeId.equals( store.asStoreId() ) ) throw new ZooKeeperException( "StoreId in database doesn't match that of the ZK cluster" );
+//                    if ( !storeId.equals( store.asStoreId() ) ) throw new ZooKeeperException( "StoreId in database doesn't match that of the ZK cluster" );
                 }
                 else
                 {   // No local store
@@ -459,6 +469,7 @@ public class ZooClient extends AbstractZooKeeperManager
             // Add watches to our master notification nodes
             subscribeToDataChangeWatcher( MASTER_NOTIFY_CHILD );
             subscribeToDataChangeWatcher( MASTER_REBOUND_CHILD );
+            subscribeToDataChangeWatcher( CALL_FOR_DATA );
             return created.substring( created.lastIndexOf( "_" ) + 1 );
         }
         catch ( KeeperException e )
@@ -884,6 +895,12 @@ public class ZooClient extends AbstractZooKeeperManager
                             clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (new master ensures I'm slave)" ) );
                         }
                     }
+                    else if ( path.contains( CALL_FOR_DATA ) )
+                    {
+                        updateLastCommittedTx();
+                        subscribeToDataChangeWatcher( CALL_FOR_DATA );
+                        System.out.println( "Call for data handled" );
+                    }
                     else
                     {
                         msgLog.logMessage( "Unrecognized data change " + path );
@@ -904,5 +921,15 @@ public class ZooClient extends AbstractZooKeeperManager
                 msgLog.flush();
             }
         }
+    }
+
+    public void updateLastCommittedTx()
+    {
+        SlaveContext context = localDatabase.getSlaveContext( 0 );
+        long txId = 0;
+        for ( Tx tx : context.lastAppliedTransactions() )
+            if ( tx.getDataSourceName().equals( Config.DEFAULT_DATA_SOURCE_NAME ) )
+                txId = tx.getTxId();
+        setCommittedTx( txId );
     }
 }

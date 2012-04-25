@@ -46,6 +46,8 @@ public interface Broker
     void rebindMaster();
 
     void notifyMasterChange( Machine newMaster );
+    
+    void callForData();
 
     void shutdown();
 

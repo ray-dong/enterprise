@@ -23,13 +23,20 @@ public interface MasterChangeListener
 {
     /**
      * Called when new master has been elected. The new master may not be available a.t.m.
-     * A call to {@link #masterChanged(String)} will confirm that the master given in
+     * A call to {@link #newMasterBecameAvailable(String)} will confirm that the master given in
      * the most recent {@link #newMasterElected(String, int)} call is up and running as master.
      * 
-     * @param masterId the connection information to the master.
+     * @param masterUrl the connection information to the master.
      * @param masterServerId the server id of the master (TODO remove)
      */
-    void newMasterElected( String masterId, int masterServerId /*Here because other legacy HA code relies on it*/ );
+    void newMasterElected( String masterUrl, int masterServerId /*Here because other legacy HA code relies on it*/,
+            MasterBecameAvailableCallback callback );
     
-    void masterChanged( String masterId );
+    void newMasterBecameAvailable( String masterUrl );
+    
+    /**
+     * Ask this instance for input needed for doing a correct master election. Called when
+     * a new master needs to be elected.
+     */
+    MasterElectionInput askForMasterElectionInput();
 }
