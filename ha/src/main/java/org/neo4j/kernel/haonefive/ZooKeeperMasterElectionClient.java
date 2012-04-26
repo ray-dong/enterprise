@@ -57,6 +57,33 @@ public class ZooKeeperMasterElectionClient
     @Override
     public void initialJoin()
     {
+        System.out.println( "INITIAL JOIN START" );
+        /* TODO remember that this is a spike.
+         * Spawn off a thread which waits a while (for the case where all dbs start at the same time)
+         * then asks ZK who is the master and sends out a "new master" event */
+        new Thread()
+        {
+            @Override
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep( 2000 );
+                    Machine master = broker.getMasterReally( true ).other();
+                    System.out.println( "INITIAL JOIN " + master + " for " + listeners );
+                    String masterUrl = "http://" + master.getServer().first() + ":" + master.getServer().other();
+                    for ( MasterChangeListener listener : listeners )
+                        listener.newMasterElected( masterUrl, master.getMachineId(), new MyMasterBecameAvailableCallback() );
+                    for ( MasterChangeListener listener : listeners )
+                        listener.newMasterBecameAvailable( masterUrl );
+                }
+                catch ( InterruptedException e )
+                {
+                    System.out.println( e );
+                    Thread.interrupted();
+                }
+            }
+        }.start();
     }
     
     @Override

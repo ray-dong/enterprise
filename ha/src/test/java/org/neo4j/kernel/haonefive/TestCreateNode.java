@@ -69,7 +69,7 @@ public class TestCreateNode
         // Start them
         startDbs( 2 );
         
-        electNewMaster();
+//        electNewMaster();
         
         createNode( dbs[0], "yo" ); // master
         createNode( dbs[1], "ya" ); // slave
@@ -79,7 +79,7 @@ public class TestCreateNode
             assertNodesExists( db, "yo", "ya" );
         
         shutdownDb( 0 );
-        electNewMaster();
+//        electNewMaster();
         startDb( 0 );
 
         // Create node on master, then on slave

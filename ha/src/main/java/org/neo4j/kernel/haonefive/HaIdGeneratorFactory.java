@@ -101,6 +101,12 @@ public class HaIdGeneratorFactory implements IdGeneratorFactory
         
         public void masterChanged( Master master, int masterServerId )
         {
+            // Assume blockade is up and no active threads are running here
+            
+            // TODO Some kind of framework/utility for switching between master/slave
+            // TODO If we're changing state, first thing to do is to set state to something
+            // which makes it unusable
+            
             boolean isBecomingMaster = masterServerId == serverId;
             long highId = delegate.getHighId();
             if ( isBecomingMaster )
