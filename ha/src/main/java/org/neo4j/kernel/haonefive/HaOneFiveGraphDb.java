@@ -231,8 +231,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     @Override
     public void newMasterElected( String masterUrl, int masterServerId, MasterBecameAvailableCallback callback )
     {
-        System.out.println( this + " newMasterElected " + masterServerId );
-        
         // TODO Block incoming transactions and rollback active ones or something.
         
         URL url;
@@ -246,22 +244,22 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         }
         
         boolean iAmToBecomeMaster = masterServerId == this.serverId;
+        DatabaseState newState = databaseState;
         if ( iAmToBecomeMaster )
         {
-            databaseState.becomeMaster( this, url.getPort() );
-            databaseState = DatabaseState.MASTER;
+            newState = databaseState.becomeMaster( this, url.getPort() );
         }
         else
         {
-            databaseState.becomeSlave( this, url.getHost(), url.getPort() );
-            databaseState = DatabaseState.SLAVE;
+            newState = databaseState.becomeSlave( this, url.getHost(), url.getPort() );
         }
-        System.out.println( this + " databaseState set to " + databaseState );
         this.masterServerId = masterServerId;
         ((HaIdGeneratorFactory) idGeneratorFactory).masterChanged( master, masterServerId );
         
         if ( iAmToBecomeMaster )
             callback.iAmMasterNowAndReady();
+        
+        databaseState = newState;
     }
 
     @Override
@@ -304,14 +302,15 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             }
 
             @Override
-            void becomeMaster( HaOneFiveGraphDb db, int port )
+            DatabaseState becomeMaster( HaOneFiveGraphDb db, int port )
             {
                 db.server = newServer( db, port );
                 db.master = newLoopbackMaster( db );
+                return MASTER;
             }
 
             @Override
-            void becomeSlave( final HaOneFiveGraphDb db, String masterIp, int masterPort )
+            DatabaseState becomeSlave( final HaOneFiveGraphDb db, String masterIp, int masterPort )
             {
                 db.master = newClient( db, masterIp, masterPort );
                 
@@ -322,7 +321,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 {
                     if ( true /*my db is empty*/ )
                     {
-                        System.out.println( "Copying store" );
                         db.life.stop();
                         try
                         {
@@ -334,7 +332,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                         {
                             db.life.start();
                         }
-                        System.out.println( "Copied store" );
                     }
                     else
                     {
@@ -345,13 +342,12 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 {
                     // TODO Verify data consistency with master
                 }
+                return SLAVE;
             }
 
             @Override
             void beforeGetMaster( HaOneFiveGraphDb db )
             {
-                new Exception().printStackTrace();
-                
                 // Wait for a master/slave decision
                 long endTime = currentTimeMillis() + SECONDS.toMillis( 20 );
                 try
@@ -360,8 +356,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                     {
                         if ( db.databaseState != this )
                             return;
-                        Thread.sleep( 100 );
-                        System.out.println( db + " waiting for role decision " + db.databaseState );
+                        Thread.sleep( 10 );
                     }
                     throw new RuntimeException( "No role decision was made" );
                 }
@@ -380,13 +375,14 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             }
 
             @Override
-            void becomeMaster( HaOneFiveGraphDb db, int port )
+            DatabaseState becomeMaster( HaOneFiveGraphDb db, int port )
             {
                 // Do nothing, I'm already master
+                return MASTER;
             }
 
             @Override
-            void becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort )
+            DatabaseState becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort )
             {
                 // TODO Switch to slave
                 db.server.shutdown();
@@ -394,6 +390,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 db.master.shutdown();
                 db.master = newClient( db, masterIp, masterPort );
                 // TODO Verify data consistency with master
+                return SLAVE;
             }
 
             @Override
@@ -409,19 +406,21 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             }
 
             @Override
-            void becomeMaster( HaOneFiveGraphDb db, int port )
+            DatabaseState becomeMaster( HaOneFiveGraphDb db, int port )
             {
                 db.server = newServer( db, port );
                 db.master.shutdown();
                 db.master = newLoopbackMaster( db );
+                return MASTER;
             }
 
             @Override
-            void becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort )
+            DatabaseState becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort )
             {
                 db.master.shutdown();
                 db.master = newClient( db, masterIp, masterPort );
                 // TODO Verify data consistency with master
+                return SLAVE;
             }
 
             @Override
@@ -430,7 +429,9 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             }
         };
         
-        abstract void becomeMaster( HaOneFiveGraphDb db, int port );
+        abstract DatabaseState becomeMaster( HaOneFiveGraphDb db, int port );
+        
+        abstract DatabaseState becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort );
         
         abstract void beforeGetMaster( HaOneFiveGraphDb db );
 
@@ -454,8 +455,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                     ConnectionLostHandler.NO_ACTION, 20, 20, 20 );
         }
 
-        abstract void becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort );
-        
         abstract void handleWriteOperation( HaOneFiveGraphDb db );
     }
     
