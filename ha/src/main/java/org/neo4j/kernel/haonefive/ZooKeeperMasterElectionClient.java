@@ -27,6 +27,7 @@ import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.SlaveDatabaseOperations;
 import org.neo4j.kernel.ha.shell.ZooClientFactory;
+import org.neo4j.kernel.ha.zookeeper.Machine;
 import org.neo4j.kernel.ha.zookeeper.ZooClient;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperBroker;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -39,66 +40,33 @@ public class ZooKeeperMasterElectionClient
     private final HaServiceSupplier stuff;
     private final StoreIdGetter storeIdGetter;
     private final String storeDir;
+    private final MasterChangeListener listener;
     
-    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter, String storeDir )
+    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter, String storeDir,
+            MasterChangeListener listener )
     {
         this.stuff = stuff;
         this.config = config;
         this.storeIdGetter = storeIdGetter;
         this.storeDir = storeDir;
+        this.listener = listener;
         broker = new ZooKeeperBroker( config, this );
     }
     
     @Override
     public void requestMaster()
     {
-//        /* TODO remember that this is a spike.
-//         * Spawn off a thread which waits a while (for the case where all dbs start at the same time)
-//         * then asks ZK who is the master and sends out a "new master" event */
-//        new Thread()
-//        {
-//            @Override
-//            public void run()
-//            {
-//                try
-//                {
-//                    Thread.sleep( 2000 );
-//                    Machine master = broker.getMasterReally( true ).other();
-//                    String masterUrl = "http://" + master.getServer().first() + ":" + master.getServer().other();
-//                    for ( MasterChangeListener listener : listeners )
-//                        listener.newMasterElected( masterUrl, master.getMachineId(), new MyMasterBecameAvailableCallback() );
-//                    for ( MasterChangeListener listener : listeners )
-//                        listener.newMasterBecameAvailable( masterUrl );
-//                }
-//                catch ( InterruptedException e )
-//                {
-//                    System.out.println( e );
-//                    Thread.interrupted();
-//                }
-//            }
-//        }.start();
+        electMasterAndPingListeners();
     }
     
-//    private void electMasterAndPingListeners()
-//    {
-//        try
-//        {
-//            Machine master = broker.getMasterReally( true ).other();
-//            String masterId = "http://" + master.getServer().first() + ":" + master.getServer().other();
-//            int masterServerId = master.getMachineId();
-//            MyMasterBecameAvailableCallback callback = new MyMasterBecameAvailableCallback();
-//            for ( MasterChangeListener listener : listeners )
-//                listener.newMasterElected( masterId, masterServerId, callback );
-//            callback.waitFor();
-//            for ( MasterChangeListener listener : listeners )
-//                listener.newMasterBecameAvailable( masterId );
-//        }
-//        catch ( InterruptedException e )
-//        {
-//            Thread.interrupted();
-//            throw new RuntimeException( e );
-//        }
-//    }
+    private void electMasterAndPingListeners()
+    {
+        Machine master = broker.getMasterReally( true ).other();
+        String masterId = "http://" + master.getServer().first() + ":" + master.getServer().other();
+        int masterServerId = master.getMachineId();
+        listener.newMasterElected( masterId, masterServerId );
+        listener.newMasterBecameAvailable( masterId );
+    }
 
     @Override
     public ZooClient newZooClient()

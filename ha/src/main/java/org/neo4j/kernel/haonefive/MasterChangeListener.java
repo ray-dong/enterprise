@@ -29,8 +29,7 @@ public interface MasterChangeListener
      * @param masterUrl the connection information to the master.
      * @param masterServerId the server id of the master (TODO remove)
      */
-    void newMasterElected( String masterUrl, int masterServerId /*Here because other legacy HA code relies on it*/,
-            MasterBecameAvailableCallback callback );
+    void newMasterElected( String masterUrl, int masterServerId /*Here because other legacy HA code relies on it*/ );
     
     void newMasterBecameAvailable( String masterUrl );
     

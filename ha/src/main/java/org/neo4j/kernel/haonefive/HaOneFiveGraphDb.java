@@ -194,7 +194,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     protected MasterElectionClient createMasterElectionClient()
     {
-        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
+        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir, this );
     }
     
     @Override
@@ -243,12 +243,12 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     }
 
     @Override
-    public void newMasterElected( String masterUrl, int masterServerId, MasterBecameAvailableCallback callback )
+    public void newMasterElected( String masterUrl, int masterServerId )
     {
-        // TODO Block incoming transactions and rollback active ones or something.
-        
         if ( this.masterServerId == masterServerId )
             return;
+        
+        // TODO Block incoming write transactions and rollback active write transactions or something.
         
         URL url;
         try
@@ -273,16 +273,13 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         this.masterServerId = masterServerId;
         ((HaIdGeneratorFactory) idGeneratorFactory).masterChanged( master, masterServerId );
         
-        if ( iAmToBecomeMaster )
-            callback.iAmMasterNowAndReady();
-        
         databaseState = newState;
     }
 
     @Override
     public void newMasterBecameAvailable( String masterUrl )
     {
-        // TODO Remove blockade
+        // TODO Remove blockade if any
     }
     
     @Override

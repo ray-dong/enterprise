@@ -36,7 +36,7 @@ import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.test.TargetDirectory;
 
-public class TestCreateNode
+public class TestHaOneFive
 {
     private TargetDirectory PATH;
     private MockedMasterElectionClient masterElection;
@@ -97,7 +97,7 @@ public class TestCreateNode
         assertNodesExists( 1, "first", "second" );
         assertNodesExists( 2, "first", "second" );
     }
-
+    
     private void pullUpdates()
     {
         for ( HaOneFiveGraphDb db : dbs )

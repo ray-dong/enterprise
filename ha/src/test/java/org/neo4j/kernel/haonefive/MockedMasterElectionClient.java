@@ -11,6 +11,13 @@ public class MockedMasterElectionClient implements MasterElectionClient
     @Override
     public void requestMaster()
     {
+        if ( currentMaster != null )
+        {
+            for ( Member member : listeners.values() )
+                member.listener.newMasterElected( currentMaster.masterUrl, currentMaster.id );
+            for ( Member member : listeners.values() )
+                member.listener.newMasterBecameAvailable( currentMaster.masterUrl );
+        }
     }
 
     @Override
@@ -20,28 +27,17 @@ public class MockedMasterElectionClient implements MasterElectionClient
 
     public void bluntlyForceMasterElection( int masterServerId )
     {
-        try
-        {
-            Member master = listeners.get( masterServerId );
-            String masterId = "http://" + "localhost" + ":" + master.port;
-            MyMasterBecameAvailableCallback callback = new MyMasterBecameAvailableCallback();
-            for ( Member member : listeners.values() )
-                member.listener.newMasterElected( masterId, masterServerId, callback );
-            callback.waitFor();
-            for ( Member member : listeners.values() )
-                member.listener.newMasterBecameAvailable( masterId );
-            currentMaster = master;
-        }
-        catch ( InterruptedException e )
-        {
-            Thread.interrupted();
-            throw new RuntimeException( e );
-        }
+        Member master = listeners.get( masterServerId );
+        for ( Member member : listeners.values() )
+            member.listener.newMasterElected( master.masterUrl, masterServerId );
+        for ( Member member : listeners.values() )
+            member.listener.newMasterBecameAvailable( master.masterUrl );
+        currentMaster = master;
     }
 
     public void addListener( MasterChangeListener listener, int id, int port )
     {
-        listeners.put( id, new Member( listener, port ) );
+        listeners.put( id, new Member( id, listener, port ) );
     }
     
     public void removeListener( int id )
@@ -52,12 +48,14 @@ public class MockedMasterElectionClient implements MasterElectionClient
     private static class Member
     {
         private final MasterChangeListener listener;
-        private final int port;
+        private final String masterUrl;
+        private final int id;
 
-        Member( MasterChangeListener listener, int port )
+        Member( int id, MasterChangeListener listener, int port )
         {
+            this.id = id;
             this.listener = listener;
-            this.port = port;
+            this.masterUrl = "http://localhost:" + port;
         }
     }
 }
