@@ -69,7 +69,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     private volatile long lastUpdated;
     
     private volatile Master master;
-    private volatile int masterServerId;
+    private volatile int masterServerId = -1;
     private volatile DatabaseState databaseState = DatabaseState.TBD;
     private volatile MasterServer server;
     final MasterElectionClient masterElectionClient;
@@ -182,8 +182,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         run();
         
         masterElectionClient = createMasterElectionClient();
-        masterElectionClient.addListener( this );
-        masterElectionClient.initialJoin();
+        masterElectionClient.requestMaster();
     }
     
     private static Map<String, String> withDefaults( Map<String, String> params )
@@ -196,6 +195,21 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     protected MasterElectionClient createMasterElectionClient()
     {
         return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
+    }
+    
+    @Override
+    public org.neo4j.graphdb.Transaction beginTx()
+    {
+        databaseState.beforeGetMaster( this );
+        return super.beginTx();
+    }
+    
+    @Override
+    public void shutdown()
+    {
+        databaseState.shutdown( this );
+        masterElectionClient.shutdown();
+        super.shutdown();
     }
     
     @Override
@@ -232,6 +246,9 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     public void newMasterElected( String masterUrl, int masterServerId, MasterBecameAvailableCallback callback )
     {
         // TODO Block incoming transactions and rollback active ones or something.
+        
+        if ( this.masterServerId == masterServerId )
+            return;
         
         URL url;
         try
@@ -317,38 +334,33 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 // TODO If my db has a different store id than the master copy it. This happens
                 // when we start up for the first time and the AbstractGraphDatabase constructor
                 // creates an empty db.
-                if ( true /* store id differs from master*/ )
+                if ( dbIsEmpty( db ) )
                 {
-                    if ( true /*my db is empty*/ )
+                    db.life.stop();
+                    try
                     {
-                        db.life.stop();
-                        try
-                        {
-                            BranchedDataPolicy.keep_none.handle( db ); // Will delete the relevant store files
-                            Response<Void> response = db.master.copyStore( db.stuff.getEmptySlaveContext(), new ToFileStoreWriter( db.storeDir ) );
-                            db.stuff.receive( response );
-                        }
-                        finally
-                        {
-                            db.life.start();
-                        }
+                        BranchedDataPolicy.keep_none.handle( db ); // Will delete the relevant store files
+                        Response<Void> response = db.master.copyStore( db.stuff.getEmptySlaveContext(), new ToFileStoreWriter( db.storeDir ) );
+                        db.stuff.receive( response );
                     }
-                    else
+                    finally
                     {
-                        // TODO You're stupid
+                        db.life.start();
                     }
-                }
-                else
-                {
-                    // TODO Verify data consistency with master
                 }
                 return SLAVE;
+            }
+            
+            @Override
+            DatabaseState becomeUndecided( HaOneFiveGraphDb db )
+            {
+                return this;
             }
 
             @Override
             void beforeGetMaster( HaOneFiveGraphDb db )
             {
-                // Wait for a master/slave decision
+                // TODO Wait for a master/slave decision
                 long endTime = currentTimeMillis() + SECONDS.toMillis( 20 );
                 try
                 {
@@ -365,6 +377,11 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                     Thread.interrupted();
                     throw new RuntimeException( e );
                 }
+            }
+            
+            @Override
+            void shutdown( HaOneFiveGraphDb db )
+            {
             }
         },
         MASTER
@@ -392,10 +409,25 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 // TODO Verify data consistency with master
                 return SLAVE;
             }
+            
+            @Override
+            DatabaseState becomeUndecided( HaOneFiveGraphDb db )
+            {
+                db.server.shutdown();
+                db.server = null;
+                db.master.shutdown();
+                return TBD;
+            }
 
             @Override
             void beforeGetMaster( HaOneFiveGraphDb db )
             {
+            }
+            
+            @Override
+            void shutdown( HaOneFiveGraphDb db )
+            {
+                db.server.shutdown();
             }
         },
         SLAVE
@@ -422,19 +454,38 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 // TODO Verify data consistency with master
                 return SLAVE;
             }
+            
+            @Override
+            DatabaseState becomeUndecided( HaOneFiveGraphDb db )
+            {
+                db.master.shutdown();
+                return TBD;
+            }
 
             @Override
             void beforeGetMaster( HaOneFiveGraphDb db )
+            {
+            }
+            
+            @Override
+            void shutdown( HaOneFiveGraphDb db )
             {
             }
         };
         
         abstract DatabaseState becomeMaster( HaOneFiveGraphDb db, int port );
         
+        protected boolean dbIsEmpty( HaOneFiveGraphDb db )
+        {
+            return db.getXaDataSourceManager().getNeoStoreDataSource().getNeoStore().getLastCommittedTx() == 1;
+        }
+
         abstract DatabaseState becomeSlave( HaOneFiveGraphDb db, String masterIp, int masterPort );
         
+        abstract DatabaseState becomeUndecided( HaOneFiveGraphDb db );
+        
         abstract void beforeGetMaster( HaOneFiveGraphDb db );
-
+        
         protected Master newLoopbackMaster( HaOneFiveGraphDb db )
         {
             return new LoopbackMaster( db.storeId, db.xaDataSourceManager,
@@ -452,15 +503,36 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             // TODO Wrap returned Master in something that handles exceptions (network a.s.o.)
             // and feeds back to master election black box if we decide to have input channels to it.
             return new MasterClient( masterIp, masterPort, db.getMessageLog(), db.storeIdGetter,
-                    ConnectionLostHandler.NO_ACTION, 20, 20, 20 );
+                    new ConnectionFailureHandler( db ), 20, 20, 20 );
         }
 
         abstract void handleWriteOperation( HaOneFiveGraphDb db );
+        
+        abstract void shutdown( HaOneFiveGraphDb db );
     }
     
     @Override
     public String toString()
     {
         return getClass().getSimpleName() + "[" + serverId + ", " + storeDir + "]";
+    }
+    
+    private static class ConnectionFailureHandler implements ConnectionLostHandler
+    {
+        private final HaOneFiveGraphDb db;
+
+        ConnectionFailureHandler( HaOneFiveGraphDb db )
+        {
+            this.db = db;
+        }
+        
+        @Override
+        public void handle( Exception e )
+        {
+            // TODO Block incoming transactions and rollback active ones or something.
+            
+            db.databaseState = db.databaseState.becomeUndecided( db );
+            db.masterElectionClient.requestMaster();
+        }
     }
 }

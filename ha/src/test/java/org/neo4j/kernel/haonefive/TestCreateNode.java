@@ -35,12 +35,11 @@ import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.test.TargetDirectory;
-import org.neo4j.test.ha.LocalhostZooKeeperCluster;
 
 public class TestCreateNode
 {
-    private LocalhostZooKeeperCluster zoo;
     private TargetDirectory PATH;
+    private MockedMasterElectionClient masterElection;
     private HaOneFiveGraphDb[] dbs;
     
     private enum Types implements RelationshipType
@@ -51,7 +50,6 @@ public class TestCreateNode
     @Before
     public void before() throws Exception
     {
-        zoo = LocalhostZooKeeperCluster.singleton().clearDataAndVerifyConnection();
         PATH = TargetDirectory.forTest( getClass() );
         PATH.cleanup();
     }
@@ -64,84 +62,88 @@ public class TestCreateNode
     }
     
     @Test
-    public void createHighlyAvailableNode() throws Exception
+    public void createNodesWhenIdDifferentRoles() throws Exception
     {
-        // Start them
         startDbs( 2 );
+        electMaster( 0 );
         
-//        electNewMaster();
+        createNode( 0, "yo" );
+        createNode( 1, "ya" );
+        assertNodesExistsInAllDbs( "yo", "ya" );
         
-        createNode( dbs[0], "yo" ); // master
-        createNode( dbs[1], "ya" ); // slave
+        electMaster( 1 );
         
-        // Verify that all nodes are in both dbs
-        for ( HaOneFiveGraphDb db : dbs )
-            assertNodesExists( db, "yo", "ya" );
+        createNode( 1, "ye" );
+        assertNodesExists( 1, "yo", "ya", "ye" );
+        assertNodesExists( 0, "yo", "ya" );
+        createNode( 0, "yi" );
+        assertNodesExistsInAllDbs( "yo", "ya", "ye", "yi" );
+    }
+    
+    @Test
+    public void changeToAnotherMaster() throws Exception
+    {
+        startDbs( 3 );
+        electMaster( 0 );
+        createNode( 1, "first" );
+        assertNodesExists( 0, "first" );
+        assertNodesExists( 1, "first" );
+        assertNodesExists( 2 );
+        pullUpdates();
         
-        shutdownDb( 0 );
-//        electNewMaster();
-        startDb( 0 );
-
-        // Create node on master, then on slave
-        createNode( dbs[1], "ye" ); // master
-        createNode( dbs[0], "yi" ); // slave
-        
-        // Verify that all nodes are in both dbs
-        for ( HaOneFiveGraphDb db : dbs )
-            assertNodesExists( db, "yo", "ya", "yi", "ye" );
-
-        createNode( dbs[1], "yu" ); // master
-        dbs[0].pullUpdates();
-        
-        for ( HaOneFiveGraphDb db : dbs )
-            assertNodesExists( db, "yo", "ya", "yi", "ye", "yu" );
+        electMaster( 2 );
+        createNode( 1, "second" );
+        assertNodesExists( 0, "first" );
+        assertNodesExists( 1, "first", "second" );
+        assertNodesExists( 2, "first", "second" );
     }
 
-    private void shutdownDb( int i )
+    private void pullUpdates()
     {
-        dbs[i].shutdown();
-        dbs[i] = null;
+        for ( HaOneFiveGraphDb db : dbs )
+            db.pullUpdates();
+    }
+
+    private void assertNodesExistsInAllDbs( String... expectedNames )
+    {
+        for ( int i = 0; i < dbs.length; i++ )
+            assertNodesExists( i, expectedNames );
+    }
+
+    private void electMaster( int id )
+    {
+        masterElection.bluntlyForceMasterElection( id );
+    }
+
+    private void shutdownDb( int id )
+    {
+        dbs[id].shutdown();
+        dbs[id] = null;
+        masterElection.removeListener( id );
     }
 
     private HaOneFiveGraphDb startDb( int serverId )
     {
         HaOneFiveGraphDb db = new HaOneFiveGraphDb( path( serverId ), stringMap(
-                "ha.server_id", "" + serverId,
-                "ha.coordinators", zoo.getConnectionString() ) );
+                "ha.server_id", "" + serverId ) )
+        {
+            @Override
+            protected MasterElectionClient createMasterElectionClient()
+            {
+                return masterElection;
+            }
+        };
         dbs[serverId] = db;
-        registerListeners();
+        masterElection.addListener( db, serverId, 6361 );
         return db;
     }
     
     private void startDbs( int count )
     {
+        masterElection = new MockedMasterElectionClient();
         dbs = new HaOneFiveGraphDb[count];
         for ( int i = 0; i < count; i++ )
             startDb( i );
-    }
-    
-    private void registerListeners()
-    {
-        for ( HaOneFiveGraphDb to : dbs )
-        {
-            if ( to == null )
-                continue;
-            to.masterElectionClient.clearListeners();
-            for ( HaOneFiveGraphDb db : dbs )
-                if ( db != null )
-                    to.masterElectionClient.addListener( db );
-        }
-    }
-
-    @Test
-    public void slaveBecomesAwareOfChangedMaster() throws Exception
-    {
-        startDbs( 3 );
-        electNewMaster();
-        
-        // do something on master and verify that pull will get it
-        electNewMaster();
-        // do something on master and verify that pull will get it
     }
 
     private String path( int serverId )
@@ -149,20 +151,9 @@ public class TestCreateNode
         return PATH.directory( "" + serverId, false ).getAbsolutePath();
     }
 
-    private void electNewMaster()
+    private void assertNodesExists( int id, String... names )
     {
-        for ( HaOneFiveGraphDb db : dbs )
-        {
-            if ( db != null )
-            {
-                db.masterElectionClient.bluntlyForceMasterElection();
-                break;
-            }
-        }
-    }
-
-    private void assertNodesExists( HaOneFiveGraphDb db, String... names )
-    {
+        GraphDatabaseService db = dbs[id];
         Set<String> expectation = new HashSet<String>( asList( names ) );
         for ( Relationship rel : db.getReferenceNode().getRelationships() )
         {
@@ -172,8 +163,9 @@ public class TestCreateNode
         assertTrue( "Expected entries not encountered: " + expectation, expectation.isEmpty() );
     }
 
-    private void createNode( GraphDatabaseService db, String name )
+    private void createNode( int id, String name )
     {
+        GraphDatabaseService db = dbs[id];
         Transaction tx = db.beginTx();
         Node node = db.createNode();
         db.getReferenceNode().createRelationshipTo( node, Types.TEST );

@@ -322,6 +322,9 @@ public abstract class Server<M, R> extends Protocol implements ChannelPipelineFa
 
     protected void handleRequest( ChannelBuffer buffer, final Channel channel ) throws IOException
     {
+        if ( shuttingDown )
+            throw new IllegalStateException( "Server has been shut down" );
+        
         Byte continuation = readContinuationHeader( buffer, channel );
         if ( continuation == null ) return;
         if ( continuation == ChunkingChannelBuffer.CONTINUATION_MORE )

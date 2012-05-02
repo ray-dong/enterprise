@@ -19,9 +19,6 @@
  */
 package org.neo4j.kernel.haonefive;
 
-import java.util.Collection;
-import java.util.concurrent.CopyOnWriteArrayList;
-
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.StoreIdGetter;
@@ -30,7 +27,6 @@ import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.SlaveDatabaseOperations;
 import org.neo4j.kernel.ha.shell.ZooClientFactory;
-import org.neo4j.kernel.ha.zookeeper.Machine;
 import org.neo4j.kernel.ha.zookeeper.ZooClient;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperBroker;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -39,7 +35,6 @@ public class ZooKeeperMasterElectionClient
         implements MasterElectionClient, ZooClientFactory, SlaveDatabaseOperations, ClusterEventReceiver
 {
     private final Broker broker;
-    private final Collection<MasterChangeListener> listeners = new CopyOnWriteArrayList<MasterChangeListener>();
     private final Config config;
     private final HaServiceSupplier stuff;
     private final StoreIdGetter storeIdGetter;
@@ -55,84 +50,55 @@ public class ZooKeeperMasterElectionClient
     }
     
     @Override
-    public void initialJoin()
+    public void requestMaster()
     {
-        System.out.println( "INITIAL JOIN START" );
-        /* TODO remember that this is a spike.
-         * Spawn off a thread which waits a while (for the case where all dbs start at the same time)
-         * then asks ZK who is the master and sends out a "new master" event */
-        new Thread()
-        {
-            @Override
-            public void run()
-            {
-                try
-                {
-                    Thread.sleep( 2000 );
-                    Machine master = broker.getMasterReally( true ).other();
-                    System.out.println( "INITIAL JOIN " + master + " for " + listeners );
-                    String masterUrl = "http://" + master.getServer().first() + ":" + master.getServer().other();
-                    for ( MasterChangeListener listener : listeners )
-                        listener.newMasterElected( masterUrl, master.getMachineId(), new MyMasterBecameAvailableCallback() );
-                    for ( MasterChangeListener listener : listeners )
-                        listener.newMasterBecameAvailable( masterUrl );
-                }
-                catch ( InterruptedException e )
-                {
-                    System.out.println( e );
-                    Thread.interrupted();
-                }
-            }
-        }.start();
+//        /* TODO remember that this is a spike.
+//         * Spawn off a thread which waits a while (for the case where all dbs start at the same time)
+//         * then asks ZK who is the master and sends out a "new master" event */
+//        new Thread()
+//        {
+//            @Override
+//            public void run()
+//            {
+//                try
+//                {
+//                    Thread.sleep( 2000 );
+//                    Machine master = broker.getMasterReally( true ).other();
+//                    String masterUrl = "http://" + master.getServer().first() + ":" + master.getServer().other();
+//                    for ( MasterChangeListener listener : listeners )
+//                        listener.newMasterElected( masterUrl, master.getMachineId(), new MyMasterBecameAvailableCallback() );
+//                    for ( MasterChangeListener listener : listeners )
+//                        listener.newMasterBecameAvailable( masterUrl );
+//                }
+//                catch ( InterruptedException e )
+//                {
+//                    System.out.println( e );
+//                    Thread.interrupted();
+//                }
+//            }
+//        }.start();
     }
     
-    @Override
-    public void clearListeners()
-    {
-        listeners.clear();
-    }
-    
-    @Override
-    public void addListener( MasterChangeListener listener )
-    {
-        listeners.add( listener );
-    }
-    
-    // For testing
-    @Override
-    public void bluntlyForceMasterElection()
-    {
-        /*
-         * - Use ZooKeeper event to notify all instances that they need to update
-         *   ZK with their master election data.
-         * - Wait for all to update (what's the criteria for end wait?)
-         * - Use the data in ZK to elect new master.
-         * - Tell all listeners about the newly elected master.
-         */
-        
-        try
-        {
-            broker.callForData();
-            
-            // TODO implement wait for real
-            Thread.sleep( 2000 );
-            
-            Machine master = broker.getMasterReally( true ).other();
-            System.out.println( "Elected " + master.getMachineId() );
-            String masterId = "http://" + master.getServer().first() + ":" + master.getServer().other();
-            int masterServerId = master.getMachineId();
-            MyMasterBecameAvailableCallback callback = new MyMasterBecameAvailableCallback();
-            for ( MasterChangeListener listener : listeners )
-                listener.newMasterElected( masterId, masterServerId, callback );
-            callback.waitFor();
-            for ( MasterChangeListener listener : listeners )
-                listener.newMasterBecameAvailable( masterId );
-        }
-        catch ( InterruptedException e )
-        {
-            throw new RuntimeException( e );
-        }
-    }
+//    private void electMasterAndPingListeners()
+//    {
+//        try
+//        {
+//            Machine master = broker.getMasterReally( true ).other();
+//            String masterId = "http://" + master.getServer().first() + ":" + master.getServer().other();
+//            int masterServerId = master.getMachineId();
+//            MyMasterBecameAvailableCallback callback = new MyMasterBecameAvailableCallback();
+//            for ( MasterChangeListener listener : listeners )
+//                listener.newMasterElected( masterId, masterServerId, callback );
+//            callback.waitFor();
+//            for ( MasterChangeListener listener : listeners )
+//                listener.newMasterBecameAvailable( masterId );
+//        }
+//        catch ( InterruptedException e )
+//        {
+//            Thread.interrupted();
+//            throw new RuntimeException( e );
+//        }
+//    }
 
     @Override
     public ZooClient newZooClient()
@@ -172,6 +138,15 @@ public class ZooKeeperMasterElectionClient
     @Override
     public void newMaster( Exception cause )
     {
+//        System.out.println( "got newMaster " + cause );
+//        // TODO ehrmm...
+//        if ( cause instanceof InformativeStackTrace )
+//        {
+//            if ( cause.getMessage().contains( "NodeDeleted" ) )
+//            {
+//                electMasterAndPingListeners();
+//            }
+//        }
     }
 
     @Override
@@ -180,21 +155,9 @@ public class ZooKeeperMasterElectionClient
         broker.restart();
     }
     
-    private static class MyMasterBecameAvailableCallback implements MasterBecameAvailableCallback
+    @Override
+    public void shutdown()
     {
-        private volatile boolean called;
-        
-        @Override
-        public synchronized void iAmMasterNowAndReady()
-        {
-            notify();
-            called = true;
-        }
-        
-        public synchronized void waitFor() throws InterruptedException
-        {
-            if ( !called )
-                wait( 10000 );
-        }
+        broker.shutdown();
     }
 }
