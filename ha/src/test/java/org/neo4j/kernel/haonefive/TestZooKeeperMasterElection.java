@@ -13,7 +13,7 @@ public class TestZooKeeperMasterElection
     {
         instances = new Instance[3];
         for ( int i = 0; i < instances.length; i++ )
-            instances[i] = new Instance( new ZooKeeperMasterElectionClient( null, null, null, null, null ), null );
+            instances[i] = new Instance( new ZooKeeperMasterElectionClient( null, null, null, null ), null );
     }
 
     @After

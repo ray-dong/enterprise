@@ -177,6 +177,22 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                     throw new RuntimeException( e );
                 }
             }
+            
+            @Override
+            public Pair<Long, Integer> getLastTx()
+            {
+                try
+                {
+                    NeoStoreXaDataSource neoStoreDataSource = getXaDataSourceManager().getNeoStoreDataSource();
+                    long tx = neoStoreDataSource.getLastCommittedTxId();
+                    int master = neoStoreDataSource.getMasterForCommittedTx( tx ).first().intValue();
+                    return Pair.of( tx, master );
+                }
+                catch ( IOException e )
+                {
+                    throw new RuntimeException( e );
+                }
+            }
         };
         
         run();
@@ -194,7 +210,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     protected MasterElectionClient createMasterElectionClient()
     {
-        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir, this );
+        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
     }
     
     @Override
@@ -280,22 +296,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     public void newMasterBecameAvailable( String masterUrl )
     {
         // TODO Remove blockade if any
-    }
-    
-    @Override
-    public MasterElectionInput askForMasterElectionInput()
-    {
-        try
-        {
-            NeoStoreXaDataSource neoStoreDataSource = getXaDataSourceManager().getNeoStoreDataSource();
-            long tx = neoStoreDataSource.getLastCommittedTxId();
-            Pair<Integer, Long> masterInfo = neoStoreDataSource.getMasterForCommittedTx( tx );
-            return new MasterElectionInput( tx, masterInfo.first() );
-        }
-        catch ( IOException e )
-        {
-            throw new RuntimeException( e );
-        }
     }
 
     public void pullUpdates()

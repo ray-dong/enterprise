@@ -206,7 +206,7 @@ public class ZooKeeperBroker extends AbstractBroker
     @Override
     public void setLastCommittedTxId( long txId )
     {
-        getZooClient().setCommittedTx( txId );
+//        getZooClient().setCommittedTx( txId );
     }
 
     public boolean iAmMaster()

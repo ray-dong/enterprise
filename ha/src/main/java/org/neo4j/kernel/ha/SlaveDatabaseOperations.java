@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha;
 import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
+import org.neo4j.helpers.Pair;
 
 public interface SlaveDatabaseOperations extends ConnectionLostHandler
 {
@@ -38,5 +39,5 @@ public interface SlaveDatabaseOperations extends ConnectionLostHandler
 
     void exceptionHappened( RuntimeException e );
 
-    int getMasterForTx( long tx );
+    Pair<Long, Integer> getLastTxData();
 }

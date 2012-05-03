@@ -22,6 +22,7 @@ package org.neo4j.kernel.haonefive;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.StoreIdGetter;
+import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
@@ -32,24 +33,21 @@ import org.neo4j.kernel.ha.zookeeper.ZooClient;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperBroker;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-public class ZooKeeperMasterElectionClient
-        implements MasterElectionClient, ZooClientFactory, SlaveDatabaseOperations, ClusterEventReceiver
+public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
+        implements ZooClientFactory, SlaveDatabaseOperations, ClusterEventReceiver
 {
     private final Broker broker;
     private final Config config;
     private final HaServiceSupplier stuff;
     private final StoreIdGetter storeIdGetter;
     private final String storeDir;
-    private final MasterChangeListener listener;
     
-    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter, String storeDir,
-            MasterChangeListener listener )
+    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter, String storeDir )
     {
         this.stuff = stuff;
         this.config = config;
         this.storeIdGetter = storeIdGetter;
         this.storeDir = storeDir;
-        this.listener = listener;
         broker = new ZooKeeperBroker( config, this );
     }
     
@@ -64,8 +62,10 @@ public class ZooKeeperMasterElectionClient
         Machine master = broker.getMasterReally( true ).other();
         String masterId = "http://" + master.getServer().first() + ":" + master.getServer().other();
         int masterServerId = master.getMachineId();
-        listener.newMasterElected( masterId, masterServerId );
-        listener.newMasterBecameAvailable( masterId );
+        for ( MasterChangeListener listener : listeners )
+            listener.newMasterElected( masterId, masterServerId );
+        for ( MasterChangeListener listener : listeners )
+            listener.newMasterBecameAvailable( masterId );
     }
 
     @Override
@@ -98,12 +98,6 @@ public class ZooKeeperMasterElectionClient
     }
 
     @Override
-    public int getMasterForTx( long tx )
-    {
-        return stuff.getMasterIdForTx( tx );
-    }
-
-    @Override
     public void newMaster( Exception cause )
     {
 //        System.out.println( "got newMaster " + cause );
@@ -116,6 +110,19 @@ public class ZooKeeperMasterElectionClient
 //            }
 //        }
     }
+    
+    @Override
+    public MasterElectionInput askForMasterElectionInput()
+    {
+        Pair<Long, Integer> lastTx = getLastTxData();
+        return new MasterElectionInput( lastTx.first(), lastTx.other() );
+    }
+    
+    @Override
+    public Pair<Long, Integer> getLastTxData()
+    {
+        return stuff.getLastTx();
+    }
 
     @Override
     public void reconnect( Exception cause )
@@ -123,7 +130,6 @@ public class ZooKeeperMasterElectionClient
         broker.restart();
     }
     
-    @Override
     public void shutdown()
     {
         broker.shutdown();

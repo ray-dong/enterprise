@@ -1622,17 +1622,21 @@ public class HighlyAvailableGraphDatabase
             }
             newMaster( e );
         }
-
+        
         @Override
-        public int getMasterForTx( long tx )
+        public Pair<Long, Integer> getLastTxData()
         {
+            long tx = -1;
             try
             {
-                return localGraph().getXaDataSourceManager().getNeoStoreDataSource().getMasterForCommittedTx( tx ).first();
+                NeoStoreXaDataSource neoStoreDataSource = localGraph().getXaDataSourceManager().getNeoStoreDataSource();
+                tx = neoStoreDataSource.getLastCommittedTxId();
+                int master = neoStoreDataSource.getMasterForCommittedTx( tx ).first();
+                return Pair.of( tx, master );
             }
             catch ( IOException e )
             {
-                throw new ComException( "Master id not found for tx:" + tx, e );
+                throw new ComException( "Master id not found for last tx:" + tx, e );
             }
         }
     }

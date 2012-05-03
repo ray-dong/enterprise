@@ -51,8 +51,6 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
 import org.neo4j.backup.OnlineBackupSettings;
-import org.neo4j.com.SlaveContext;
-import org.neo4j.com.SlaveContext.Tx;
 import org.neo4j.com.StoreIdGetter;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
@@ -83,9 +81,6 @@ public class ZooClient extends AbstractZooKeeperManager
     private final ZooKeeper zooKeeper;
     private final int machineId;
     private String sequenceNr;
-
-    private long committedTx;
-    private int masterForCommittedTx;
 
     private final Object keeperStateMonitor = new Object();
     private volatile KeeperState keeperState = KeeperState.Disconnected;
@@ -393,16 +388,16 @@ public class ZooClient extends AbstractZooKeeperManager
             if ( storeId != null )
             {   // There's a cluster in place, let's use that
                 rootPath = asRootPath( storeId );
-                if ( NeoStoreUtil.storeExists( storeDir ) )
-                {   // We have a local store, use and verify against it
-                    NeoStoreUtil store = new NeoStoreUtil( storeDir );
-                    committedTx = store.getLastCommittedTx();
+//                if ( NeoStoreUtil.storeExists( storeDir ) )
+//                {   // We have a local store, use and verify against it
+//                    NeoStoreUtil store = new NeoStoreUtil( storeDir );
+//                    committedTx = store.getLastCommittedTx();
 //                    if ( !storeId.equals( store.asStoreId() ) ) throw new ZooKeeperException( "StoreId in database doesn't match that of the ZK cluster" );
-                }
-                else
-                {   // No local store
-                    committedTx = 1;
-                }
+//                }
+//                else
+//                {   // No local store
+//                    committedTx = 1;
+//                }
             }
             else
             {   // Cluster doesn't exist
@@ -412,7 +407,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 storeId = createCluster( storeIdSuggestion );
                 makeSureRootPathIsFound();
             }
-            masterForCommittedTx = getFirstMasterForTx( committedTx );
+//            masterForCommittedTx = getFirstMasterForTx( committedTx );
         }
     }
 
@@ -463,7 +458,8 @@ public class ZooClient extends AbstractZooKeeperManager
             writeHaServerConfig();
             String root = getRoot();
             String path = root + "/" + machineId + "_";
-            String created = zooKeeper.create( path, dataRepresentingMe( committedTx, masterForCommittedTx ),
+            Pair<Long, Integer> lastTx = localDatabase.getLastTxData();
+            String created = zooKeeper.create( path, dataRepresentingMe( lastTx.first(), lastTx.other() ),
                 ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL );
 
             // Add watches to our master notification nodes
@@ -637,12 +633,9 @@ public class ZooClient extends AbstractZooKeeperManager
         connection.setJMXConnectionData( new String( url ), new String( instanceId ) );
     }
 
-    public synchronized void setCommittedTx( long tx )
+    private synchronized void setCommittedTx( long tx, int master )
     {
         waitForSyncConnected();
-        this.committedTx = tx;
-        int master = localDatabase.getMasterForTx( tx );
-        this.masterForCommittedTx = master;
         String root = getRoot();
         String path = root + "/" + machineId + "_" + sequenceNr;
         byte[] data = dataRepresentingMe( tx, master );
@@ -762,7 +755,6 @@ public class ZooClient extends AbstractZooKeeperManager
     public String toString()
     {
         return getClass().getSimpleName() + "[serverId:" + machineId + ", seq:" + sequenceNr +
-                ", lastCommittedTx:" + committedTx + " w/ master:" + masterForCommittedTx +
                 ", session:" + sessionId + "]";
     }
 
@@ -924,11 +916,7 @@ public class ZooClient extends AbstractZooKeeperManager
 
     public void updateLastCommittedTx()
     {
-        SlaveContext context = localDatabase.getSlaveContext( 0 );
-        long txId = 0;
-        for ( Tx tx : context.lastAppliedTransactions() )
-            if ( tx.getDataSourceName().equals( Config.DEFAULT_DATA_SOURCE_NAME ) )
-                txId = tx.getTxId();
-        setCommittedTx( txId );
+        Pair<Long, Integer> lastTx = localDatabase.getLastTxData();
+        setCommittedTx( lastTx.first(), lastTx.other() );
     }
 }

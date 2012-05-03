@@ -23,6 +23,7 @@ import javax.transaction.Transaction;
 
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
+import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
@@ -51,6 +52,8 @@ public interface HaServiceSupplier
     void makeSureTxHasBeenInitialized();
     
     int getMasterIdForTx( long tx );
+    
+    Pair<Long, Integer> getLastTx();
 
     // ...
 }

@@ -3,11 +3,8 @@ package org.neo4j.kernel.haonefive;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MockedMasterElectionClient implements MasterElectionClient
+public class MockedMasterElectionClient extends AbstractMasterElectionClient
 {
-    private final Map<Integer,Member> listeners = new HashMap<Integer, Member>();
-    private Member currentMaster;
-    
     @Override
     public void requestMaster()
     {
@@ -20,11 +17,6 @@ public class MockedMasterElectionClient implements MasterElectionClient
         }
     }
 
-    @Override
-    public void shutdown()
-    {
-    }
-
     public void bluntlyForceMasterElection( int masterServerId )
     {
         Member master = listeners.get( masterServerId );
@@ -33,6 +25,13 @@ public class MockedMasterElectionClient implements MasterElectionClient
         for ( Member member : listeners.values() )
             member.listener.newMasterBecameAvailable( master.masterUrl );
         currentMaster = master;
+    }
+
+    @Override
+    public MasterElectionInput askForMasterElectionInput()
+    {
+        // TODO Auto-generated method stub
+        return null;
     }
 
     public void addListener( MasterChangeListener listener, int id, int port )

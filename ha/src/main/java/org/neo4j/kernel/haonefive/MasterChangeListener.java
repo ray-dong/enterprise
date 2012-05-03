@@ -19,6 +19,11 @@
  */
 package org.neo4j.kernel.haonefive;
 
+/**
+ * The MasterChangeListener is listening for events from master election, for example some state of
+ * some services in the database must be switched accordingly. It can also provide input to the
+ * election algorithm when if asked for.
+ */
 public interface MasterChangeListener
 {
     /**
@@ -32,10 +37,4 @@ public interface MasterChangeListener
     void newMasterElected( String masterUrl, int masterServerId /*Here because other legacy HA code relies on it*/ );
     
     void newMasterBecameAvailable( String masterUrl );
-    
-    /**
-     * Ask this instance for input needed for doing a correct master election. Called when
-     * a new master needs to be elected.
-     */
-    MasterElectionInput askForMasterElectionInput();
 }
