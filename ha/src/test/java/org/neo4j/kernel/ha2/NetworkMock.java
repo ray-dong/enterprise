@@ -26,16 +26,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageType;
 import org.neo4j.helpers.collection.Visitor;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRing;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
 
 /**
  * TODO
  */
-public class NetworkMock
+public abstract class NetworkMock<CONTEXT,MESSAGE extends Enum<MESSAGE>&MessageType, SERVER extends ProtocolServer<CONTEXT,MESSAGE> >
 {
-    Map<String, TestServer> participants = new HashMap<String, TestServer>();
+    Map<String, TestProtocolServer<CONTEXT,MESSAGE,SERVER>> participants = new HashMap<String, TestProtocolServer<CONTEXT,MESSAGE,SERVER>>();
 
     private final NetworkFailureStrategy failureStrategy;
 
@@ -49,9 +48,9 @@ public class NetworkMock
         this.failureStrategy = failureStrategy;
     }
 
-    public TestServer addServer( String serverId )
+    public TestProtocolServer<CONTEXT,MESSAGE,SERVER> addServer( String serverId )
     {
-        TestServer server = new TestServer( serverId );
+        TestProtocolServer<CONTEXT,MESSAGE,SERVER> server = newTestProtocolServer(serverId);
 
         debug( serverId, "joins ring" );
 
@@ -60,6 +59,8 @@ public class NetworkMock
         return server;
     }
 
+    protected abstract TestProtocolServer<CONTEXT,MESSAGE,SERVER> newTestProtocolServer(String serverId);
+
     private void debug( String participant, String string )
     {
         Logger.getLogger("").info( "=== " + participant + " " + string );
@@ -67,28 +68,18 @@ public class NetworkMock
 
     public void removeServer( String serverId )
     {
-        removeServer( serverId, true );
-    }
-    
-    public void removeServer( String serverId, boolean callLeaveRing )
-    {
         debug( serverId, "leaves ring" );
-        TestServer server = participants.get(serverId);
-        if ( callLeaveRing )
-        {
-            server.newClient( TokenRing.class ).leaveRing();
-            tickUntilDone();
-        }
+        TestProtocolServer server = participants.get(serverId);
         server.stop();
 
         participants.remove( serverId );
     }
-    
+
     public int tick()
     {
         // Get all messages from all test servers
         List<Message> messages = new ArrayList<Message>(  );
-        for( TestServer testServer : participants.values() )
+        for( TestProtocolServer testServer : participants.values() )
         {
             testServer.sendMessages( messages );
         }
@@ -100,7 +91,7 @@ public class NetworkMock
             String to = message.getHeader( Message.TO );
             if ( to.equals( Message.BROADCAST ))
             {
-                for( Map.Entry<String, TestServer> testServer : participants.entrySet() )
+                for( Map.Entry<String, TestProtocolServer<CONTEXT,MESSAGE,SERVER>> testServer : participants.entrySet() )
                 {
                     if (!testServer.getKey().equals( message.getHeader( Message.FROM ) ))
                     {
@@ -123,7 +114,7 @@ public class NetworkMock
                     Logger.getLogger("").info( "Send message to "+to+" was lost");
                 } else
                 {
-                    TestServer server = participants.get( to );
+                    TestProtocolServer<CONTEXT,MESSAGE,SERVER> server = participants.get( to );
                     Logger.getLogger("").info( "Send to "+to+": "+message);
                     server.process( message );
                     nrOfReceivedMessages++;
@@ -139,24 +130,24 @@ public class NetworkMock
         {
             while (tick()>0){}
             
-            for( TestServer testServer : participants.values() )
+            for( TestProtocolServer testServer : participants.values() )
             {
                 testServer.checkExpectations();
             }
         } while (tick() > 0);
     }
     
-    public void verifyState( String serverId, Verifier<TokenRingContext> verifier )
+    public void verifyState( String serverId, Verifier<CONTEXT> verifier )
     {
-        TestServer participant = participants.get( serverId );
+        TestProtocolServer participant = participants.get( serverId );
         if ( participant == null ) 
             throw new IllegalArgumentException( "Unknown server id '" + serverId + "'" );
         participant.verifyState( verifier );
     }
 
-    public void visitServers( Visitor<Server> visitor )
+    public void visitServers( Visitor<SERVER> visitor )
     {
-        for( TestServer testServer : participants.values() )
+        for( TestProtocolServer<CONTEXT,MESSAGE,SERVER> testServer : participants.values() )
         {
             if (!visitor.visit( testServer.getServer() ))
                 return;

@@ -30,9 +30,7 @@ import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
 import org.neo4j.kernel.ha2.failure.TimeoutMessageFailureHandler;
-import org.neo4j.kernel.ha2.protocol.RingParticipant;
-import org.neo4j.kernel.ha2.protocol.tokenring.ServerIdRingParticipantComparator;
-import org.neo4j.kernel.ha2.protocol.tokenring.TokenRingContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.PaxosContext;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -42,19 +40,21 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public class NetworkedServerFactory
 {
     private LifeSupport life;
+    private StringLogger logger;
 
-    public NetworkedServerFactory( LifeSupport life )
+    public NetworkedServerFactory( LifeSupport life, StringLogger logger )
     {
         this.life = life;
+        this.logger = logger;
     }
 
-    public Server newNetworkedServer(Map<String, String> configuration)
+    public MultiPaxosServer newNetworkedServer(Map<String, String> configuration)
     {
         NetworkNode.Configuration config = ConfigProxy.config( configuration, NetworkNode.Configuration.class );
-        NetworkNode node = new NetworkNode( config, StringLogger.SYSTEM );
+        NetworkNode node = new NetworkNode( config, logger );
         life.add( node );
 
-        final Server server = new Server( new TokenRingContext(new ServerIdRingParticipantComparator()), node, node, new AbstractMessageFailureHandler.Factory()
+        final MultiPaxosServer server = new MultiPaxosServer( new PaxosContext(), node, node, new AbstractMessageFailureHandler.Factory()
         {
             @Override
             public AbstractMessageFailureHandler newMessageFailureHandler( MessageProcessor incoming,
@@ -71,8 +71,7 @@ public class NetworkedServerFactory
             @Override
             public void listeningAt( URI me )
             {
-                RingParticipant participant = new RingParticipant( me.toString() );
-                server.listeningAt( participant );
+                server.listeningAt( me.toString() );
             }
 
             @Override

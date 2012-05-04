@@ -111,8 +111,8 @@ public class StateMachineProxyFactory<MESSAGETYPE extends Enum<MESSAGETYPE> & Me
                 ResponseFuture future = responseFutureMap.get( conversationId );
                 if (future != null && !future.wasInitiatedBy(message.getMessageType().name()))
                 {
-                    future.setResponse( message );
-                    responseFutureMap.remove( conversationId );
+                    if (future.setPotentialResponse( message ))
+                        responseFutureMap.remove( conversationId );
                 }
             }
         }
@@ -140,10 +140,32 @@ public class StateMachineProxyFactory<MESSAGETYPE extends Enum<MESSAGETYPE> & Me
             initiatedByMessageType = MessageType.class.cast(message.getMessageType());
         }
 
-        public synchronized void setResponse( Message response )
+        public synchronized boolean setPotentialResponse( Message response )
         {
-            this.response = response;
-            this.notifyAll();
+            if (isResponse(response))
+            {
+                this.response = response;
+                this.notifyAll();
+                return true;
+            } else
+            {
+                return false;
+            }
+        }
+
+        private boolean isResponse( Message response )
+        {
+            if (initiatedByMessageType.next().length == 0)
+                return true;
+            else
+            {
+                for( MessageType messageType : initiatedByMessageType.next() )
+                {
+                    if (response.getMessageType().equals( messageType ))
+                        return true;
+                }
+                return false;
+            }
         }
 
         @Override

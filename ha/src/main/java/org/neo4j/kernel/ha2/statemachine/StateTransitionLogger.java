@@ -30,10 +30,10 @@ import org.neo4j.kernel.ha2.protocol.RingParticipant;
 public class StateTransitionLogger<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
         implements StateTransitionListener<MESSAGETYPE>
 {
-    private RingParticipant participant;
+    private String participant;
     private Logger logger;
 
-    public StateTransitionLogger(RingParticipant participant, Logger logger )
+    public StateTransitionLogger(String participant, Logger logger )
     {
         this.participant = participant;
         this.logger = logger;
@@ -42,10 +42,10 @@ public class StateTransitionLogger<MESSAGETYPE extends Enum<MESSAGETYPE> & Messa
     public void stateTransition(StateTransition transition)
     {
         if (transition.getMessage().getPayload() instanceof String)
-            logger.warning(participant.toString()+": "+
+            logger.warning(participant+": "+
                                transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
                                                                                                                                transition.getNewState().toString());
         else
-            logger.info(participant.toString()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
+            logger.info(participant+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
     }
 }

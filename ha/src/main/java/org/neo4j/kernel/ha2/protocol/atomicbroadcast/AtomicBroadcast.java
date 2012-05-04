@@ -18,14 +18,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2.message;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
 
 /**
- * TODO
+ * Atomic broadcast API
  */
-public interface MessageType
+public interface AtomicBroadcast
 {
-    String name();
-    MessageType[] next();
-    MessageType failureMessage();
+    void possibleServers(String... serverId);
+    void fail(String serverId);
+    void recover(String serverId);
+
+    void join();
+    void leave();
+
+    void propose( Object value );
+    void addAtomicBroadcastListener( AtomicBroadcastListener listener );
+    void removeAtomicBroadcastListener( AtomicBroadcastListener listener );
 }

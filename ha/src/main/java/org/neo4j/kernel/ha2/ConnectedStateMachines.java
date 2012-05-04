@@ -105,7 +105,7 @@ public class ConnectedStateMachines
                 }
             }
 
-            if( outgoingMessage.hasHeader( Message.TO ) )
+            if( outgoingMessage.hasHeader( Message.TO ))
             {
                 try
                 {
@@ -120,7 +120,7 @@ public class ConnectedStateMachines
             {
                 // Deliver internally if possible
                 StateMachine<?,?,?> internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
-                if (internalStatemachine == null && stateMachine != internalStatemachine )
+                if (internalStatemachine != null && stateMachine != internalStatemachine )
                 {
                     internalStatemachine.handle( (Message)outgoingMessage, outgoing );
                 }

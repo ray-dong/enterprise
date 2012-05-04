@@ -18,14 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2.message;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
 
 /**
- * TODO
+ * Paxos listener. Implement this to learn values from Paxos algorithm.
  */
-public interface MessageType
+public interface AtomicBroadcastListener
 {
-    String name();
-    MessageType[] next();
-    MessageType failureMessage();
+    void learn(Object value);
 }

@@ -18,14 +18,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2.message;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 /**
- * TODO
+ * Record of Paxos instance in acceptors
  */
-public interface MessageType
+public class AcceptorInstance
 {
-    String name();
-    MessageType[] next();
-    MessageType failureMessage();
+    long instanceId = -1;
+    long ballot = -1;
+    Object value;
+
+    public void set( AcceptorMessage.AcceptState acceptState )
+    {
+        this.instanceId = acceptState.getInstance();
+        this.ballot = acceptState.getBallot();
+        this.value = acceptState.getValue();
+    }
 }

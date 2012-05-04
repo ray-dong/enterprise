@@ -50,11 +50,16 @@ public class Message<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
         return new Message<MESSAGETYPE>(message, payload).setHeader( TO, to.toString() );
     }
     
+    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message)
+    {
+        return internal( message, null );
+    }
+    
     public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message, Object payload)
     {
         return new Message<MESSAGETYPE>( message, payload );
     }
-    
+
     // Standard headers
     public static final String CONVERSATION_ID = "conversation-id";
     public static final String CREATED_BY = "created-by";
@@ -115,11 +120,20 @@ public class Message<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
 
     public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> copyHeadersTo( Message<MESSAGETYPE> message, String... names )
     {
-        for( String name : names )
+        if (names.length == 0)
         {
-            String value = headers.get( name );
-            if (value != null)
-                message.setHeader( name, value );
+            for( Map.Entry<String, String> header : headers.entrySet() )
+            {
+                message.setHeader( header.getKey(), header.getValue() );
+            }
+        } else
+        {
+            for( String name : names )
+            {
+                String value = headers.get( name );
+                if (value != null)
+                    message.setHeader( name, value );
+            }
         }
         
         return message;

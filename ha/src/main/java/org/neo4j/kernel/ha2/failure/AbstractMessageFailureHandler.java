@@ -49,6 +49,7 @@ public class AbstractMessageFailureHandler
         this.incoming = incoming;
         source.addMessageProcessor( new CancelTimeouts() );
         outgoing.addMessageProcessor( new ExpectationTimeouts() );
+        outgoing.addMessageProcessor( new CancelTimeouts() );
     }
     
     protected void expectation(ExpectationFailure<?> expectationFailure)

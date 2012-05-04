@@ -38,7 +38,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public class NetworkSendReceiveTest
 {
     public enum TestMessage
-        implements MessageType<TestMessage>
+        implements MessageType
     {
         helloWorld;
 

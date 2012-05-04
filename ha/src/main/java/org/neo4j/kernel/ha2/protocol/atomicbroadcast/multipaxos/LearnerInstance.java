@@ -18,14 +18,19 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2.message;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 /**
  * TODO
  */
-public interface MessageType
+public class LearnerInstance
 {
-    String name();
-    MessageType[] next();
-    MessageType failureMessage();
+    long instanceId = -1;
+    Object value;
+
+    public void set( LearnerMessage.LearnState learnState )
+    {
+        this.instanceId = learnState.getInstanceId();
+        this.value = learnState.getValue();
+    }
 }

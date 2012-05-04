@@ -190,7 +190,10 @@ public class NetworkNode
         if (to.equals( Message.BROADCAST ))
         {
             broadcast( message );
-        } else
+        } else if (to.equals( me.toString() ))
+        {
+            receive( message );
+        }else
         {
             send( message );
         }
@@ -239,7 +242,7 @@ public class NetworkNode
         }
         catch( URISyntaxException e )
         {
-            msgLog.logMessage("Not valid URI:" + message.getHeader( Message.TO ));
+            msgLog.logMessage("Not valid URI:" + message.getHeader( Message.TO ), true);
         }
 
         Channel channel = getChannel(to);
@@ -253,13 +256,13 @@ public class NetworkNode
             }
         } catch (Exception e)
         {
-            msgLog.logMessage("Could not connect to:" + to);
+            msgLog.logMessage("Could not connect to:" + to, true);
             return;
         }
 
         try
         {
-            msgLog.logMessage("Sending to "+to+": "+message);
+            msgLog.logMessage("Sending to "+to+": "+message, true);
             channel.write(message);
         } catch (Exception e)
         {
@@ -383,23 +386,13 @@ public class NetworkNode
         public void messageReceived(ChannelHandlerContext ctx, MessageEvent event) throws Exception
         {
             final Message message = (Message) event.getMessage();
-            msgLog.logMessage("Received:" + message);
+            msgLog.logMessage("Received:" + message, true);
             executor.submit( new Runnable()
             {
                 @Override
                 public void run()
                 {
-                    for( MessageProcessor listener : processors )
-                    {
-                        try
-                        {
-                            listener.process( message );
-                        }
-                        catch( Exception e )
-                        {
-                            // Ignore
-                        }
-                    }
+                    receive( message );
                 }
             } );
         }
@@ -420,6 +413,21 @@ public class NetworkNode
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
         {
 //            msgLog.logMessage("Receive exception:", e.getCause());
+        }
+    }
+
+    private void receive( Message message )
+    {
+        for( MessageProcessor listener : processors )
+        {
+            try
+            {
+                listener.process( message );
+            }
+            catch( Exception e )
+            {
+                // Ignore
+            }
         }
     }
 }
