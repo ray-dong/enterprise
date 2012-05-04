@@ -132,7 +132,7 @@ public abstract class NetworkMock<CONTEXT,MESSAGE extends Enum<MESSAGE>&MessageT
             
             for( TestProtocolServer testServer : participants.values() )
             {
-                testServer.checkExpectations();
+                testServer.checkTimeouts();
             }
         } while (tick() > 0);
     }

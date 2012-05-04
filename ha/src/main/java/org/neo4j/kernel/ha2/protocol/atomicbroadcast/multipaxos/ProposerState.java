@@ -28,12 +28,12 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Proposer
  */
 public enum ProposerState
-    implements State<PaxosContext, ProposerMessage, ProposerState>
+    implements State<MultiPaxosContext, ProposerMessage, ProposerState>
 {
     start
         {
             @Override
-            public ProposerState handle( PaxosContext context,
+            public ProposerState handle( MultiPaxosContext context,
                                       Message<ProposerMessage> message,
                                       MessageProcessor outgoing
             )
@@ -44,7 +44,7 @@ public enum ProposerState
                     case join:
                     {
                         context.proposerInstances.clear();
-                        for (int i = 0; i < 100; i++)
+                        for (int i = 0; i < 10; i++)
                             context.proposerInstances.add( new ProposerInstance() );
 
                         if (context.clusterConfiguration.getCoordinator().equals( context.getMe() ))
@@ -61,7 +61,7 @@ public enum ProposerState
     coordinator
         {
             @Override
-            public ProposerState handle( PaxosContext context,
+            public ProposerState handle( MultiPaxosContext context,
                                       Message<ProposerMessage> message,
                                       MessageProcessor outgoing
             )
@@ -71,25 +71,23 @@ public enum ProposerState
                 {
                     case propose:
                     {
-                        context.pendingValues.push( message.getPayload() );
-
-                        long instanceId = context.lastInstanceId++;
-                        long ballot = 100 + context.getServerId(); // First server will have first ballot id be 101
-
-                        ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(instanceId) );
-                        instance.propose(instanceId, ballot);
-
-                        for( String acceptor : context.clusterConfiguration.getAcceptors() )
+                        if (context.bookedInstances.size() == context.proposerInstances.size()-3)
                         {
-                            outgoing.process( Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState(instanceId, ballot ) ).setHeader( "instance", ""+instanceId ));
+                            // Too many values already in process - put this on hold for now
+                            System.out.println( "Pending "+message.getPayload()  );
+                            context.pendingValues.offer( message.getPayload() );
+                            return this;
+                        } else
+                        {
+                            Object payload = message.getPayload();
+                            propose( context, outgoing, payload );
                         }
-
                         break;
                     }
 
                     case phase1Timeout:
                     {
-                        long instanceId = Long.parseLong( message.getHeader( "instance" ) );
+                        long instanceId = (Long) message.getPayload();
                         ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(instanceId) );
                         long ballot = instance.ballot + 100;
                         instance.phase1Timeout(ballot);
@@ -106,24 +104,26 @@ public enum ProposerState
                         ProposerMessage.PromiseState promiseState = (ProposerMessage.PromiseState) message.getPayload();
                         ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(promiseState.getInstance()) );
 
-                        if (instance.ballot == promiseState.getBallot())
+                        if (instance.state == ProposerInstance.State.p1_pending && instance.ballot == promiseState.getBallot())
                         {
                             instance.promise( promiseState );
 
                             if (instance.promises.size() == context.getMinimumQuorumSize())
                             {
+                                context.timeouts.cancelTimeout( instance.id );
+
                                 // No promises contained a value
                                 if (instance.value_1 == null)
                                 {
                                     // R0
-                                    instance.ready(instance.value_2 == null ? context.pendingValues.poll() : instance.value_2, true);
+                                    instance.ready(instance.value_2 == null ? context.bookedInstances.get( instance.id ) : instance.value_2, true);
                                 } else
                                 {
                                     // R1
                                     if (instance.value_2 == null)
                                     {
                                         instance.ready( instance.value_1, false );
-                                    } else if (instance.value_1.equals( instance.value_2 == null ? context.pendingValues.poll() : instance.value_2 ))
+                                    } else if (instance.value_1.equals( instance.value_2 == null ? context.bookedInstances.get( instance.id ) : instance.value_2 ))
                                     {
                                         instance.ready( instance.value_2, instance.clientValue );
                                     } else if (instance.clientValue)
@@ -142,6 +142,8 @@ public enum ProposerState
                                 {
                                     outgoing.process( Message.to( AcceptorMessage.accept, acceptor, new AcceptorMessage.AcceptState( instance.id, instance.ballot, instance.value_2) ) );
                                 }
+
+                                context.timeouts.setTimeout( instance.id, Message.internal( ProposerMessage.phase2Timeout, instance.id ) );
                             }
                         }
                         break;
@@ -149,16 +151,18 @@ public enum ProposerState
 
                     case phase2Timeout:
                     {
-                        long instanceId = Long.parseLong( message.getHeader( "instance" ) );
+                        long instanceId = (Long) message.getPayload();
                         ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(instanceId) );
-                        long ballot = instance.ballot + 100;
-                        instance.phase2Timeout( ballot );
 
-                        outgoing.process( message );
-
-                        for( String acceptor : context.clusterConfiguration.getAcceptors() )
+                        if (instance.state == ProposerInstance.State.p2_pending)
                         {
-                            outgoing.process( message.copyHeadersTo(Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState(instanceId, ballot ) ), "instance"));
+                            long ballot = instance.ballot + 100;
+                            instance.phase2Timeout( ballot );
+
+                            for( String acceptor : context.clusterConfiguration.getAcceptors() )
+                            {
+                                outgoing.process( message.copyHeadersTo(Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState(instanceId, ballot ) ), "instance"));
+                            }
                         }
                     }
 
@@ -175,13 +179,17 @@ public enum ProposerState
                         ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(acceptedState.getInstance()) );
 
                         // Sanity check the id
-                        if (instance.id == acceptedState.getInstance())
+                        if (instance.id == acceptedState.getInstance() && instance.state == ProposerInstance.State.p2_pending)
                         {
                             instance.accepted(acceptedState);
 
                             if (instance.accepts.size() == context.getMinimumQuorumSize())
                             {
+                                context.timeouts.cancelTimeout( instance.id );
+
                                 instance.closed();
+
+                                System.out.println("Learned:"+instance);
 
                                 // Tell learners
                                 for( String learner : context.getLearners() )
@@ -189,7 +197,16 @@ public enum ProposerState
                                     outgoing.process( Message.to( LearnerMessage.learn, learner, new LearnerMessage.LearnState( instance.id, instance.value_2 ) ));
                                 }
 
+                                context.bookedInstances.remove( instance.id );
                                 instance.delivered();
+
+                                // Check if we have anything pending - try to start process for it
+                                if (!context.pendingValues.isEmpty() && context.bookedInstances.size() < 10)
+                                {
+                                    Object value = context.pendingValues.remove();
+                                    System.out.println( "Restarting "+value +" booked:"+context.bookedInstances.size() );
+                                    propose( context, outgoing, value );
+                                }
                             }
                         }
                         break;
@@ -203,12 +220,39 @@ public enum ProposerState
                 
                 return this;
             }
+
+            private void propose( MultiPaxosContext context, MessageProcessor outgoing, Object payload )
+            {
+                long instanceId = context.lastInstanceId++;
+
+                context.bookedInstances.put( instanceId, payload );
+
+                long ballot = 100 + context.getServerId(); // First server will have first ballot id be 101
+
+                ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(instanceId) );
+
+                if (instance.state == ProposerInstance.State.empty)
+                {
+                    instance.propose(instanceId, ballot);
+
+                    for( String acceptor : context.clusterConfiguration.getAcceptors() )
+                    {
+                        outgoing.process( Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState( instanceId, ballot ) ).setHeader( "instance", ""+instanceId ));
+                    }
+
+                    context.timeouts.setTimeout( instanceId, Message.internal( ProposerMessage.phase1Timeout, instanceId ) );
+                } else
+                {
+                    // Wait with this value - we have our hands full right now
+                    context.pendingValues.offerFirst( payload );
+                }
+            }
         },
 
     proposer
         {
             @Override
-            public ProposerState handle( PaxosContext paxosContext,
+            public ProposerState handle( MultiPaxosContext paxosContext,
                                          Message<ProposerMessage> proposerMessageMessage,
                                          MessageProcessor outgoing
             )

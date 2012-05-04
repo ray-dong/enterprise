@@ -24,6 +24,7 @@ import org.neo4j.kernel.ha2.NetworkFailureStrategy;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.RingPaxosServer;
 import org.neo4j.kernel.ha2.TestProtocolServer;
+import org.neo4j.kernel.ha2.timeout.TestTimeouts;
 
 /**
  * TODO
@@ -49,7 +50,9 @@ public class RingPaxosNetworkMock
             protected void init()
             {
                 context = new RingPaxosContext();
-                server = new RingPaxosServer( context, receiver, sender, new TestFailureHandlerFactory() );
+                context.timeouts = new TestTimeouts( receiver );
+                timeouts = context.timeouts;
+                server = new RingPaxosServer( context, receiver, sender );
             }
         };
     }

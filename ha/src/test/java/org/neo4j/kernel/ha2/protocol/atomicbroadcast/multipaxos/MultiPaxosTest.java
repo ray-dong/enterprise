@@ -25,15 +25,11 @@ import java.util.concurrent.ExecutionException;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
-import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.MultiPaxosServer;
 import org.neo4j.kernel.ha2.NetworkMock;
-import org.neo4j.kernel.ha2.NetworkedServerFactory;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
-import org.neo4j.kernel.impl.util.StringLogger;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 
@@ -89,7 +85,7 @@ public class MultiPaxosTest
 
     private AtomicBroadcast newMember( String id, String... possibleServers )
     {
-        TestProtocolServer<PaxosContext, AtomicBroadcastMessage, MultiPaxosServer> server = network.addServer( id );
+        TestProtocolServer<MultiPaxosContext, AtomicBroadcastMessage, MultiPaxosServer> server = network.addServer( id );
         AtomicBroadcast member = server.newClient( AtomicBroadcast.class );
         member.possibleServers( possibleServers );
         member.join();

@@ -25,7 +25,6 @@ import org.neo4j.com2.NetworkNode;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
-import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos.AcceptorState;
@@ -62,11 +61,10 @@ public class RingPaxosServer
 
     public RingPaxosServer( RingPaxosContext context,
                             MessageSource input,
-                            MessageProcessor output,
-                            AbstractMessageFailureHandler.Factory failureHandlerFactory
+                            MessageProcessor output
     )
     {
-        super(context, input, output, failureHandlerFactory);
+        super(context, input, output);
 
         acceptor = new StateMachine<RingPaxosContext, AcceptorMessage, AcceptorState>(context, AcceptorMessage.class, AcceptorState.start);
         coordinator = new StateMachine<RingPaxosContext, CoordinatorMessage, CoordinatorState>(context, CoordinatorMessage.class, CoordinatorState.start);

@@ -24,14 +24,14 @@ import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.neo4j.com2.NetworkNode;
+import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageSource;
+import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
-import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
-import org.neo4j.kernel.ha2.failure.TimeoutMessageFailureHandler;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.PaxosContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
+import org.neo4j.kernel.ha2.timeout.TimeoutsService;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 /**
@@ -51,21 +51,20 @@ public class NetworkedServerFactory
     public MultiPaxosServer newNetworkedServer(Map<String, String> configuration)
     {
         NetworkNode.Configuration config = ConfigProxy.config( configuration, NetworkNode.Configuration.class );
-        NetworkNode node = new NetworkNode( config, logger );
+        final NetworkNode node = new NetworkNode( config, logger );
         life.add( node );
 
-        final MultiPaxosServer server = new MultiPaxosServer( new PaxosContext(), node, node, new AbstractMessageFailureHandler.Factory()
+        MultiPaxosContext context = new MultiPaxosContext();
+        context.timeouts = life.add( new TimeoutsService( new FixedTimeoutStrategy( TimeUnit.SECONDS.toMillis( 10 ) ), new MessageProcessor()
         {
             @Override
-            public AbstractMessageFailureHandler newMessageFailureHandler( MessageProcessor incoming,
-                                                                           MessageSource outgoing,
-                                                                           MessageSource source
-            )
+            public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
             {
-                return life.add(new TimeoutMessageFailureHandler( incoming, outgoing, source,
-                                                           new FixedTimeoutStrategy(TimeUnit.SECONDS.toMillis( 2 )) ));
+                node.receive( message );
             }
-        });
+        }));
+
+        final MultiPaxosServer server = new MultiPaxosServer( context, node, node );
         node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
         {
             @Override

@@ -32,12 +32,12 @@ import static org.neo4j.com2.message.Message.*;
  * State Machine for implementation of Atomic Broadcast client interface
  */
 public enum AtomicBroadcastState
-    implements State<PaxosContext, AtomicBroadcastMessage, AtomicBroadcastState>
+    implements State<MultiPaxosContext, AtomicBroadcastMessage, AtomicBroadcastState>
 {
     start
         {
             @Override
-            public AtomicBroadcastState handle( PaxosContext context,
+            public AtomicBroadcastState handle( MultiPaxosContext context,
                                       Message<AtomicBroadcastMessage> message,
                                       MessageProcessor outgoing
             )
@@ -73,7 +73,7 @@ public enum AtomicBroadcastState
     joined
         {
             @Override
-            public AtomicBroadcastState handle( PaxosContext context,
+            public AtomicBroadcastState handle( MultiPaxosContext context,
                                       Message<AtomicBroadcastMessage> message,
                                       MessageProcessor outgoing
             )
@@ -93,7 +93,7 @@ public enum AtomicBroadcastState
                         break;
                     }
 
-                    case propose:
+                    case broadcast:
                     {
                         // TODO This assumes that this process is coordinator. Should handle other cases as well
                         outgoing.process( internal( ProposerMessage.propose, message.getPayload() ) );

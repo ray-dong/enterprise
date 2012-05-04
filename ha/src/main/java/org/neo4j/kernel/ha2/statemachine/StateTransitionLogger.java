@@ -22,7 +22,6 @@ package org.neo4j.kernel.ha2.statemachine;
 
 import java.util.logging.Logger;
 import org.neo4j.com2.message.MessageType;
-import org.neo4j.kernel.ha2.protocol.RingParticipant;
 
 /**
  * TODO

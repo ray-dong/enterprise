@@ -22,22 +22,27 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.Specifications;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 import static org.neo4j.helpers.collection.Iterables.*;
 
 /**
  * Context shared by all Paxos state machines.
  */
-public class PaxosContext
+public class MultiPaxosContext
 {
+    public Timeouts timeouts;
+
     private String me;
 
     private List<String> possibleServers = new ArrayList<String>(  );
@@ -49,6 +54,7 @@ public class PaxosContext
 
     // Proposer/coordinator state
     Deque<Object> pendingValues = new LinkedList<Object>();
+    Map<Long,Object> bookedInstances = new HashMap<Long,Object>(  );
     public long lastInstanceId = 0;
     List<ProposerInstance> proposerInstances = new ArrayList<ProposerInstance>(100);
 
@@ -147,7 +153,7 @@ public class PaxosContext
                     @Override
                     public void notify( AtomicBroadcastListener listener )
                     {
-                        listener.learn( value );
+                        listener.receive( value );
                     }
                 } );
     }

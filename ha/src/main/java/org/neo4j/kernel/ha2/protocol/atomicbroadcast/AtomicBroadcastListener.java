@@ -21,9 +21,9 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
 
 /**
- * Paxos listener. Implement this to learn values from Paxos algorithm.
+ * Atomic broadcast listener. Implement this to receive values from any AB algorithm.
  */
 public interface AtomicBroadcastListener
 {
-    void learn(Object value);
+    void receive( Object value );
 }

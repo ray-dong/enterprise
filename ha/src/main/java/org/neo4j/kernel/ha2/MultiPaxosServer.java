@@ -25,33 +25,30 @@ import org.neo4j.com2.NetworkNode;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
-import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerState;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.PaxosContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
-import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 
 /**
  * TODO
  */
 public class MultiPaxosServer
-    extends ProtocolServer<PaxosContext,AtomicBroadcastMessage>
+    extends ProtocolServer<MultiPaxosContext,AtomicBroadcastMessage>
 {
-    protected final StateMachine<PaxosContext, AcceptorMessage, AcceptorState> acceptor;
-    protected final StateMachine<PaxosContext, ProposerMessage, ProposerState> coordinator;
-    protected final StateMachine<PaxosContext, LearnerMessage, LearnerState> learner;
-    protected final StateMachine<PaxosContext, AtomicBroadcastMessage, AtomicBroadcastState> paxosStateMachine;
+    protected final StateMachine<MultiPaxosContext, AcceptorMessage, AcceptorState> acceptor;
+    protected final StateMachine<MultiPaxosContext, ProposerMessage, ProposerState> coordinator;
+    protected final StateMachine<MultiPaxosContext, LearnerMessage, LearnerState> learner;
+    protected final StateMachine<MultiPaxosContext, AtomicBroadcastMessage, AtomicBroadcastState> paxosStateMachine;
 
     public interface Configuration
         extends NetworkNode.Configuration
@@ -60,18 +57,17 @@ public class MultiPaxosServer
 
     private Logger logger = Logger.getLogger( getClass().getName() );
 
-    public MultiPaxosServer( PaxosContext context,
+    public MultiPaxosServer( MultiPaxosContext context,
                              MessageSource input,
-                             MessageProcessor output,
-                             AbstractMessageFailureHandler.Factory failureHandlerFactory
+                             MessageProcessor output
     )
     {
-        super(context, input, output, failureHandlerFactory);
+        super(context, input, output);
 
-        acceptor = new StateMachine<PaxosContext, AcceptorMessage, AcceptorState>(context, AcceptorMessage.class, AcceptorState.start);
-        coordinator = new StateMachine<PaxosContext, ProposerMessage, ProposerState>(context, ProposerMessage.class, ProposerState.start);
-        learner = new StateMachine<PaxosContext, LearnerMessage, LearnerState>(context, LearnerMessage.class, LearnerState.start);
-        paxosStateMachine = new StateMachine<PaxosContext, AtomicBroadcastMessage, AtomicBroadcastState>(context, AtomicBroadcastMessage.class, AtomicBroadcastState.start);
+        acceptor = new StateMachine<MultiPaxosContext, AcceptorMessage, AcceptorState>(context, AcceptorMessage.class, AcceptorState.start);
+        coordinator = new StateMachine<MultiPaxosContext, ProposerMessage, ProposerState>(context, ProposerMessage.class, ProposerState.start);
+        learner = new StateMachine<MultiPaxosContext, LearnerMessage, LearnerState>(context, LearnerMessage.class, LearnerState.start);
+        paxosStateMachine = new StateMachine<MultiPaxosContext, AtomicBroadcastMessage, AtomicBroadcastState>(context, AtomicBroadcastMessage.class, AtomicBroadcastState.start);
 
         connectedStateMachines.addMessageProcessor( new FromHeaderMessageProcessor() );
         connectedStateMachines.addStateMachine( acceptor );
@@ -98,7 +94,7 @@ public class MultiPaxosServer
 
         context.setMe( me );
 
-        paxosStateMachine.addStateTransitionListener( new StateTransitionLogger<AtomicBroadcastMessage>( me, Logger.getAnonymousLogger() ) );
+//        paxosStateMachine.addStateTransitionListener( new StateTransitionLogger<AtomicBroadcastMessage>( me, Logger.getAnonymousLogger() ) );
 
         StateMachineConversations conversations = new StateMachineConversations(me);
         proxyFactory = new StateMachineProxyFactory<AtomicBroadcastMessage>( me, AtomicBroadcastMessage.class, paxosStateMachine, connectedStateMachines, conversations );

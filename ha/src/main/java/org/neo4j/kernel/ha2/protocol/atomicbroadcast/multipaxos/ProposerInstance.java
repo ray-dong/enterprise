@@ -38,8 +38,8 @@ public class ProposerInstance
         delivered
     }
 
-    long id = 0;
-    State state;
+    long id = -1;
+    State state = State.empty;
     long ballot = 0;
     List<ProposerMessage.PromiseState> promises = new ArrayList<ProposerMessage.PromiseState>();
     List<ProposerMessage.AcceptedState> accepts = new ArrayList<ProposerMessage.AcceptedState>();
@@ -108,10 +108,16 @@ public class ProposerInstance
 
     public void delivered()
     {
-        id = 0;
-        state = State.delivered;
+        id = -1;
+        state = State.empty;
         ballot = 0;
         value_2 = null;
         clientValue = false;
+    }
+
+    @Override
+    public String toString()
+    {
+        return id+": "+state.name()+" b="+ballot;
     }
 }

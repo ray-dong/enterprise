@@ -23,7 +23,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 import org.neo4j.com2.message.MessageType;
 
 /**
- * Messages for the Paxos client API
+ * Messages for the AtomicBroadcast client API
  */
 public enum AtomicBroadcastMessage
     implements MessageType
@@ -31,7 +31,7 @@ public enum AtomicBroadcastMessage
     failure,
     joined, join(failure, joined),left, leave(failure, left), // Group management
     possibleServers,fail,recover, // Node management
-    propose(failure, ProposerMessage.accepted), addAtomicBroadcastListener, removeAtomicBroadcastListener; // Paxos API
+    broadcast(failure, ProposerMessage.accepted), addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast
 
     private MessageType failureMessage;
     private MessageType[] next;

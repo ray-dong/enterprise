@@ -18,21 +18,16 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
+package org.neo4j.kernel.ha2.timeout;
+
+import org.neo4j.com2.message.Message;
 
 /**
- * Atomic broadcast API
+ * TODO
  */
-public interface AtomicBroadcast
+public interface Timeouts
 {
-    void possibleServers(String... serverId);
-    void fail(String serverId);
-    void recover(String serverId);
+    void setTimeout(Object key, Message timeoutMessage);
 
-    void join();
-    void leave();
-
-    void broadcast( Object value );
-    void addAtomicBroadcastListener( AtomicBroadcastListener listener );
-    void removeAtomicBroadcastListener( AtomicBroadcastListener listener );
+    void cancelTimeout(Object key);
 }

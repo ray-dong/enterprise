@@ -28,12 +28,12 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Acceptor
  */
 public enum AcceptorState
-    implements State<PaxosContext, AcceptorMessage, AcceptorState>
+    implements State<MultiPaxosContext, AcceptorMessage, AcceptorState>
 {
     start
         {
             @Override
-            public AcceptorState handle( PaxosContext context,
+            public AcceptorState handle( MultiPaxosContext context,
                                       Message<AcceptorMessage> message,
                                       MessageProcessor outgoing
             )
@@ -45,7 +45,7 @@ public enum AcceptorState
                     {
                         // Initialize all learner instances
                         context.acceptorInstances.clear();
-                        for (int i = 0; i < 100; i++)
+                        for (int i = 0; i < 10; i++)
                             context.acceptorInstances.add( new AcceptorInstance() );
 
                         return acceptor;
@@ -59,7 +59,7 @@ public enum AcceptorState
     acceptor
         {
             @Override
-            public AcceptorState handle( PaxosContext context,
+            public AcceptorState handle( MultiPaxosContext context,
                                       Message<AcceptorMessage> message,
                                       MessageProcessor outgoing
             )

@@ -81,5 +81,11 @@ public enum LearnerMessage
         {
             return value;
         }
+
+        @Override
+        public String toString()
+        {
+            return instanceId+": "+value;
+        }
     }
 }

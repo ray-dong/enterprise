@@ -24,12 +24,13 @@ import org.neo4j.kernel.ha2.MultiPaxosServer;
 import org.neo4j.kernel.ha2.NetworkFailureStrategy;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.TestProtocolServer;
+import org.neo4j.kernel.ha2.timeout.TestTimeouts;
 
 /**
  * TODO
  */
 public class MultiPaxosNetworkMock
-    extends NetworkMock<PaxosContext, AtomicBroadcastMessage, MultiPaxosServer>
+    extends NetworkMock<MultiPaxosContext, AtomicBroadcastMessage, MultiPaxosServer>
 {
     public MultiPaxosNetworkMock()
     {
@@ -41,15 +42,17 @@ public class MultiPaxosNetworkMock
     }
 
     @Override
-    protected TestProtocolServer<PaxosContext, AtomicBroadcastMessage, MultiPaxosServer> newTestProtocolServer( String serverId )
+    protected TestProtocolServer<MultiPaxosContext, AtomicBroadcastMessage, MultiPaxosServer> newTestProtocolServer( String serverId )
     {
-        return new TestProtocolServer<PaxosContext, AtomicBroadcastMessage, MultiPaxosServer>( serverId )
+        return new TestProtocolServer<MultiPaxosContext, AtomicBroadcastMessage, MultiPaxosServer>( serverId )
         {
             @Override
             protected void init()
             {
-                context = new PaxosContext();
-                server = new MultiPaxosServer( context, receiver, sender, new TestFailureHandlerFactory() );
+                context = new MultiPaxosContext();
+                timeouts = new TestTimeouts( receiver );
+                context.timeouts = timeouts;
+                server = new MultiPaxosServer( context, receiver, sender );
             }
         };
     }

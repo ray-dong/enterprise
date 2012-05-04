@@ -25,8 +25,6 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 /**
  * Map that is synced through an Atomic Broadcast protocol
@@ -45,10 +43,12 @@ public class AtomicBroadcastMap<K,V>
         atomicBroadcastListener = new AtomicBroadcastListener()
         {
             @Override
-            public void learn( Object value )
+            public void receive( Object value )
             {
                 MapCommand command = (MapCommand) value;
                 command.execute( map );
+
+                System.out.println( map );
 
                 synchronized( AtomicBroadcastMap.this )
                 {
@@ -101,27 +101,27 @@ public class AtomicBroadcastMap<K,V>
     @Override
     public V put( K key, V value )
     {
-        atomicBroadcast.propose( lastCommand = new Put( key, value ) );
+        atomicBroadcast.broadcast( lastCommand = new Put( key, value ) );
         return map.get( key );
     }
 
     @Override
     public V remove( Object key )
     {
-        atomicBroadcast.propose( lastCommand = new Remove( key ) );
+        atomicBroadcast.broadcast( lastCommand = new Remove( key ) );
         return map.get( key );
     }
 
     @Override
     public void putAll( Map<? extends K, ? extends V> m )
     {
-        atomicBroadcast.propose( lastCommand = new PutAll( m ) );
+        atomicBroadcast.broadcast( lastCommand = new PutAll( m ) );
     }
 
     @Override
     public void clear()
     {
-        atomicBroadcast.propose( lastCommand = new Clear() );
+        atomicBroadcast.broadcast( lastCommand = new Clear() );
     }
 
     @Override
@@ -221,6 +221,12 @@ public class AtomicBroadcastMap<K,V>
             int result = key.hashCode();
             result = 31 * result + value.hashCode();
             return result;
+        }
+
+        @Override
+        public String toString()
+        {
+            return "Put: "+key+"="+value;
         }
     }
 

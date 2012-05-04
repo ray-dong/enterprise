@@ -67,24 +67,18 @@ public class MultiPaxosNetworkTest
         atomicBroadcast3.possibleServers( server1.getServerId(), server2.getServerId(), server3.getServerId() );
         atomicBroadcast3.join();
 
-        AtomicBroadcastListener broadcastListener = new AtomicBroadcastListener()
-        {
-            @Override
-            public void learn( Object value )
-            {
-                System.out.println( value );
-            }
-        };
-
-        atomicBroadcast1.addAtomicBroadcastListener( broadcastListener );
-        atomicBroadcast2.addAtomicBroadcastListener( broadcastListener );
-        atomicBroadcast3.addAtomicBroadcastListener( broadcastListener );
-
         AtomicBroadcastMap<String,String> map = new AtomicBroadcastMap<String,String>( atomicBroadcast1 );
 
-        map.put( "foo", "bar" );
-        String value = map.get( "foo");
-        Assert.assertThat(value, CoreMatchers.equalTo( "bar" ));
+        for (int i = 0; i < 900; i++ )
+        {
+            map.put( "foo"+i, "bar"+i );
+        }
+
+        System.out.println( "Set all values" );
+
+        String value = map.get( "foo1");
+        System.out.println( "Read value" );
+        Assert.assertThat(value, CoreMatchers.equalTo( "bar1" ));
 
         map.close();
 

@@ -28,12 +28,12 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Learner
  */
 public enum LearnerState
-    implements State<PaxosContext, LearnerMessage, LearnerState>
+    implements State<MultiPaxosContext, LearnerMessage, LearnerState>
 {
     start
         {
             @Override
-            public LearnerState handle( PaxosContext context,
+            public LearnerState handle( MultiPaxosContext context,
                                       Message<LearnerMessage> message,
                                       MessageProcessor outgoing
             )
@@ -45,7 +45,7 @@ public enum LearnerState
                     {
                         // Initialize all learner instances
                         context.learnerInstances.clear();
-                        for (int i = 0; i < 100; i++)
+                        for (int i = 0; i < 10; i++)
                             context.learnerInstances.add( new LearnerInstance() );
 
                         // TODO Do formal join process
@@ -60,7 +60,7 @@ public enum LearnerState
     learner
         {
             @Override
-            public LearnerState handle( PaxosContext context,
+            public LearnerState handle( MultiPaxosContext context,
                                       Message<LearnerMessage> message,
                                       MessageProcessor outgoing
             )
@@ -88,7 +88,7 @@ public enum LearnerState
                                 } else
                                 {
                                     // Found hole - wait for it to be filled!
-                                    break;
+                                    return this;
                                 }
                             }
                         }

@@ -18,25 +18,47 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
+package org.neo4j.kernel.ha2.timeout;
+
+import java.util.HashMap;
+import java.util.Map;
+import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageProcessor;
 
 /**
  * TODO
  */
-public class LearnerInstance
+public class TestTimeouts
+    implements Timeouts
 {
-    long instanceId = -1;
-    Object value;
+    private MessageProcessor receiver;
 
-    public void set( LearnerMessage.LearnState learnState )
+    private Map<Object,Message> timeouts = new HashMap<Object, Message>(  );
+
+    public TestTimeouts( MessageProcessor receiver )
     {
-        this.instanceId = learnState.getInstanceId();
-        this.value = learnState.getValue();
+        this.receiver = receiver;
     }
 
     @Override
-    public String toString()
+    public void setTimeout( Object key, Message timeoutMessage )
     {
-        return instanceId+": "+value;
+        timeouts.put( key, timeoutMessage );
+    }
+
+    @Override
+    public void cancelTimeout( Object key )
+    {
+        timeouts.remove( key );
+    }
+
+    public void checkTimeouts()
+    {
+        for( Message message : timeouts.values() )
+        {
+            receiver.process( message );
+        }
+
+        timeouts.clear();
     }
 }

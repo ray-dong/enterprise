@@ -181,6 +181,21 @@ public class NetworkNode
         processors = Listeners.addListener( processor, processors);
     }
 
+    public void receive( Message message )
+    {
+        for( MessageProcessor listener : processors )
+        {
+            try
+            {
+                listener.process( message );
+            }
+            catch( Exception e )
+            {
+                // Ignore
+            }
+        }
+    }
+
     // MessageProcessor implementation
     @Override
     public void process( Message message )
@@ -262,7 +277,7 @@ public class NetworkNode
 
         try
         {
-            msgLog.logMessage("Sending to "+to+": "+message, true);
+//            msgLog.logMessage("Sending to "+to+": "+message, true);
             channel.write(message);
         } catch (Exception e)
         {
@@ -386,7 +401,7 @@ public class NetworkNode
         public void messageReceived(ChannelHandlerContext ctx, MessageEvent event) throws Exception
         {
             final Message message = (Message) event.getMessage();
-            msgLog.logMessage("Received:" + message, true);
+//            msgLog.logMessage("Received:" + message, true);
             executor.submit( new Runnable()
             {
                 @Override
@@ -413,21 +428,6 @@ public class NetworkNode
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
         {
 //            msgLog.logMessage("Receive exception:", e.getCause());
-        }
-    }
-
-    private void receive( Message message )
-    {
-        for( MessageProcessor listener : processors )
-        {
-            try
-            {
-                listener.process( message );
-            }
-            catch( Exception e )
-            {
-                // Ignore
-            }
         }
     }
 }

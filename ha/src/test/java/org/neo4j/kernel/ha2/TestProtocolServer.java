@@ -29,8 +29,8 @@ import org.neo4j.com2.message.MessageSource;
 import org.neo4j.com2.message.MessageType;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.LifeSupport;
-import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.timeout.TestTimeouts;
 
 /**
  * TODO
@@ -40,7 +40,7 @@ public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&M
 {
     protected final TestMessageSource receiver;
     protected final TestMessageSender sender;
-    protected TestMessageFailureHandler failureHandler;
+    protected TestTimeouts timeouts;
 
     private Logger logger = Logger.getLogger( getClass().getName() );
 
@@ -105,9 +105,9 @@ public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&M
         return this;
     }
 
-    public void checkExpectations()
+    public void checkTimeouts()
     {
-        failureHandler.checkExpectations();
+        timeouts.checkTimeouts();
     }
 
     public class TestMessageSender
@@ -146,36 +146,6 @@ public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&M
             {
                 listener.process( message );
             }
-        }
-    }
-
-    public class TestMessageFailureHandler
-        extends AbstractMessageFailureHandler
-    {
-        public TestMessageFailureHandler( MessageProcessor incoming, MessageSource outgoing, MessageSource source )
-        {
-            super(incoming, outgoing, source);
-        }
-
-        public void checkExpectations()
-        {
-            for( ExpectationFailure expectationFailure : expectations.values() )
-            {
-                expectationFailure.run();
-            }
-        }
-    }
-
-    public class TestFailureHandlerFactory
-        implements AbstractMessageFailureHandler.Factory
-    {
-        @Override
-        public AbstractMessageFailureHandler newMessageFailureHandler( MessageProcessor incoming,
-                                                                       MessageSource outgoing,
-                                                                       MessageSource source
-        )
-        {
-            return failureHandler = new TestMessageFailureHandler( incoming, outgoing, receiver);
         }
     }
 }

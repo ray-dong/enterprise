@@ -27,7 +27,6 @@ import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
 import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.Lifecycle;
-import org.neo4j.kernel.ha2.failure.AbstractMessageFailureHandler;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 
@@ -51,15 +50,13 @@ public abstract class ProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&Messa
 
     public ProtocolServer( CONTEXT context,
                            MessageSource input,
-                           MessageProcessor output,
-                           AbstractMessageFailureHandler.Factory failureHandlerFactory
+                           MessageProcessor output
     )
     {
         this.context = context;
         connectedStateMachines = new ConnectedStateMachines( input, output );
 
         connectedStateMachines.addMessageProcessor( new FromHeaderMessageProcessor() );
-        failureHandlerFactory.newMessageFailureHandler( connectedStateMachines, connectedStateMachines, input );
     }
     
     @Override
