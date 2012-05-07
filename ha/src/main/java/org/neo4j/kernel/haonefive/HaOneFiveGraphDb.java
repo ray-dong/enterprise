@@ -23,7 +23,6 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Map;
 
@@ -41,6 +40,7 @@ import org.neo4j.com.TxChecksumVerifier;
 import org.neo4j.graphdb.index.IndexProvider;
 import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Service;
+import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.AbstractGraphDatabase;
 import org.neo4j.kernel.BranchedDataPolicy;
 import org.neo4j.kernel.IdGeneratorFactory;
@@ -179,14 +179,14 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             }
             
             @Override
-            public Pair<Long, Integer> getLastTx()
+            public Triplet<Long, Integer, Long> getLastTx()
             {
                 try
                 {
                     NeoStoreXaDataSource neoStoreDataSource = getXaDataSourceManager().getNeoStoreDataSource();
                     long tx = neoStoreDataSource.getLastCommittedTxId();
-                    int master = neoStoreDataSource.getMasterForCommittedTx( tx ).first().intValue();
-                    return Pair.of( tx, master );
+                    Pair<Integer, Long> gottenMaster = neoStoreDataSource.getMasterForCommittedTx( tx );
+                    return Triplet.of( tx, gottenMaster.first(), gottenMaster.other() );
                 }
                 catch ( IOException e )
                 {
@@ -259,32 +259,22 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     }
 
     @Override
-    public void newMasterElected( String masterUrl, int masterServerId )
+    public void newMasterElected( URL masterUrl, int masterServerId )
     {
         if ( this.masterServerId == masterServerId )
             return;
         
-        // TODO Block incoming write transactions and rollback active write transactions or something.
-        
-        URL url;
-        try
-        {
-            url = new URL( masterUrl );
-        }
-        catch ( MalformedURLException e )
-        {
-            throw new RuntimeException( e );
-        }
+        enterDatabaseStateSwitchBlockade();
         
         boolean iAmToBecomeMaster = masterServerId == this.serverId;
         DatabaseState newState = databaseState;
         if ( iAmToBecomeMaster )
         {
-            newState = databaseState.becomeMaster( this, url.getPort() );
+            newState = databaseState.becomeMaster( this, masterUrl.getPort() );
         }
         else
         {
-            newState = databaseState.becomeSlave( this, url.getHost(), url.getPort() );
+            newState = databaseState.becomeSlave( this, masterUrl.getHost(), masterUrl.getPort() );
         }
         this.masterServerId = masterServerId;
         ((HaIdGeneratorFactory) idGeneratorFactory).masterChanged( master, masterServerId );
@@ -293,11 +283,23 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     }
 
     @Override
-    public void newMasterBecameAvailable( String masterUrl )
+    public void newMasterBecameAvailable( URL masterUrl )
     {
-        // TODO Remove blockade if any
+        databaseState.verifyConsistencyWithMaster( this );
+        
+        exitDatabaseStateSwitchBlockade();
+    }
+    
+    private void enterDatabaseStateSwitchBlockade()
+    {
+        // TODO Block incoming write transactions and roll back active write transactions or something.
     }
 
+    private void exitDatabaseStateSwitchBlockade()
+    {
+        // TODO
+    }
+    
     public void pullUpdates()
     {
         Response<Void> response = master.pullUpdates( stuff.getSlaveContext() );
@@ -311,8 +313,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             @Override
             void handleWriteOperation( HaOneFiveGraphDb db )
             {
-                // TODO Block and wait for db to decide role a while and return
-                // If it couldn't be decided throw exception
+                waitForRoleDecision( db );
             }
 
             @Override
@@ -328,23 +329,11 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             {
                 db.master = newClient( db, masterIp, masterPort );
                 
-                // TODO If my db has a different store id than the master copy it. This happens
+                // If my db is empty than the master then copy it from the master. This happens
                 // when we start up for the first time and the AbstractGraphDatabase constructor
                 // creates an empty db.
                 if ( dbIsEmpty( db ) )
-                {
-                    db.life.stop();
-                    try
-                    {
-                        BranchedDataPolicy.keep_none.handle( db ); // Will delete the relevant store files
-                        Response<Void> response = db.master.copyStore( db.stuff.getEmptySlaveContext(), new ToFileStoreWriter( db.storeDir ) );
-                        db.stuff.receive( response );
-                    }
-                    finally
-                    {
-                        db.life.start();
-                    }
-                }
+                    db.copyStore( BranchedDataPolicy.keep_none );
                 return SLAVE;
             }
             
@@ -357,28 +346,18 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             @Override
             void beforeGetMaster( HaOneFiveGraphDb db )
             {
-                // TODO Wait for a master/slave decision
-                long endTime = currentTimeMillis() + SECONDS.toMillis( 20 );
-                try
-                {
-                    while ( currentTimeMillis() < endTime )
-                    {
-                        if ( db.databaseState != this )
-                            return;
-                        Thread.sleep( 10 );
-                    }
-                    throw new RuntimeException( "No role decision was made" );
-                }
-                catch ( InterruptedException e )
-                {
-                    Thread.interrupted();
-                    throw new RuntimeException( e );
-                }
+                waitForRoleDecision( db );
             }
             
             @Override
             void shutdown( HaOneFiveGraphDb db )
             {
+            }
+
+            @Override
+            void verifyConsistencyWithMaster( HaOneFiveGraphDb db )
+            {
+                throw new UnsupportedOperationException( "Should not be called" );
             }
         },
         MASTER
@@ -403,7 +382,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 db.server = null;
                 db.master.shutdown();
                 db.master = newClient( db, masterIp, masterPort );
-                // TODO Verify data consistency with master
                 return SLAVE;
             }
             
@@ -425,6 +403,11 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             void shutdown( HaOneFiveGraphDb db )
             {
                 db.server.shutdown();
+            }
+
+            @Override
+            void verifyConsistencyWithMaster( HaOneFiveGraphDb db )
+            {
             }
         },
         SLAVE
@@ -448,7 +431,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             {
                 db.master.shutdown();
                 db.master = newClient( db, masterIp, masterPort );
-                // TODO Verify data consistency with master
                 return SLAVE;
             }
             
@@ -468,10 +450,38 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             void shutdown( HaOneFiveGraphDb db )
             {
             }
+
+            @Override
+            void verifyConsistencyWithMaster( HaOneFiveGraphDb db )
+            {
+                db.verifyConsistencyWithMaster();
+            }
         };
         
         abstract DatabaseState becomeMaster( HaOneFiveGraphDb db, int port );
         
+        protected void waitForRoleDecision( HaOneFiveGraphDb db )
+        {
+            // Wait for a master/slave decision some time and see if a decision is made.
+            // If no decisions was made before the timeout then throw exception.
+            long endTime = currentTimeMillis() + SECONDS.toMillis( 20 );
+            try
+            {
+                while ( currentTimeMillis() < endTime )
+                {
+                    if ( db.databaseState != this )
+                        return;
+                    Thread.sleep( 10 );
+                }
+                throw new RuntimeException( "No role decision was made" );
+            }
+            catch ( InterruptedException e )
+            {
+                Thread.interrupted();
+                throw new RuntimeException( e );
+            }
+        }
+
         protected boolean dbIsEmpty( HaOneFiveGraphDb db )
         {
             return db.getXaDataSourceManager().getNeoStoreDataSource().getNeoStore().getLastCommittedTx() == 1;
@@ -506,6 +516,8 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         abstract void handleWriteOperation( HaOneFiveGraphDb db );
         
         abstract void shutdown( HaOneFiveGraphDb db );
+        
+        abstract void verifyConsistencyWithMaster( HaOneFiveGraphDb db );
     }
     
     @Override
@@ -514,6 +526,40 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         return getClass().getSimpleName() + "[" + serverId + ", " + storeDir + "]";
     }
     
+    private void copyStore( BranchedDataPolicy policy )
+    {
+        life.stop();
+        try
+        {
+            policy.handle( this );
+            Response<Void> response = master.copyStore( stuff.getEmptySlaveContext(), new ToFileStoreWriter( storeDir ) );
+            stuff.receive( response );
+        }
+        finally
+        {
+            life.start();
+        }
+    }
+
+    private void verifyConsistencyWithMaster()
+    {
+        Triplet<Long, Integer, Long> myLastTx = stuff.getLastTx();
+        boolean okWithMaster = false;
+        try
+        {
+            Pair<Integer, Long> mastersLastTx = master.getMasterIdForCommittedTx( myLastTx.first(), storeId ).response();
+            okWithMaster = myLastTx.other().equals( mastersLastTx );
+        }
+        catch ( RuntimeException e )
+        {
+            // Maybe master is missing transactions that I have... looks like branched data to me.
+        }
+        
+        if ( !okWithMaster )
+            copyStore( BranchedDataPolicy.keep_all );
+        // We're good to go
+    }
+
     private static class ConnectionFailureHandler implements ConnectionLostHandler
     {
         private final HaOneFiveGraphDb db;
@@ -527,7 +573,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         public void handle( Exception e )
         {
             // TODO Block incoming transactions and rollback active ones or something.
-            
+            e.printStackTrace();
             db.databaseState = db.databaseState.becomeUndecided( db );
             db.masterElectionClient.requestMaster();
         }

@@ -19,10 +19,15 @@
  */
 package org.neo4j.kernel.haonefive;
 
+import static org.neo4j.kernel.haonefive.UrlUtil.toUrl;
+
+import java.net.URL;
+
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.StoreIdGetter;
 import org.neo4j.helpers.Pair;
+import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
@@ -60,12 +65,12 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     private void electMasterAndPingListeners()
     {
         Machine master = broker.getMasterReally( true ).other();
-        String masterId = "http://" + master.getServer().first() + ":" + master.getServer().other();
+        URL masterUrl = toUrl( master.getServer().first(), master.getServer().other() );
         int masterServerId = master.getMachineId();
         for ( MasterChangeListener listener : listeners )
-            listener.newMasterElected( masterId, masterServerId );
+            listener.newMasterElected( masterUrl, masterServerId );
         for ( MasterChangeListener listener : listeners )
-            listener.newMasterBecameAvailable( masterId );
+            listener.newMasterBecameAvailable( masterUrl);
     }
 
     @Override
@@ -121,7 +126,8 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     @Override
     public Pair<Long, Integer> getLastTxData()
     {
-        return stuff.getLastTx();
+        Triplet<Long, Integer, Long> data = stuff.getLastTx();
+        return Pair.of( data.first(), data.second() );
     }
 
     @Override

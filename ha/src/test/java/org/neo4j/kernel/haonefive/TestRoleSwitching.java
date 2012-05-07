@@ -21,8 +21,10 @@ package org.neo4j.kernel.haonefive;
 
 import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 
+import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -34,13 +36,14 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
+import org.neo4j.kernel.BranchedDataPolicy;
 import org.neo4j.test.TargetDirectory;
 
-public class TestHaOneFive
+public class TestRoleSwitching
 {
     private TargetDirectory PATH;
-    private MockedMasterElectionClient masterElection;
     private HaOneFiveGraphDb[] dbs;
+    private MockedDistributedElection distributedElection;
     
     private enum Types implements RelationshipType
     {
@@ -52,6 +55,7 @@ public class TestHaOneFive
     {
         PATH = TargetDirectory.forTest( getClass() );
         PATH.cleanup();
+        distributedElection = new MockedDistributedElection();
     }
     
     @After
@@ -62,7 +66,7 @@ public class TestHaOneFive
     }
     
     @Test
-    public void createNodesWhenIdDifferentRoles() throws Exception
+    public void createNodesWhenInDifferentRoles() throws Exception
     {
         startDbs( 2 );
         electMaster( 0 );
@@ -81,7 +85,7 @@ public class TestHaOneFive
     }
     
     @Test
-    public void changeToAnotherMaster() throws Exception
+    public void changeToAnotherMasterWhileStayingSlave() throws Exception
     {
         startDbs( 3 );
         electMaster( 0 );
@@ -98,6 +102,24 @@ public class TestHaOneFive
         assertNodesExists( 2, "first", "second" );
     }
     
+    @Test
+    public void detectBranchWhenSteppingDownFromMasterRoleHavingUndistributedTransactions() throws Exception
+    {
+        startDbs( 3 );
+        electMaster( 0 );
+        createNode( 0, "first" );
+        electMaster( 1 );
+        assertTrue( hasBranch( 0 ) );
+        assertFalse( hasBranch( 1 ) );
+        assertFalse( hasBranch( 2 ) );
+    }
+    
+    private boolean hasBranch( int serverId )
+    {
+        File[] branches = BranchedDataPolicy.listBranchedDataDirectories( path( serverId ) );
+        return branches != null && branches.length > 0;
+    }
+
     private void pullUpdates()
     {
         for ( HaOneFiveGraphDb db : dbs )
@@ -112,17 +134,10 @@ public class TestHaOneFive
 
     private void electMaster( int id )
     {
-        masterElection.bluntlyForceMasterElection( id );
+        distributedElection.bluntlyForceMasterElection( id );
     }
 
-    private void shutdownDb( int id )
-    {
-        dbs[id].shutdown();
-        dbs[id] = null;
-        masterElection.removeListener( id );
-    }
-
-    private HaOneFiveGraphDb startDb( int serverId )
+    private HaOneFiveGraphDb startDb( final int serverId )
     {
         HaOneFiveGraphDb db = new HaOneFiveGraphDb( path( serverId ), stringMap(
                 "ha.server_id", "" + serverId ) )
@@ -130,17 +145,18 @@ public class TestHaOneFive
             @Override
             protected MasterElectionClient createMasterElectionClient()
             {
-                return masterElection;
+                MockedMasterElectionClient client = new MockedMasterElectionClient( distributedElection );
+                distributedElection.addClient( client, serverId, 6361 );
+                return client;
             }
         };
         dbs[serverId] = db;
-        masterElection.addListener( db, serverId, 6361 );
+        db.masterElectionClient.addMasterChangeListener( db );
         return db;
     }
     
     private void startDbs( int count )
     {
-        masterElection = new MockedMasterElectionClient();
         dbs = new HaOneFiveGraphDb[count];
         for ( int i = 0; i < count; i++ )
             startDb( i );

@@ -1,60 +1,49 @@
 package org.neo4j.kernel.haonefive;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.net.URL;
+
+import org.neo4j.helpers.Pair;
 
 public class MockedMasterElectionClient extends AbstractMasterElectionClient
 {
+    final MockedDistributedElection distributed;
+
+    public MockedMasterElectionClient( MockedDistributedElection distributed )
+    {
+        this.distributed = distributed;
+    }
+    
     @Override
     public void requestMaster()
     {
+        Pair<URL, Integer> currentMaster = distributed.currentMaster();
         if ( currentMaster != null )
         {
-            for ( Member member : listeners.values() )
-                member.listener.newMasterElected( currentMaster.masterUrl, currentMaster.id );
-            for ( Member member : listeners.values() )
-                member.listener.newMasterBecameAvailable( currentMaster.masterUrl );
+            distributeNewMasterElected( currentMaster.first(), currentMaster.other() );
+            distributeNewMasterBecameAvailable( currentMaster.first() );
         }
-    }
-
-    public void bluntlyForceMasterElection( int masterServerId )
-    {
-        Member master = listeners.get( masterServerId );
-        for ( Member member : listeners.values() )
-            member.listener.newMasterElected( master.masterUrl, masterServerId );
-        for ( Member member : listeners.values() )
-            member.listener.newMasterBecameAvailable( master.masterUrl );
-        currentMaster = master;
     }
 
     @Override
     public MasterElectionInput askForMasterElectionInput()
     {
-        // TODO Auto-generated method stub
-        return null;
+        throw new UnsupportedOperationException( "Not needed when mocked" );
     }
 
-    public void addListener( MasterChangeListener listener, int id, int port )
+    @Override
+    public void shutdown()
     {
-        listeners.put( id, new Member( id, listener, port ) );
     }
-    
-    public void removeListener( int id )
-    {
-        listeners.remove( id );
-    }
-    
-    private static class Member
-    {
-        private final MasterChangeListener listener;
-        private final String masterUrl;
-        private final int id;
 
-        Member( int id, MasterChangeListener listener, int port )
-        {
-            this.id = id;
-            this.listener = listener;
-            this.masterUrl = "http://localhost:" + port;
-        }
+    public void distributeNewMasterElected( URL masterUrl, int masterServerId )
+    {
+        for ( MasterChangeListener listener : listeners )
+            listener.newMasterElected( masterUrl, masterServerId );
+    }
+
+    public void distributeNewMasterBecameAvailable( URL masterUrl )
+    {
+        for ( MasterChangeListener listener : listeners )
+            listener.newMasterBecameAvailable( masterUrl );
     }
 }

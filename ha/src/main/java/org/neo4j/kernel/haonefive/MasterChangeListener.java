@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.haonefive;
 
+import java.net.URL;
+
 /**
  * The MasterChangeListener is listening for events from master election, for example some state of
  * some services in the database must be switched accordingly. It can also provide input to the
@@ -34,7 +36,7 @@ public interface MasterChangeListener
      * @param masterUrl the connection information to the master.
      * @param masterServerId the server id of the master (TODO remove)
      */
-    void newMasterElected( String masterUrl, int masterServerId /*Here because other legacy HA code relies on it*/ );
+    void newMasterElected( URL masterUrl, int masterServerId /*Here because other legacy HA code relies on it*/ );
     
-    void newMasterBecameAvailable( String masterUrl );
+    void newMasterBecameAvailable( URL masterUrl );
 }
