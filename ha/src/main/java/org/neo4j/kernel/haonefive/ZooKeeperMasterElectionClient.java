@@ -28,6 +28,7 @@ import org.neo4j.com.SlaveContext;
 import org.neo4j.com.StoreIdGetter;
 import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Triplet;
+import org.neo4j.kernel.InformativeStackTrace;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.Broker;
 import org.neo4j.kernel.ha.ClusterEventReceiver;
@@ -36,6 +37,7 @@ import org.neo4j.kernel.ha.shell.ZooClientFactory;
 import org.neo4j.kernel.ha.zookeeper.Machine;
 import org.neo4j.kernel.ha.zookeeper.ZooClient;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperBroker;
+import org.neo4j.kernel.ha.zookeeper.ZooKeeperMachine;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
@@ -46,6 +48,7 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     private final HaServiceSupplier stuff;
     private final StoreIdGetter storeIdGetter;
     private final String storeDir;
+    private Machine currentMaster = ZooKeeperMachine.NO_MACHINE;
     
     public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter, String storeDir )
     {
@@ -59,14 +62,27 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     @Override
     public void requestMaster()
     {
-        electMasterAndPingListeners();
+        if ( currentMaster.getMachineId() == -1 )
+            if ( !figureOutCurrentMaster() )
+                return;
+        pingListenersAboutCurrentMaster();
     }
     
-    private void electMasterAndPingListeners()
+    private boolean figureOutCurrentMaster()
     {
         Machine master = broker.getMasterReally( true ).other();
-        URL masterUrl = toUrl( master.getServer().first(), master.getServer().other() );
-        int masterServerId = master.getMachineId();
+        if ( master.getMachineId() != currentMaster.getMachineId() )
+        {
+            currentMaster = master;
+            return true;
+        }
+        return false;
+    }
+
+    private void pingListenersAboutCurrentMaster()
+    {
+        URL masterUrl = toUrl( currentMaster.getServer().first(), currentMaster.getServer().other() );
+        int masterServerId = currentMaster.getMachineId();
         for ( MasterChangeListener listener : listeners )
             listener.newMasterElected( masterUrl, masterServerId );
         for ( MasterChangeListener listener : listeners )
@@ -105,17 +121,32 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     @Override
     public void newMaster( Exception cause )
     {
-//        System.out.println( "got newMaster " + cause );
-//        // TODO ehrmm...
-//        if ( cause instanceof InformativeStackTrace )
-//        {
-//            if ( cause.getMessage().contains( "NodeDeleted" ) )
-//            {
-//                electMasterAndPingListeners();
-//            }
-//        }
+        cause.printStackTrace();
+        if ( cause instanceof InformativeStackTrace )
+        {
+            if ( cause.getMessage().contains( "NodeDeleted" ) )
+            {
+                broker.callForData();
+                sleep( 2000 ); // TODO Ehurm
+            }
+        }
+        
+        if ( figureOutCurrentMaster() )
+            pingListenersAboutCurrentMaster();
     }
     
+    private void sleep( int i )
+    {
+        try
+        {
+            Thread.sleep( i );
+        }
+        catch ( InterruptedException e )
+        {
+            throw new RuntimeException( e );
+        }
+    }
+
     @Override
     public MasterElectionInput askForMasterElectionInput()
     {

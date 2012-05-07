@@ -115,7 +115,7 @@ public class ZooClient extends AbstractZooKeeperManager
         this.localDatabase = localDatabase;
         this.clusterReceiver = clusterReceiver;
         machineId = conf.getInteger( server_id );
-        backupPort = conf.getInteger( OnlineBackupSettings.online_backup_port);
+        backupPort = conf.getInteger( OnlineBackupSettings.online_backup_port );
         haServer = conf.isSet(server) ? conf.get( server ) : defaultServer();
         writeLastCommittedTx = conf.getEnum(SlaveUpdateMode.class, slave_coordinator_update_mode).syncWithZooKeeper;
         clusterName = conf.get( cluster_name );
@@ -249,7 +249,7 @@ public class ZooClient extends AbstractZooKeeperManager
                     }
                     catch ( KeeperException ce )
                     {
-                        if ( e.code() != KeeperException.Code.NODEEXISTS ) throw new ZooKeeperException( "Creation error", ce );
+                        if ( e.code() != KeeperException.Code.NODEEXISTS ) throw new ZooKeeperException( "Creation error " + e.code(), ce );
                     }
                 }
                 else throw new ZooKeeperException( "Couldn't get or create " + child, e );
