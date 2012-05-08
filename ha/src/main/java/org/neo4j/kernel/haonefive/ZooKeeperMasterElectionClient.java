@@ -81,7 +81,7 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
         return false;
     }
 
-    private void pingListenersAboutCurrentMaster()
+    private synchronized void pingListenersAboutCurrentMaster()
     {
         URL masterUrl = toUrl( currentMaster.getServer().first(), currentMaster.getServer().other() );
         int masterServerId = currentMaster.getMachineId();

@@ -201,6 +201,11 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         masterElectionClient.requestMaster();
     }
     
+    public boolean isMaster()
+    {
+        return databaseState == DatabaseState.MASTER;
+    }
+    
     private static Map<String, String> withDefaults( Map<String, String> params )
     {
         params = new ConfigurationDefaults( HaSettings.class ).apply( params );
@@ -210,7 +215,10 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     protected MasterElectionClient createMasterElectionClient()
     {
-        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
+        MasterElectionClient client = new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
+        // TODO Maybe adding of the listener shouldn't be in here
+        client.addMasterChangeListener( this );
+        return client;
     }
     
     @Override
@@ -261,6 +269,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     @Override
     public void newMasterElected( URL masterUrl, int masterServerId )
     {
+        new Exception( this + ":newMasterElected:" + masterUrl + " " + masterServerId ).printStackTrace();
         if ( this.masterServerId == masterServerId )
             return;
         
