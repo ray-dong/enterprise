@@ -116,7 +116,6 @@ public class TestZooKeeperMasterElectionBlackBox
         waitForMasterToBecomeAvailable( (currentMaster+1)%instances.length );
         int newMaster = getCurrentMaster();
         assertTrue( newMaster == (currentMaster+1)%instances.length || newMaster == (currentMaster+2)%instances.length );
-        System.err.println( "start" );
         startInstance( currentMaster );
         Thread.sleep( 5000 );
         waitForMasterToBecomeAvailable( currentMaster );
