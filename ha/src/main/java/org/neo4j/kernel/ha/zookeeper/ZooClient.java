@@ -233,26 +233,31 @@ public class ZooClient extends AbstractZooKeeperManager
         String path = root + "/" + child;
         try
         {
-            try
+            for ( int i = 0; i < 2; i++ )
             {
-                zooKeeper.getData( path, true, null );
-            }
-            catch ( KeeperException e )
-            {
-                if ( e.code() == KeeperException.Code.NONODE )
-                {   // Create it if it doesn't exist
-                    byte[] data = new byte[4];
-                    ByteBuffer.wrap( data ).putInt( -1 );
-                    try
-                    {
-                        zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
-                    }
-                    catch ( KeeperException ce )
-                    {
-                        if ( e.code() != KeeperException.Code.NODEEXISTS ) throw new ZooKeeperException( "Creation error " + e.code(), ce );
-                    }
+                try
+                {
+                    zooKeeper.getData( path, true, null );
+                    return;
                 }
-                else throw new ZooKeeperException( "Couldn't get or create " + child, e );
+                catch ( KeeperException e )
+                {
+                    if ( e.code() == KeeperException.Code.NONODE )
+                    {   // Create it if it doesn't exist
+                        byte[] data = new byte[4];
+                        ByteBuffer.wrap( data ).putInt( -1 );
+                        try
+                        {
+                            zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
+                        }
+                        catch ( KeeperException ce )
+                        {
+                            if ( e.code() != KeeperException.Code.NODEEXISTS && e.code() != KeeperException.Code.NONODE )
+                                throw new ZooKeeperException( "Creation error " + e.code() + " " + e.getPath(), ce );
+                        }
+                    }
+                    else throw new ZooKeeperException( "Couldn't get or create " + child, e );
+                }
             }
         }
         catch ( InterruptedException e )
@@ -290,35 +295,43 @@ public class ZooClient extends AbstractZooKeeperManager
             {
                 if ( e.code() != KeeperException.Code.NONODE )
                 {
-                    throw new ZooKeeperException( "Couldn't get master notify node", e );
+                    throw new ZooKeeperException( "Couldn't get master watch node " + child, e );
                 }
             }
 
             // Didn't exist or has changed
-            try
+            for ( int i = 0; i < 2; i++ )
             {
-                data = new byte[4];
-                ByteBuffer.wrap( data ).putInt( value );
-                if ( !exists )
+                try
                 {
-                    zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE,
-                            CreateMode.PERSISTENT );
-                    msgLog.logMessage( child + " created with " + value );
+                    data = new byte[4];
+                    ByteBuffer.wrap( data ).putInt( value );
+                    try
+                    {
+                        zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE,
+                                CreateMode.PERSISTENT );
+                        msgLog.logMessage( child + " created with " + value );
+                    }
+                    catch ( KeeperException e )
+                    {
+                        if ( e.code() != KeeperException.Code.NODEEXISTS && e.code() != KeeperException.Code.NONODE )
+                        {
+                            throw new ZooKeeperException( "Couldn't set data watcher " + child, e );
+                        }
+                        zooKeeper.setData( path, data, -1 );
+                        msgLog.logMessage( child + " set to " + value );
+                    }
+    
+                    // Add a watch for it
+                    zooKeeper.getData( path, true, null );
+                    return true;
                 }
-                else if ( value != -1 )
+                catch ( KeeperException e )
                 {
-                    zooKeeper.setData( path, data, -1 );
-                    msgLog.logMessage( child + " set to " + value );
-                }
-
-                // Add a watch for it
-                zooKeeper.getData( path, true, null );
-            }
-            catch ( KeeperException e )
-            {
-                if ( e.code() != KeeperException.Code.NODEEXISTS )
-                {
-                    throw new ZooKeeperException( "Couldn't set master notify node", e );
+                    if ( e.code() != KeeperException.Code.NODEEXISTS && e.code() != KeeperException.Code.NONODE )
+                    {
+                        throw new ZooKeeperException( "Couldn't set data watcher node", e );
+                    }
                 }
             }
             return true;
@@ -806,6 +819,9 @@ public class ZooClient extends AbstractZooKeeperManager
 
         private void processEvent( WatchedEvent event, ZooKeeper zooKeeper )
         {
+            if ( shutdown )
+                return;
+            
             try
             {
                 String path = event.getPath();
@@ -882,10 +898,10 @@ public class ZooClient extends AbstractZooKeeperManager
                         // This event is for all the others after the master got the
                         // MASTER_NOTIFY_CHILD which then shouts out to the others to
                         // become slaves if they don't already are.
-                        if ( newMasterMachineId != machineId )
-                        {
-                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (new master ensures I'm slave)" ) );
-                        }
+//                        if ( newMasterMachineId != machineId )
+//                        {
+                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (new master ensures I'm slave) " + newMasterMachineId ) );
+//                        }
                     }
                     else if ( path.contains( CALL_FOR_DATA ) )
                     {

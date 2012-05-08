@@ -135,8 +135,9 @@ public class ZooKeeperBroker extends AbstractBroker
     {
         // Change the call-for-data value in ZK so that all clients gets a NodeChangedEvent
         // for that path and updates ZK.
-        zooClient.triggerDataChangeWatcher( ZooClient.CALL_FOR_DATA );
-        zooClient.updateLastCommittedTx();
+        ZooClient client = getZooClient();
+        client.triggerDataChangeWatcher( ZooClient.CALL_FOR_DATA );
+        client.updateLastCommittedTx();
     }
 
     @Override
@@ -244,10 +245,10 @@ public class ZooKeeperBroker extends AbstractBroker
     }
 
     @Override
-    public void rebindMaster()
+    public void rebindMaster( int masterId )
     {
         getZooClient().setDataChangeWatcher( ZooClient.MASTER_REBOUND_CHILD,
-                getMyMachineId() );
+                masterId );
     }
 
     @Override

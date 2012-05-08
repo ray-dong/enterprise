@@ -44,6 +44,7 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
         implements ZooClientFactory, SlaveDatabaseOperations, ClusterEventReceiver
 {
     private final Broker broker;
+    private ZooClient zooClient;
     private final Config config;
     private final HaServiceSupplier stuff;
     private final StoreIdGetter storeIdGetter;
@@ -74,6 +75,7 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
         if ( master.getMachineId() != currentMaster.getMachineId() )
         {
             currentMaster = master;
+            broker.rebindMaster( master.getMachineId() );
             return true;
         }
         return false;
@@ -92,7 +94,8 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     @Override
     public ZooClient newZooClient()
     {
-        return new ZooClient( storeDir, StringLogger.SYSTEM, storeIdGetter, config, this, this );
+        zooClient = new ZooClient( storeDir, StringLogger.SYSTEM, storeIdGetter, config, this, this );
+        return zooClient;
     }
 
     @Override
@@ -121,18 +124,37 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     @Override
     public void newMaster( Exception cause )
     {
-        cause.printStackTrace();
         if ( cause instanceof InformativeStackTrace )
         {
             if ( cause.getMessage().contains( "NodeDeleted" ) )
             {
-                broker.callForData();
-                sleep( 2000 ); // TODO Ehurm
+                gatherElectionInput();
+                figureOutCurrentMaster();
+            }
+            else if ( cause.getMessage().contains( "new master" ) )
+            {
+                int index = cause.getMessage().lastIndexOf( ' ' );
+                int masterId = Integer.parseInt( cause.getMessage().substring( index+1 ) );
+                currentMaster = zooClient.getAllMachines( false ).get( masterId );
+                pingListenersAboutCurrentMaster();
             }
         }
-        
-        if ( figureOutCurrentMaster() )
-            pingListenersAboutCurrentMaster();
+    }
+
+    private void gatherElectionInput()
+    {
+        // Do this call in a thread since this method call may very well come from
+        // the ZK process thread itself.
+        new Thread()
+        {
+            @Override
+            public void run()
+            {
+                broker.callForData();
+            }
+        }.start();
+        sleep( 2000 ); // TODO Ehurm, instead do what Chris does with his branch there...
+                       // set to -1 and then wait for all to fill in
     }
     
     private void sleep( int i )

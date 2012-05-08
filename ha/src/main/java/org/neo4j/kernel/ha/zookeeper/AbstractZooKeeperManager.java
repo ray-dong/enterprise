@@ -254,7 +254,7 @@ public abstract class AbstractZooKeeperManager
         }
     }
 
-    protected Map<Integer, ZooKeeperMachine> getAllMachines( boolean wait )
+    public Map<Integer, ZooKeeperMachine> getAllMachines( boolean wait )
     {
         return getAllMachines( wait, WaitMode.SESSION );
     }

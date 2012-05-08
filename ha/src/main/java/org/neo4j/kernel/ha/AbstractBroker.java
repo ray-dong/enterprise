@@ -85,6 +85,12 @@ public abstract class AbstractBroker implements Broker
 
     public void rebindMaster()
     {
+        rebindMaster( getMyMachineId() );
+    }
+    
+    @Override
+    public void rebindMaster( int masterId )
+    {
         // Do nothing
     }
 

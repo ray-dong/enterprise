@@ -45,6 +45,8 @@ public interface Broker
 
     void rebindMaster();
 
+    void rebindMaster( int masterId );
+    
     void notifyMasterChange( Machine newMaster );
     
     void callForData();

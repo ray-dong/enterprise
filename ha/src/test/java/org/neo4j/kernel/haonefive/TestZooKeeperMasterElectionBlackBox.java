@@ -22,6 +22,7 @@ package org.neo4j.kernel.haonefive;
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static junit.framework.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.neo4j.com.SlaveContext.lastAppliedTx;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.kernel.configuration.Config.DEFAULT_DATA_SOURCE_NAME;
@@ -53,6 +54,7 @@ public class TestZooKeeperMasterElectionBlackBox
     private StoreIdGetter storeIdGetter;
     private LocalhostZooKeeperCluster zoo;
     private Instance[] instances;
+    private Instance[] shutDownInstances;
     
     @Before
     public void before() throws Exception
@@ -100,6 +102,42 @@ public class TestZooKeeperMasterElectionBlackBox
         assertEquals( rightfulMaster(), getCurrentMaster() );
     }
     
+    @Test
+    public void shouldReelectSameMasterIfEqualTxIds() throws Exception
+    {
+        startCluster( 3 );
+        
+        int currentMaster = getCurrentMaster();
+        setLastTx( 0, 3, currentMaster );
+        setLastTx( 1, 3, currentMaster );
+        setLastTx( 2, 3, currentMaster );
+        
+        shutdownInstance( currentMaster );
+        waitForMasterToBecomeAvailable( (currentMaster+1)%instances.length );
+        int newMaster = getCurrentMaster();
+        assertTrue( newMaster == (currentMaster+1)%instances.length || newMaster == (currentMaster+2)%instances.length );
+        System.err.println( "start" );
+        startInstance( currentMaster );
+        Thread.sleep( 5000 );
+        waitForMasterToBecomeAvailable( currentMaster );
+        assertEquals( currentMaster, getCurrentMaster() );
+    }
+    
+    private Instance newInstance( int id )
+    {
+        return new Instance( id, storeIdGetter, "target/db/" + id );
+    }
+    
+    private void startInstance( int id )
+    {
+        Instance instance = newInstance( id );
+        Instance previous = shutDownInstances[id];
+        instance.setLastTx( previous.lastTx, previous.masterIdForLastTx );
+        shutDownInstances[id] = null;
+        instances[id] = instance;
+        instance.client.requestMaster();
+    }
+
     private int rightfulMaster()
     {
         Integer id = null;
@@ -114,12 +152,6 @@ public class TestZooKeeperMasterElectionBlackBox
                 }
             }
         return id;
-    }
-
-    @Test
-    public void shouldReelectSameMasterIfEqualTxIds() throws Exception
-    {
-        
     }
     
     private Instance waitForMasterToBecomeAvailable( int id )
@@ -148,6 +180,7 @@ public class TestZooKeeperMasterElectionBlackBox
             if ( instance != null )
                 instance.invalidateMaster();
         instances[i].shutdown();
+        shutDownInstances[i] = instances[i];
         instances[i] = null;
     }
 
@@ -175,8 +208,9 @@ public class TestZooKeeperMasterElectionBlackBox
     private void startCluster( int size )
     {
         instances = new Instance[size];
+        shutDownInstances = new Instance[size];
         for ( int i = 0; i < instances.length; i++ )
-            instances[i] = new Instance( i, storeIdGetter, "target/db/" + i );
+            instances[i] = newInstance( i );
         
         // This mimics what ha graphdb will do after its master election client has been created.
         for ( Instance instance : instances )
