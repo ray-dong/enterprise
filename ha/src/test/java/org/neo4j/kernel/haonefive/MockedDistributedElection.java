@@ -39,14 +39,26 @@ public class MockedDistributedElection
 
     public void bluntlyForceMasterElection( int masterServerId )
     {
-        Member master = members.get( masterServerId );
+        bluntlyPrepareMasterElection( masterServerId ).complete();
+    }
+    
+    public PreparedElection bluntlyPrepareMasterElection( int masterServerId )
+    {
+        final Member master = members.get( masterServerId );
         for ( Member member : members.values() )
             member.client.distributeNewMasterElected( master.masterUrl, masterServerId );
-        for ( Member member : members.values() )
-            member.client.distributeNewMasterBecameAvailable( master.masterUrl );
-        currentMaster = master;
+        return new PreparedElection()
+        {
+            @Override
+            public void complete()
+            {
+                for ( Member member : members.values() )
+                    member.client.distributeNewMasterBecameAvailable( master.masterUrl );
+                currentMaster = master;
+            }
+        };
     }
-
+    
     public void addClient( MockedMasterElectionClient client, int serverId, int port )
     {
         members.put( serverId, new Member( serverId, client, port ) );
@@ -64,5 +76,10 @@ public class MockedDistributedElection
             this.client = client;
             this.masterUrl = toUrl( "localhost", port );
         }
+    }
+    
+    public interface PreparedElection
+    {
+        void complete();
     }
 }

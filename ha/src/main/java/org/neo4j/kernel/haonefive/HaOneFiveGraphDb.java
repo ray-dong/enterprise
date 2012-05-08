@@ -63,6 +63,8 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
 public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterChangeListener
 {
+    private static final int DEFAULT_STATE_SWITCH_TIMEOUT = 20;
+    
     final HaServiceSupplier stuff;
     private final int serverId;
     private volatile long sessionTimestamp;
@@ -73,6 +75,10 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     private volatile DatabaseState databaseState = DatabaseState.TBD;
     private volatile MasterServer server;
     final MasterElectionClient masterElectionClient;
+    private final StateSwitchBlock switchBlock = new StateSwitchBlock();
+    
+    // TODO configurable
+    private final int stateSwitchTimeout = DEFAULT_STATE_SWITCH_TIMEOUT;
     
     // TODO This is an artifact of integrating with legacy code (MasterClient should change to not use this).
     private final StoreIdGetter storeIdGetter = new StoreIdGetter()
@@ -157,7 +163,11 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 {
                     Transaction tx = txManager.getTransaction();
                     int eventIdentifier = txManager.getEventIdentifier();
-                    if ( !hasAnyLocks( tx ) ) txHook.initializeTransaction( eventIdentifier );
+                    if ( !hasAnyLocks( tx ) )
+                    {
+                        txHook.initializeTransaction( eventIdentifier );
+                        initializeTx();
+                    }
                 }
                 catch ( SystemException e )
                 {
@@ -224,10 +234,19 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     @Override
     public org.neo4j.graphdb.Transaction beginTx()
     {
-        databaseState.beforeGetMaster( this );
+        // TODO first startup ever we don't have a proper db, so don't even serve read requests
+        // if this is a startup for where we have been a member of this cluster before we
+        // can server (possibly quite outdated) read requests.
         return super.beginTx();
     }
     
+    protected void initializeTx()
+    {
+        if ( !switchBlock.await( stateSwitchTimeout ) )
+            // TODO Specific exception instead?
+            throw new RuntimeException( "Timed out waiting for database to switch state" );
+    }
+
     @Override
     public void shutdown()
     {
@@ -269,7 +288,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     @Override
     public void newMasterElected( URL masterUrl, int masterServerId )
     {
-        new Exception( this + ":newMasterElected:" + masterUrl + " " + masterServerId ).printStackTrace();
         if ( this.masterServerId == masterServerId )
             return;
         
@@ -302,11 +320,13 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     private void enterDatabaseStateSwitchBlockade()
     {
         // TODO Block incoming write transactions and roll back active write transactions or something.
+        switchBlock.enter();
     }
 
     private void exitDatabaseStateSwitchBlockade()
     {
         // TODO
+        switchBlock.exit();
     }
     
     public void pullUpdates()
@@ -582,7 +602,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         public void handle( Exception e )
         {
             // TODO Block incoming transactions and rollback active ones or something.
-            e.printStackTrace();
+            db.enterDatabaseStateSwitchBlockade();
             db.databaseState = db.databaseState.becomeUndecided( db );
             db.masterElectionClient.requestMaster();
         }

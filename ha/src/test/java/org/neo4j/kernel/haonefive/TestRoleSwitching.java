@@ -19,52 +19,13 @@
  */
 package org.neo4j.kernel.haonefive;
 
-import static java.util.Arrays.asList;
 import static junit.framework.Assert.assertTrue;
 import static org.junit.Assert.assertFalse;
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
 
-import java.io.File;
-import java.util.HashSet;
-import java.util.Set;
-
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
-import org.neo4j.graphdb.GraphDatabaseService;
-import org.neo4j.graphdb.Node;
-import org.neo4j.graphdb.Relationship;
-import org.neo4j.graphdb.RelationshipType;
-import org.neo4j.graphdb.Transaction;
-import org.neo4j.kernel.BranchedDataPolicy;
-import org.neo4j.test.TargetDirectory;
 
-public class TestRoleSwitching
+public class TestRoleSwitching extends MockedElectionTest
 {
-    private TargetDirectory PATH;
-    private HaOneFiveGraphDb[] dbs;
-    private MockedDistributedElection distributedElection;
-    
-    private enum Types implements RelationshipType
-    {
-        TEST;
-    }
-    
-    @Before
-    public void before() throws Exception
-    {
-        PATH = TargetDirectory.forTest( getClass() );
-        PATH.cleanup();
-        distributedElection = new MockedDistributedElection();
-    }
-    
-    @After
-    public void after() throws Exception
-    {
-        for ( HaOneFiveGraphDb db : dbs )
-            db.shutdown();
-    }
-    
     @Test
     public void createNodesWhenInDifferentRoles() throws Exception
     {
@@ -112,81 +73,5 @@ public class TestRoleSwitching
         assertTrue( hasBranch( 0 ) );
         assertFalse( hasBranch( 1 ) );
         assertFalse( hasBranch( 2 ) );
-    }
-    
-    private boolean hasBranch( int serverId )
-    {
-        File[] branches = BranchedDataPolicy.listBranchedDataDirectories( path( serverId ) );
-        return branches != null && branches.length > 0;
-    }
-
-    private void pullUpdates()
-    {
-        for ( HaOneFiveGraphDb db : dbs )
-            db.pullUpdates();
-    }
-
-    private void assertNodesExistsInAllDbs( String... expectedNames )
-    {
-        for ( int i = 0; i < dbs.length; i++ )
-            assertNodesExists( i, expectedNames );
-    }
-
-    private void electMaster( int id )
-    {
-        distributedElection.bluntlyForceMasterElection( id );
-    }
-
-    private HaOneFiveGraphDb startDb( final int serverId )
-    {
-        HaOneFiveGraphDb db = new HaOneFiveGraphDb( path( serverId ), stringMap(
-                "ha.server_id", "" + serverId ) )
-        {
-            @Override
-            protected MasterElectionClient createMasterElectionClient()
-            {
-                MockedMasterElectionClient client = new MockedMasterElectionClient( distributedElection );
-                distributedElection.addClient( client, serverId, 6361 );
-                return client;
-            }
-        };
-        dbs[serverId] = db;
-        db.masterElectionClient.addMasterChangeListener( db );
-        return db;
-    }
-    
-    private void startDbs( int count )
-    {
-        dbs = new HaOneFiveGraphDb[count];
-        for ( int i = 0; i < count; i++ )
-            startDb( i );
-    }
-
-    private String path( int serverId )
-    {
-        return PATH.directory( "" + serverId, false ).getAbsolutePath();
-    }
-
-    private void assertNodesExists( int id, String... names )
-    {
-        GraphDatabaseService db = dbs[id];
-        Set<String> expectation = new HashSet<String>( asList( names ) );
-        for ( Relationship rel : db.getReferenceNode().getRelationships() )
-        {
-            String name = (String) rel.getEndNode().getProperty( "name" );
-            assertTrue( "Found unexpected name " + name, expectation.remove( name ) );
-        }
-        assertTrue( "Expected entries not encountered: " + expectation, expectation.isEmpty() );
-    }
-
-    private void createNode( int id, String name )
-    {
-        GraphDatabaseService db = dbs[id];
-        Transaction tx = db.beginTx();
-        Node node = db.createNode();
-        db.getReferenceNode().createRelationshipTo( node, Types.TEST );
-        node.setProperty( "name", name );
-        tx.success();
-        tx.finish();
     }
 }
