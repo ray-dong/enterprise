@@ -21,11 +21,10 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.util.concurrent.ExecutionException;
+
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
-import org.junit.Test;
 import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkedServerFactory;
 import org.neo4j.kernel.ha2.ProtocolServer;
@@ -33,6 +32,7 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
+import org.neo4j.kernel.lifecycle.LifeSupport;
 
 /**
  * TODO

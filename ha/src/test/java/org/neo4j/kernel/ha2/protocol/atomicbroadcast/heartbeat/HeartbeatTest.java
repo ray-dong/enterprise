@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
 import java.util.logging.Logger;
+
 import org.junit.Test;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
 import org.neo4j.kernel.ha2.HeartbeatServerFactory;

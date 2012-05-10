@@ -20,15 +20,17 @@
 
 package org.neo4j.kernel.ha2;
 
+import static java.lang.Integer.parseInt;
+
 import java.net.URI;
 import java.util.Map;
+
 import org.neo4j.com_2.NetworkNode;
-import org.neo4j.kernel.ConfigProxy;
-import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 import org.neo4j.kernel.ha2.timeout.TimeoutsService;
 import org.neo4j.kernel.impl.util.StringLogger;
+import org.neo4j.kernel.lifecycle.LifeSupport;
 
 /**
  * TODO
@@ -48,9 +50,23 @@ public class NetworkedServerFactory
         this.logger = logger;
     }
 
-    public ProtocolServer newNetworkedServer(Map<String, String> configuration)
+    public ProtocolServer newNetworkedServer(final Map<String, String> configuration)
     {
-        NetworkNode.Configuration config = ConfigProxy.config( configuration, NetworkNode.Configuration.class );
+        NetworkNode.Configuration config = new NetworkNode.Configuration()
+        {
+            @Override
+            public int[] port( int[] defaultPortRange, int min, int max )
+            {
+                 String port = configuration.get( "port" );
+                 return port != null ? new int[] { parseInt( port ), parseInt( port ) } : defaultPortRange;
+            }
+            
+            @Override
+            public String address( String def )
+            {
+                return configuration.containsKey( "address" ) ? configuration.get( "address" ) : def;
+            }
+        };
         final NetworkNode node = new NetworkNode( config, logger );
         life.add( node );
 

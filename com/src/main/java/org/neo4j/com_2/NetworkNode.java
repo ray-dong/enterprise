@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.Channel;
@@ -56,8 +57,8 @@ import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.helpers.Listeners;
-import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.impl.util.StringLogger;
+import org.neo4j.kernel.lifecycle.Lifecycle;
 
 /**
  * TODO
