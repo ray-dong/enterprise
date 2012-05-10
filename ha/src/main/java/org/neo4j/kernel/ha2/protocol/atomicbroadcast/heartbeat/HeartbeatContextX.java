@@ -29,16 +29,16 @@ import org.neo4j.kernel.ha2.timeout.Timeouts;
 /**
  * TODO
  */
-public class HeartbeatContext
+public class HeartbeatContextX
 {
     Timeouts timeouts;
 
     public String me;
     List<String> servers = new ArrayList<String>(  );
     List<String> failed = new ArrayList<String>(  );
-    Iterable<HeartbeatListener> listeners = Listeners.newListeners();
+    Iterable<HeartbeatListenerX> listeners = Listeners.newListeners();
 
-    public HeartbeatContext( Timeouts timeouts )
+    public HeartbeatContextX(Timeouts timeouts)
     {
         this.timeouts = timeouts;
     }
@@ -55,10 +55,10 @@ public class HeartbeatContext
     {
         Object failedServer = failed.remove( server );
         if (failedServer != null)
-            Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatListener>()
+            Listeners.notifyListeners( listeners, new Listeners.Notification<HeartbeatListenerX>()
             {
                 @Override
-                public void notify( HeartbeatListener listener )
+                public void notify( HeartbeatListenerX listener )
                 {
                     listener.alive( server );
                 }
@@ -70,10 +70,10 @@ public class HeartbeatContext
         if (!failed.contains( server ))
         {
             failed.remove( server );
-            Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatListener>()
+            Listeners.notifyListeners( listeners, new Listeners.Notification<HeartbeatListenerX>()
             {
                 @Override
-                public void notify( HeartbeatListener listener )
+                public void notify( HeartbeatListenerX listener )
                 {
                     listener.failed( server );
                 }
@@ -86,12 +86,12 @@ public class HeartbeatContext
         this.me = me;
     }
 
-    public void addHeartbeatListener( HeartbeatListener listener )
+    public void addHeartbeatListener( HeartbeatListenerX listener )
     {
         listeners = Listeners.addListener( listener, listeners );
     }
 
-    public void removeHeartbeatListener(HeartbeatListener listener)
+    public void removeHeartbeatListener(HeartbeatListenerX listener)
     {
         listeners = Listeners.removeListener( listener, listeners );
     }

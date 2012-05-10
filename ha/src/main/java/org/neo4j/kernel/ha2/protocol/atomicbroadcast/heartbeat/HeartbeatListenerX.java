@@ -23,12 +23,9 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 /**
  * TODO
  */
-public interface Heartbeat
+public interface HeartbeatListenerX
 {
-    void join();
-    void leave();
-    void possibleServers(String... servers);
+    void failed(String server);
 
-    void addHeartbeatListener( HeartbeatListener listener );
-    void removeHeartbeatListener( HeartbeatListener listener );
+    void alive(String server);
 }

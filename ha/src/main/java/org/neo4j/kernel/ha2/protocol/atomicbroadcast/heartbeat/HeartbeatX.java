@@ -20,21 +20,15 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
-import org.junit.Test;
-import org.neo4j.com2.NetworkNode;
-import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.ConfigProxy;
-import org.neo4j.kernel.impl.util.StringLogger;
-
 /**
  * TODO
  */
-public class HeartBeatTest
+public interface HeartbeatX
 {
-    @Test
-    public void testNoFailures()
-    {
-        NetworkNode node = new NetworkNode( ConfigProxy.config( MapUtil.stringMap( ), NetworkNode.Configuration.class ) , StringLogger.SYSTEM );
-        node.
-    }
+    void join();
+    void leave();
+    void possibleServers(String... servers);
+
+    void addHeartbeatListener( HeartbeatListenerX listener );
+    void removeHeartbeatListener( HeartbeatListenerX listener );
 }

@@ -26,7 +26,7 @@ import org.neo4j.com_2.message.MessageType;
 /**
  * TODO
  */
-public enum HeartbeatMessage
+public enum HeartbeatMessageX
     implements MessageType
 {
     possibleServers,
