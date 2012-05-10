@@ -20,17 +20,8 @@
 
 package org.neo4j.kernel.ha2;
 
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageSource;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastState;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerState;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerState;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos.CoordinatorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos.CoordinatorState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos.RingPaxosContext;

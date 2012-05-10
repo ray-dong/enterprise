@@ -22,7 +22,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
 
 import java.io.Serializable;
 import java.util.List;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.MessageType;
 
 /**
  * Acceptor state machine messages

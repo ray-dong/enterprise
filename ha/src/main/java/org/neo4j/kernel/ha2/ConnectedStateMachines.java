@@ -24,15 +24,14 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.Future;
 import java.util.logging.Logger;
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageSource;
-import org.neo4j.com2.message.MessageType;
-import org.neo4j.kernel.ha2.statemachine.State;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.com_2.message.MessageSource;
+import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 
-import static org.neo4j.com2.message.Message.*;
+import static org.neo4j.com_2.message.Message.*;
 
 /**
  * TODO

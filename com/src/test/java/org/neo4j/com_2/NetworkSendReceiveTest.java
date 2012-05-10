@@ -18,13 +18,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2;
+package org.neo4j.com_2;
 
 import java.util.Map;
 import org.junit.Test;
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.com_2.message.MessageType;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;

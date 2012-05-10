@@ -20,13 +20,12 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Future;
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageType;
+
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.com_2.message.MessageType;
 
 /**
  * State machine that wraps a context and a state, which can change when a Message comes in.

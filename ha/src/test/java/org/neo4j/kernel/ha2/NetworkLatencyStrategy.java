@@ -20,8 +20,8 @@
 
 package org.neo4j.kernel.ha2;
 
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageType;
 
 /**
  * Strategy for deciding message delay, and whether a message is actually lost. Used to test failure handling scenarios.

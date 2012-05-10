@@ -20,8 +20,8 @@
 
 package org.neo4j.kernel.ha2;
 
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageType;
 
 /**
  * Messages never gets lost

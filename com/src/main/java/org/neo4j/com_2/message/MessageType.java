@@ -18,12 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2;
+package org.neo4j.com_2.message;
 
 /**
- * TODO
+ * Message name. This is implemented by enums.
  */
-public interface NetworkMessageListener
+public interface MessageType
 {
-    void received(Object message);
+    String name();
 }

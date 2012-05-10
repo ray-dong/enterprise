@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2;
+package org.neo4j.com_2;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -51,10 +51,10 @@ import org.jboss.netty.handler.codec.serialization.ObjectDecoder;
 import org.jboss.netty.handler.codec.serialization.ObjectEncoder;
 import org.jboss.netty.handler.logging.LoggingHandler;
 import org.neo4j.com.ComException;
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageSource;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.com_2.message.MessageSource;
+import org.neo4j.com_2.message.MessageType;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.impl.util.StringLogger;

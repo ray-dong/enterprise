@@ -25,7 +25,7 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.logging.Logger;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.StateTransition;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;

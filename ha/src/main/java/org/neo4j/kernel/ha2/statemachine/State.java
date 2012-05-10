@@ -20,9 +20,9 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.com_2.message.MessageType;
 
 /**
  * Implemented by states in a state machine. Each state must

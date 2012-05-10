@@ -18,12 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2.message;
+package org.neo4j.com_2;
 
 /**
  * TODO
  */
-public interface MessageSource
+public interface NetworkMessageListener
 {
-    void addMessageProcessor( MessageProcessor messageProcessor );
+    void received(Object message);
 }

@@ -20,8 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
 
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
 
 /**

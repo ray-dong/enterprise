@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com2.message;
+package org.neo4j.com_2.message;
 
 import java.io.Serializable;
 import java.util.HashMap;

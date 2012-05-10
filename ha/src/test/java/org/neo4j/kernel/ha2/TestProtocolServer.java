@@ -23,17 +23,16 @@ package org.neo4j.kernel.ha2;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageSource;
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.com_2.message.MessageSource;
+import org.neo4j.com_2.message.MessageType;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TestTimeouts;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
-import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
  * TODO

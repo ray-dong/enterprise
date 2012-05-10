@@ -22,7 +22,7 @@ package org.neo4j.kernel.ha2;
 
 import java.net.URI;
 import java.util.Map;
-import org.neo4j.com2.NetworkNode;
+import org.neo4j.com_2.NetworkNode;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
