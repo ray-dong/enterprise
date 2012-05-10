@@ -21,29 +21,14 @@
 package org.neo4j.kernel.ha2;
 
 import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageType;
 
 /**
- * Ask a set of failure strategies if a message is lost. Anyone says yes, then it is lost.
+ * Strategy for deciding message delay, and whether a message is actually lost. Used to test failure handling scenarios.
  */
-public class MultipleFailureStrategy
-    implements NetworkFailureStrategy
+public interface NetworkLatencyStrategy
 {
-    private final NetworkFailureStrategy[] failureStrategies;
+    public static long LOST = -1;
 
-    public MultipleFailureStrategy( NetworkFailureStrategy... failureStrategies )
-    {
-        this.failureStrategies = failureStrategies;
-    }
-
-    @Override
-    public boolean isLost( Message<?> message, String serverIdTo )
-    {
-        for( NetworkFailureStrategy failureStrategy : failureStrategies )
-        {
-            if (failureStrategy.isLost( message, serverIdTo ))
-                return true;
-        }
-        
-        return false;
-    }
+    long messageDelay(Message<? extends MessageType> message, String serverIdTo);
 }

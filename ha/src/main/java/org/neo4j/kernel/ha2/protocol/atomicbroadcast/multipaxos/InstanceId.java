@@ -18,33 +18,59 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import org.neo4j.com2.message.MessageType;
+import java.io.Serializable;
 
 /**
- * Learner state machine messages
+ * TODO
  */
-public enum LearnerMessage
-    implements MessageType
+public class InstanceId
+    implements Serializable
 {
-    failure,
-    join,leave,
+    long id;
 
-    learn;
-
-    public static class LearnState
+    public InstanceId( long id )
     {
-        private int v_vid;
+        this.id = id;
+    }
 
-        public LearnState( int v_vid )
+    public long getId()
+    {
+        return id;
+    }
+
+    @Override
+    public boolean equals( Object o )
+    {
+        if( this == o )
         {
-            this.v_vid = v_vid;
+            return true;
+        }
+        if( o == null || getClass() != o.getClass() )
+        {
+            return false;
         }
 
-        public int getV_vid()
+        InstanceId that = (InstanceId) o;
+
+        if( id != that.id )
         {
-            return v_vid;
+            return false;
         }
+
+        return true;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return (int) ( id ^ ( id >>> 32 ) );
+    }
+
+    @Override
+    public String toString()
+    {
+        return id+"";
     }
 }

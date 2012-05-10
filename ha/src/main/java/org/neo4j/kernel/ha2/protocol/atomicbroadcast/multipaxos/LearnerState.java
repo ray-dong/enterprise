@@ -28,7 +28,7 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Learner
  */
 public enum LearnerState
-    implements State<MultiPaxosContext, LearnerMessage, LearnerState>
+    implements State<MultiPaxosContext, LearnerMessage>
 {
     start
         {
@@ -71,19 +71,19 @@ public enum LearnerState
                     case learn:
                     {
                         LearnerMessage.LearnState learnState = ( LearnerMessage.LearnState) message.getPayload();
-                        if (learnState.getInstanceId() == context.lastLearnedInstanceId + 1)
+                        if (learnState.getInstanceId().equals( new InstanceId( context.lastLearnedInstanceId+1) ))
                         {
                             context.learnValue( learnState.getValue() );
-                            context.lastLearnedInstanceId = learnState.getInstanceId();
+                            context.lastLearnedInstanceId = learnState.getInstanceId().getId();
                             for (int i=1; i < context.learnerInstances.size(); i++)
                             {
-                                int index = context.getLearnerInstanceIndex(learnState.getInstanceId()+i);
+                                int index = context.getLearnerInstanceIndex(learnState.getInstanceId().getId()+i);
                                 LearnerInstance learnerInstance = context.learnerInstances.get( index );
-                                if ( learnerInstance.instanceId != -1)
+                                if ( learnerInstance.instanceId != null)
                                 {
                                     context.learnValue( learnerInstance.value );
-                                    context.lastLearnedInstanceId = learnerInstance.instanceId;
-                                    learnerInstance.instanceId = -1;
+                                    context.lastLearnedInstanceId = learnerInstance.instanceId.getId();
+                                    learnerInstance.instanceId = null;
                                     learnerInstance.value = null;
                                 } else
                                 {
@@ -95,10 +95,10 @@ public enum LearnerState
                         else
                         {
                             // Store it and wait for hole to be filled
-                            int distance = (int)(learnState.getInstanceId() - context.lastLearnedInstanceId);
+                            int distance = (int)(learnState.getInstanceId().getId() - context.lastLearnedInstanceId);
                             if (distance < context.learnerInstances.size()-1)
                             {
-                                int index = context.getLearnerInstanceIndex(learnState.getInstanceId());
+                                int index = context.getLearnerInstanceIndex(learnState.getInstanceId().getId());
                                 context.learnerInstances.get( index ).set(learnState);
                             } else
                             {

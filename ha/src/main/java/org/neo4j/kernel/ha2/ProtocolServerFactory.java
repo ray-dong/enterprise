@@ -18,33 +18,16 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2;
 
-import org.neo4j.com2.message.MessageType;
+import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageSource;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
- * Learner state machine messages
+ * TODO
  */
-public enum LearnerMessage
-    implements MessageType
+public interface ProtocolServerFactory
 {
-    failure,
-    join,leave,
-
-    learn;
-
-    public static class LearnState
-    {
-        private int v_vid;
-
-        public LearnState( int v_vid )
-        {
-            this.v_vid = v_vid;
-        }
-
-        public int getV_vid()
-        {
-            return v_vid;
-        }
-    }
+    ProtocolServer newProtocolServer(Timeouts timeouts, MessageSource input, MessageProcessor output);
 }

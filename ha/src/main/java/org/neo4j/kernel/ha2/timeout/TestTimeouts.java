@@ -20,10 +20,13 @@
 
 package org.neo4j.kernel.ha2.timeout;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO
@@ -31,19 +34,24 @@ import org.neo4j.com2.message.MessageProcessor;
 public class TestTimeouts
     implements Timeouts
 {
+    private long now = 0;
+
     private MessageProcessor receiver;
+    private TimeoutStrategy timeoutStrategy;
 
-    private Map<Object,Message> timeouts = new HashMap<Object, Message>(  );
+    private Map<Object,Timeout> timeouts = new HashMap<Object, Timeout>(  );
+    private List<Map.Entry<Object,Timeout>> triggeredTimeouts = new ArrayList<Map.Entry<Object,Timeout>>(  );
 
-    public TestTimeouts( MessageProcessor receiver )
+    public TestTimeouts( MessageProcessor receiver, TimeoutStrategy timeoutStrategy )
     {
         this.receiver = receiver;
+        this.timeoutStrategy = timeoutStrategy;
     }
 
     @Override
-    public void setTimeout( Object key, Message timeoutMessage )
+    public void setTimeout( Object key, Message<? extends MessageType> timeoutMessage )
     {
-        timeouts.put( key, timeoutMessage );
+        timeouts.put( key, new Timeout( now + timeoutStrategy.timeoutFor( timeoutMessage ), timeoutMessage ));
     }
 
     @Override
@@ -52,13 +60,68 @@ public class TestTimeouts
         timeouts.remove( key );
     }
 
-    public void checkTimeouts()
+    public Map<Object, Timeout> getTimeouts()
     {
-        for( Message message : timeouts.values() )
+        return timeouts;
+    }
+
+    public void tick(long time)
+    {
+        // Time has passed
+        now += time;
+
+        // Check if any timeouts needs to be triggered
+        triggeredTimeouts.clear();
+        for( Map.Entry<Object,Timeout> timeout : timeouts.entrySet() )
         {
-            receiver.process( message );
+            if (timeout.getValue().checkTimeout(now))
+                triggeredTimeouts.add( timeout );
         }
 
-        timeouts.clear();
+        // Remove all timeouts that were triggered
+        for( Map.Entry<Object,Timeout> triggeredTimeout : triggeredTimeouts )
+        {
+            timeouts.remove( triggeredTimeout.getKey() );
+        }
+
+        // Trigger timeouts
+        for( Map.Entry<Object, Timeout> triggeredTimeout : triggeredTimeouts )
+        {
+            triggeredTimeout.getValue().trigger( receiver );
+        }
+    }
+
+    public static class Timeout
+    {
+        private long timeout;
+        private Message<? extends MessageType> timeoutMessage;
+
+        public Timeout( long timeout, Message<? extends MessageType> timeoutMessage )
+        {
+            this.timeout = timeout;
+            this.timeoutMessage = timeoutMessage;
+        }
+
+        public boolean checkTimeout(long now)
+        {
+            if (now>=timeout)
+            {
+                return true;
+            } else
+            {
+                return false;
+            }
+        }
+
+        public void trigger( MessageProcessor receiver )
+        {
+            receiver.process( timeoutMessage );
+        }
+
+        @Override
+        public String toString()
+        {
+            return timeout+": "+timeoutMessage;
+        }
     }
 }

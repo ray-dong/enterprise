@@ -30,12 +30,12 @@ import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.StateTransition;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 
-public class StateTransitionExpectations<CONTEXT,MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>>
+public class StateTransitionExpectations<CONTEXT,MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
 {
-    public final StateTransitionListener<MESSAGETYPE> NO_EXPECTATIONS = new StateTransitionListener<MESSAGETYPE>()
+    public final StateTransitionListener NO_EXPECTATIONS = new StateTransitionListener()
     {
         @Override
-        public void stateTransition( StateTransition<MESSAGETYPE> messagetypeStateTransition )
+        public void stateTransition( StateTransition messagetypeStateTransition )
         {
         }
     };
@@ -46,7 +46,7 @@ public class StateTransitionExpectations<CONTEXT,MESSAGETYPE extends Enum<MESSAG
     {
         ExpectationsBuilder builder = new ExpectationsBuilder();
         for ( int i = 0; i < initialAlternatingExpectedMessageAndState.length; i++ )
-            builder.expect( (MessageType) initialAlternatingExpectedMessageAndState[i++], (STATE) initialAlternatingExpectedMessageAndState[i] );
+            builder.expect( (MessageType) initialAlternatingExpectedMessageAndState[i++], (State)initialAlternatingExpectedMessageAndState[i] );
         return builder;
     }
     
@@ -86,7 +86,7 @@ public class StateTransitionExpectations<CONTEXT,MESSAGETYPE extends Enum<MESSAG
         private final Deque<ExpectedTransition> transitions = new LinkedList<ExpectedTransition>();
         private boolean includeUnchanged;
         
-        public ExpectationsBuilder expect( MessageType messageToGetHere, STATE state )
+        public ExpectationsBuilder expect( MessageType messageToGetHere, State state )
         {
             transitions.add( new ExpectedTransition( messageToGetHere, state ) );
             return this;
@@ -192,9 +192,9 @@ public class StateTransitionExpectations<CONTEXT,MESSAGETYPE extends Enum<MESSAG
     private class ExpectedTransition
     {
         private final MessageType messageToGetHere;
-        private final STATE state;
+        private final State state;
         
-        ExpectedTransition( MessageType messageToGetHere, STATE state )
+        ExpectedTransition( MessageType messageToGetHere, State state )
         {
             this.messageToGetHere = messageToGetHere;
             this.state = state;

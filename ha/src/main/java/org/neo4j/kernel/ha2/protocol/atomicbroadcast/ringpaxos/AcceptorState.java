@@ -28,7 +28,7 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Acceptor
  */
 public enum AcceptorState
-    implements State<RingPaxosContext, AcceptorMessage, AcceptorState>
+    implements State<RingPaxosContext, AcceptorMessage>
 {
     start
         {

@@ -41,18 +41,6 @@ public class NetworkSendReceiveTest
         implements MessageType
     {
         helloWorld;
-
-        @Override
-        public MessageType[] next()
-        {
-            return new MessageType[ 0 ];
-        }
-
-        @Override
-        public TestMessage failureMessage()
-        {
-            return null;
-        }
     }
 
     @Test
@@ -110,7 +98,7 @@ public class NetworkSendReceiveTest
                     node.addMessageProcessor( new MessageProcessor()
                     {
                         @Override
-                        public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
+                        public void process( Message<? extends MessageType> message )
                         {
                             System.out.println( message );
                         }
@@ -143,7 +131,7 @@ public class NetworkSendReceiveTest
         }
 
         @Override
-        public void process( Message message )
+        public void process( Message<? extends MessageType> message )
         {
             node.process( message );
         }

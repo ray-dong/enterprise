@@ -28,7 +28,7 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Acceptor
  */
 public enum AcceptorState
-    implements State<MultiPaxosContext, AcceptorMessage, AcceptorState>
+    implements State<MultiPaxosContext, AcceptorMessage>
 {
     start
         {
@@ -43,11 +43,6 @@ public enum AcceptorState
                 {
                     case join:
                     {
-                        // Initialize all learner instances
-                        context.acceptorInstances.clear();
-                        for (int i = 0; i < 10; i++)
-                            context.acceptorInstances.add( new AcceptorInstance() );
-
                         return acceptor;
                     }
                 }
@@ -70,18 +65,7 @@ public enum AcceptorState
                     case prepare:
                     {
                         AcceptorMessage.PrepareState prepareState = (AcceptorMessage.PrepareState) message.getPayload();
-                        AcceptorInstance instance = context.acceptorInstances.get( context.getAcceptorInstanceIndex( prepareState.getInstanceId() ) );
-                        if ( instance.instanceId < prepareState.getInstanceId())
-                        {
-                            // Reset instance - this assumes we are not working on more than n instances at any given time, where n is size of list
-                            instance.instanceId = prepareState.getInstanceId();
-                            instance.ballot = 0;
-                            instance.value = null;
-                        } else if (instance.instanceId > prepareState.getInstanceId())
-                        {
-                            // This proposer is out of date - ignore him
-                            break;
-                        }
+                        AcceptorInstance instance = context.acceptorInstances.getAcceptorInstance( prepareState.getInstanceId() );
 
                         if ( prepareState.getBallot() > instance.ballot )
                         {
@@ -100,7 +84,7 @@ public enum AcceptorState
                     {
                         // Task 4
                         AcceptorMessage.AcceptState acceptState = ( AcceptorMessage.AcceptState) message.getPayload();
-                        AcceptorInstance instance = context.acceptorInstances.get( context.getAcceptorInstanceIndex( acceptState.getInstance() ) );
+                        AcceptorInstance instance = context.acceptorInstances.getAcceptorInstance( acceptState.getInstance() );
 
                         if (acceptState.getBallot() == instance.ballot)
                         {

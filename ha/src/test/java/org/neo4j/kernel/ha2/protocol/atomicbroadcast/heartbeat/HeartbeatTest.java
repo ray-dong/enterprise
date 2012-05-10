@@ -18,27 +18,23 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
+import org.neo4j.kernel.ha2.HeartbeatServerFactory;
 import org.neo4j.kernel.ha2.NetworkMock;
-import org.neo4j.kernel.ha2.RingPaxosServerFactory;
 import org.neo4j.kernel.ha2.TestProtocolServer;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
-import org.junit.Assert;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
-
-import static org.hamcrest.CoreMatchers.equalTo;
 
 /**
  * TODO
  */
-public class RingPaxosTest
+public class HeartbeatTest
 {
+    Logger logger = Logger.getLogger( HeartbeatTest.class.getName() );
+
     private static final String ID1 = "1";
     private static final String ID2 = "2";
     private static final String ID3 = "3";
@@ -46,35 +42,63 @@ public class RingPaxosTest
 
     private NetworkMock network;
 
-    private AtomicBroadcast member1;
-    private AtomicBroadcast member2;
-    private AtomicBroadcast member3;
+    private Heartbeat member1;
+    private Heartbeat member2;
+    private Heartbeat member3;
 
     @Test
-    public void testDecision()
-        throws ExecutionException, InterruptedException
+    public void testNoFailures()
     {
-        network = new NetworkMock(500, new RingPaxosServerFactory(), new FixedNetworkLatencyStrategy(), new FixedTimeoutStrategy( 1000 ));
+        network = new NetworkMock(500, new HeartbeatServerFactory(), new FixedNetworkLatencyStrategy(), new FixedTimeoutStrategy( 1000 ));
 
         member1 = newMember( ID1, POSSIBLE_SERVERS );
         member2 = newMember( ID2, POSSIBLE_SERVERS );
         member3 = newMember( ID3, POSSIBLE_SERVERS );
 
-        Map<String, String> map1 = new AtomicBroadcastMap<String,String>(member1);
-        Map<String, String> map2 = new AtomicBroadcastMap<String,String>(member2);
+        member1.addHeartbeatListener( new HeartbeatListener()
+        {
+            @Override
+            public void failed( String server )
+            {
+                logger.severe( "Failed:" + server );
+            }
 
-        map1.put( "foo", "bar" );
+            @Override
+            public void alive( String server )
+            {
+                logger.severe( "Alive:" + server );
+            }
+        } );
+
+        member1.join();
+        member2.join();
+        member3.join();
+
         network.tickUntilDone();
-        Object foo = map2.get( "foo" );
-        Assert.assertThat( foo.toString(), equalTo( "bar" ));
+
+        logger.info( "SHOULD BE OK HERE" );
+
+        network.tickUntilDone();
+        network.tickUntilDone();
+        network.tickUntilDone();
+
+        member3.leave();
+
+        network.tickUntilDone();
+        logger.info( "3 SHOULD BE FAILED NOW" );
+
+        member2.leave();
+        member1.leave();
+
+        network.tickUntilDone();
+        logger.info( "1 & 2 SHOULD BE FAILED NOW" );
     }
 
-    private AtomicBroadcast newMember( String id, String... possibleServers )
+    private Heartbeat newMember( String id, String... possibleServers )
     {
         TestProtocolServer server = network.addServer( id );
-        AtomicBroadcast member = server.newClient( AtomicBroadcast.class );
+        Heartbeat member = server.newClient( Heartbeat.class );
         member.possibleServers( possibleServers );
-        member.join();
         return member;
     }
 }

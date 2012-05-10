@@ -28,7 +28,7 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Proposer
  */
 public enum ProposerState
-    implements State<MultiPaxosContext, ProposerMessage, ProposerState>
+    implements State<MultiPaxosContext, ProposerMessage>
 {
     start
         {
@@ -43,10 +43,6 @@ public enum ProposerState
                 {
                     case join:
                     {
-                        context.proposerInstances.clear();
-                        for (int i = 0; i < 10; i++)
-                            context.proposerInstances.add( new ProposerInstance() );
-
                         if (context.clusterConfiguration.getCoordinator().equals( context.getMe() ))
                             return coordinator;
                         else
@@ -71,24 +67,15 @@ public enum ProposerState
                 {
                     case propose:
                     {
-                        if (context.bookedInstances.size() == context.proposerInstances.size()-3)
-                        {
-                            // Too many values already in process - put this on hold for now
-                            System.out.println( "Pending "+message.getPayload()  );
-                            context.pendingValues.offer( message.getPayload() );
-                            return this;
-                        } else
-                        {
-                            Object payload = message.getPayload();
-                            propose( context, outgoing, payload );
-                        }
+                        Object payload = message.getPayload();
+                        propose( context, outgoing, payload );
                         break;
                     }
 
                     case phase1Timeout:
                     {
-                        long instanceId = (Long) message.getPayload();
-                        ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(instanceId) );
+                        InstanceId instanceId = (InstanceId) message.getPayload();
+                        ProposerInstance instance = context.proposerInstances.getProposerInstance( instanceId );
                         long ballot = instance.ballot + 100;
                         instance.phase1Timeout(ballot);
                         for( String acceptor : context.clusterConfiguration.getAcceptors() )
@@ -102,7 +89,7 @@ public enum ProposerState
                     {
                         // P
                         ProposerMessage.PromiseState promiseState = (ProposerMessage.PromiseState) message.getPayload();
-                        ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(promiseState.getInstance()) );
+                        ProposerInstance instance = context.proposerInstances.getProposerInstance( promiseState.getInstance() );
 
                         if (instance.state == ProposerInstance.State.p1_pending && instance.ballot == promiseState.getBallot())
                         {
@@ -131,7 +118,8 @@ public enum ProposerState
                                         instance.ready( instance.value_1, false );
                                     } else
                                     {
-                                        // TODO Paxos Made Code says to discard client value, but we never popped it from pending list
+                                        // Another value was already associated with this instance. Push value back onto pending list
+                                        context.pendingValues.offerFirst( context.bookedInstances.remove( instance.id ) );
                                         instance.ready( instance.value_1, false );
                                     }
                                 }
@@ -151,8 +139,8 @@ public enum ProposerState
 
                     case phase2Timeout:
                     {
-                        long instanceId = (Long) message.getPayload();
-                        ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(instanceId) );
+                        InstanceId instanceId = (InstanceId) message.getPayload();
+                        ProposerInstance instance = context.proposerInstances.getProposerInstance(instanceId);
 
                         if (instance.state == ProposerInstance.State.p2_pending)
                         {
@@ -176,7 +164,7 @@ public enum ProposerState
                     case accepted:
                     {
                         ProposerMessage.AcceptedState acceptedState = (ProposerMessage.AcceptedState) message.getPayload();
-                        ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(acceptedState.getInstance()) );
+                        ProposerInstance instance = context.proposerInstances.getProposerInstance( acceptedState.getInstance() );
 
                         // Sanity check the id
                         if (instance.id == acceptedState.getInstance() && instance.state == ProposerInstance.State.p2_pending)
@@ -223,13 +211,13 @@ public enum ProposerState
 
             private void propose( MultiPaxosContext context, MessageProcessor outgoing, Object payload )
             {
-                long instanceId = context.lastInstanceId++;
+                InstanceId instanceId = context.newInstanceId();
 
                 context.bookedInstances.put( instanceId, payload );
 
                 long ballot = 100 + context.getServerId(); // First server will have first ballot id be 101
 
-                ProposerInstance instance = context.proposerInstances.get( context.getProposerInstanceIndex(instanceId) );
+                ProposerInstance instance = context.proposerInstances.getProposerInstance(instanceId);
 
                 if (instance.state == ProposerInstance.State.empty)
                 {

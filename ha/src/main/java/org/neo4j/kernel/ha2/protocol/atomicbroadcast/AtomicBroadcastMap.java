@@ -34,7 +34,7 @@ public class AtomicBroadcastMap<K,V>
 {
     private Map<K,V> map = new ConcurrentHashMap<K, V>(  );
     private AtomicBroadcast atomicBroadcast;
-    private MapCommand lastCommand;
+    private volatile MapCommand lastCommand;
     protected final AtomicBroadcastListener atomicBroadcastListener;
 
     public AtomicBroadcastMap( AtomicBroadcast atomicBroadcast )
@@ -48,7 +48,7 @@ public class AtomicBroadcastMap<K,V>
                 MapCommand command = (MapCommand) value;
                 command.execute( map );
 
-                System.out.println( map );
+                System.out.println( "Map:"+map );
 
                 synchronized( AtomicBroadcastMap.this )
                 {
@@ -94,6 +94,7 @@ public class AtomicBroadcastMap<K,V>
     @Override
     public V get( Object key )
     {
+        System.out.println("GET "+lastCommand);
         checkUpToDate();
         return map.get( key );
     }
@@ -102,6 +103,7 @@ public class AtomicBroadcastMap<K,V>
     public V put( K key, V value )
     {
         atomicBroadcast.broadcast( lastCommand = new Put( key, value ) );
+        System.out.println("PUT "+lastCommand);
         return map.get( key );
     }
 
@@ -155,6 +157,7 @@ public class AtomicBroadcastMap<K,V>
     {
         if (lastCommand != null)
         {
+            System.out.println("Wait for command");
             try
             {
                 this.wait();

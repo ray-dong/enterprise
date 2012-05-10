@@ -20,12 +20,9 @@
 
 package org.neo4j.kernel.ha2;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.concurrent.Future;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
@@ -33,6 +30,7 @@ import org.neo4j.com2.message.MessageSource;
 import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 
 import static org.neo4j.com2.message.Message.*;
 
@@ -45,7 +43,7 @@ public class ConnectedStateMachines
     private final Logger logger = Logger.getLogger( ConnectedStateMachines.class.getName() );
     
     private final MessageProcessor sender;
-    private final Map<Class<? extends Enum<?>>,StateMachine<?,?,?>> stateMachines = new HashMap<Class<? extends Enum<?>>, StateMachine<?,?,?>>(  );
+    private final Map<Class<? extends MessageType>,StateMachine> stateMachines = new LinkedHashMap<Class<? extends MessageType>, StateMachine>(  );
 
     private final List<MessageProcessor> outgoingProcessors = new ArrayList<MessageProcessor>(  );
     private final OutgoingMessageProcessor outgoing;
@@ -60,14 +58,19 @@ public class ConnectedStateMachines
         source.addMessageProcessor( this );
     }
     
-    public synchronized <CONTEXT, MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>> void addStateMachine(StateMachine<CONTEXT, MESSAGETYPE,STATE> stateMachine)
+    public synchronized void addStateMachine(StateMachine stateMachine)
     {
         stateMachines.put(stateMachine.getMessageType(), stateMachine);
     }
 
-    public synchronized <CONTEXT, MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>> void removeStateMachine(StateMachine<CONTEXT, MESSAGETYPE,STATE> stateMachine)
+    public synchronized void removeStateMachine(StateMachine stateMachine)
     {
         stateMachines.remove(stateMachine.getMessageType());
+    }
+
+    public Iterable<StateMachine> getStateMachines()
+    {
+        return stateMachines.values();
     }
 
     @Override
@@ -77,9 +80,9 @@ public class ConnectedStateMachines
     }
 
     @Override
-    public synchronized <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
+    public synchronized void process( Message<? extends MessageType> message )
     {
-        StateMachine<?,MESSAGETYPE,?> stateMachine = (StateMachine<?, MESSAGETYPE, ?>) stateMachines.get( message.getMessageType().getClass() );
+        StateMachine stateMachine = stateMachines.get( message.getMessageType().getClass() );
         if (stateMachine == null)
             return; // No StateMachine registered for this MessageType type - Ignore this
 
@@ -119,8 +122,9 @@ public class ConnectedStateMachines
             } else
             {
                 // Deliver internally if possible
-                StateMachine<?,?,?> internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
-                if (internalStatemachine != null && stateMachine != internalStatemachine )
+                StateMachine internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
+//                if (internalStatemachine != null && stateMachine != internalStatemachine )
+                if (internalStatemachine != null)
                 {
                     internalStatemachine.handle( (Message)outgoingMessage, outgoing );
                 }
@@ -128,11 +132,68 @@ public class ConnectedStateMachines
         }
     }
 
+    public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
+    {
+        for( StateMachine stateMachine : stateMachines.values() )
+        {
+            stateMachine.addStateTransitionListener( stateTransitionListener );
+        }
+    }
+
+    public void removeStateTransitionListener(StateTransitionListener stateTransitionListener)
+    {
+        for( StateMachine stateMachine : stateMachines.values() )
+        {
+            stateMachine.removeStateTransitionListener( stateTransitionListener );
+        }
+    }
+
+    public void checkValidProxyInterface(Class<?> proxyInterface)
+        throws IllegalArgumentException
+    {
+        method: for( Method method : proxyInterface.getMethods() )
+        {
+            if (!(method.getReturnType().equals( Void.TYPE ) || method.getReturnType().equals( Future.class )))
+            {
+                throw new IllegalArgumentException( "Methods must return either void or Future" );
+            }
+
+            for( StateMachine stateMachine : stateMachines.values() )
+            {
+                try
+                {
+                    Enum.valueOf( (Class<? extends Enum>) stateMachine.getMessageType(), method.getName() );
+
+                    // Ok!
+                    continue method;
+                }
+                catch( Exception e )
+                {
+                    // Continue searching
+                }
+            }
+
+            // Could not find any state in any state machine that can handle this method
+            throw new IllegalArgumentException( "No state machine can handle the method:"+method.getName() );
+        }
+    }
+
+    @Override
+    public String toString()
+    {
+        List<String> states = new ArrayList<String>();
+        for( StateMachine stateMachine : stateMachines.values() )
+        {
+            states.add( stateMachine.getState().toString() );
+        }
+        return states.toString();
+    }
+
     private class OutgoingMessageProcessor
         implements MessageProcessor
     {
         @Override
-        public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
+        public void process( Message<? extends MessageType> message )
         {
             outgoingMessages.offer( message );
         }

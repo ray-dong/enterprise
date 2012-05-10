@@ -25,5 +25,5 @@ package org.neo4j.com2.message;
  */
 public interface MessageProcessor
 {
-    <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message );
+    void process( Message<? extends MessageType> message );
 }

@@ -21,46 +21,54 @@
 package org.neo4j.kernel.ha2;
 
 import java.util.logging.Logger;
-import org.neo4j.com2.NetworkNode;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageSource;
 import org.neo4j.com2.message.MessageType;
+import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.Lifecycle;
+import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 
 /**
- * TODO
+ * A ProtocolServer ties together the underlying ConnectedStateMachines with an understanding of ones
+ * own server address (me), and provides a proxy factory for creating clients to invoke the CSM.
  */
-public abstract class ProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&MessageType>
+public class ProtocolServer
     implements Lifecycle
 {
-    protected final CONTEXT context;
-    protected StateMachineProxyFactory<MESSAGE> proxyFactory;
-    protected final ConnectedStateMachines connectedStateMachines;
     private String me;
-
-    public interface Configuration
-        extends NetworkNode.Configuration
-    {
-    }
+    protected StateMachineProxyFactory proxyFactory;
+    protected final ConnectedStateMachines connectedStateMachines;
+    private Iterable<BindingListener> bindingListeners = Listeners.newListeners();
 
     private Logger logger = Logger.getLogger( getClass().getName() );
 
-    public ProtocolServer( CONTEXT context,
-                           MessageSource input,
-                           MessageProcessor output
+    public ProtocolServer( ConnectedStateMachines connectedStateMachines
     )
     {
-        this.context = context;
-        connectedStateMachines = new ConnectedStateMachines( input, output );
+        this.connectedStateMachines = connectedStateMachines;
 
-        connectedStateMachines.addMessageProcessor( new FromHeaderMessageProcessor() );
+        FromHeaderMessageProcessor fromHeaderMessageProcessor = new FromHeaderMessageProcessor();
+        addBindingListener( fromHeaderMessageProcessor );
+        connectedStateMachines.addMessageProcessor( fromHeaderMessageProcessor );
+
+        StateMachineConversations conversations = new StateMachineConversations();
+        proxyFactory = new StateMachineProxyFactory( connectedStateMachines, conversations );
+        connectedStateMachines.addMessageProcessor( proxyFactory );
+
+        addBindingListener( conversations );
+        addBindingListener( proxyFactory );
     }
     
     @Override
     public void init()
+        throws Throwable
+    {
+    }
+
+    @Override
+    public void start()
         throws Throwable
     {
     }
@@ -78,9 +86,28 @@ public abstract class ProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&Messa
     {
     }
 
-    public void listeningAt( String me )
+    public void addBindingListener(BindingListener listener)
+    {
+        bindingListeners = Listeners.addListener( listener, bindingListeners );
+    }
+
+    public void removeBindingListener(BindingListener listener)
+    {
+        bindingListeners = Listeners.removeListener( listener, bindingListeners );
+    }
+
+    public void listeningAt( final String me )
     {
         this.me = me;
+
+        Listeners.notifyListeners( bindingListeners, new Listeners.Notification<BindingListener>()
+        {
+            @Override
+            public void notify( BindingListener listener )
+            {
+                listener.listeningAt( me );
+            }
+        } );
     }
 
     /**
@@ -92,12 +119,15 @@ public abstract class ProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&Messa
         return me;
     }
 
-    public CONTEXT getContext()
+    public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
     {
-        return context;
+        connectedStateMachines.addStateTransitionListener( stateTransitionListener );
     }
 
-    public abstract void addStateTransitionListener( StateTransitionListener stateTransitionListener );
+    public void removeStateTransitionListener(StateTransitionListener stateTransitionListener)
+    {
+        connectedStateMachines.removeStateTransitionListener( stateTransitionListener );
+    }
 
     public <T> T newClient( Class<T> clientProxyInterface )
     {
@@ -105,12 +135,20 @@ public abstract class ProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&Messa
     }
 
     private class FromHeaderMessageProcessor
-        implements MessageProcessor
+        implements MessageProcessor, BindingListener
     {
+        private String me;
+
         @Override
-        public void process( Message message )
+        public void listeningAt( String me )
         {
-            if( message.hasHeader( Message.TO ) )
+            this.me = me;
+        }
+
+        @Override
+        public void process( Message<? extends MessageType> message )
+        {
+            if( message.hasHeader( Message.TO ) && me != null)
             {
                 message.setHeader( Message.FROM, me );
             }

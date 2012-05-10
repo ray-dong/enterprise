@@ -18,14 +18,35 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
-import org.neo4j.com2.message.Message;
+import java.io.Serializable;
+import org.neo4j.com2.message.MessageType;
 
 /**
- * Strategy for deciding whether a message gets lost or not. Used to test failure handling scenarios.
+ * TODO
  */
-public interface NetworkFailureStrategy
+public enum HeartbeatMessage
+    implements MessageType
 {
-    boolean isLost( Message<?> message, String serverIdTo );
+    possibleServers,
+    addHeartbeatListener,removeHeartbeatListener,
+    join,leave,
+    i_am_alive,timed_out,send_heartbeat;
+
+    public static class IAmAliveState
+        implements Serializable
+    {
+        private String server;
+
+        public IAmAliveState( String server )
+        {
+            this.server = server;
+        }
+
+        public String getServer()
+        {
+            return server;
+        }
+    }
 }

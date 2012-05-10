@@ -29,7 +29,7 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Coordinator
  */
 public enum CoordinatorState
-    implements State<RingPaxosContext, CoordinatorMessage, CoordinatorState>
+    implements State<RingPaxosContext, CoordinatorMessage>
 {
     start
         {

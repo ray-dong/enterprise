@@ -21,11 +21,9 @@
 package org.neo4j.com2.message;
 
 /**
- * TODO
+ * Message name. This is implemented by enums.
  */
 public interface MessageType
 {
     String name();
-    MessageType[] next();
-    MessageType failureMessage();
 }

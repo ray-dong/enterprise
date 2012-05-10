@@ -54,6 +54,7 @@ import org.neo4j.com.ComException;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageSource;
+import org.neo4j.com2.message.MessageType;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.Lifecycle;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -198,7 +199,7 @@ public class NetworkNode
 
     // MessageProcessor implementation
     @Override
-    public void process( Message message )
+    public void process( Message<? extends MessageType> message )
     {
         String to = message.getHeader( Message.TO );
         

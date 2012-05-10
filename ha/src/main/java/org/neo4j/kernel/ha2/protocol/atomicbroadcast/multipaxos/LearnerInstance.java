@@ -25,7 +25,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
  */
 public class LearnerInstance
 {
-    long instanceId = -1;
+    InstanceId instanceId = null;
     Object value;
 
     public void set( LearnerMessage.LearnState learnState )

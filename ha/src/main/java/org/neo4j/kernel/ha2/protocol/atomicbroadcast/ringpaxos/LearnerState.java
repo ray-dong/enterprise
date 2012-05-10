@@ -28,7 +28,7 @@ import org.neo4j.kernel.ha2.statemachine.State;
  * State machine for Paxos Learner
  */
 public enum LearnerState
-    implements State<RingPaxosContext, LearnerMessage, LearnerState>
+    implements State<RingPaxosContext, LearnerMessage>
 {
     start
         {

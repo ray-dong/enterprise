@@ -30,12 +30,15 @@ import org.neo4j.com2.message.MessageType;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.LifeSupport;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TestTimeouts;
+import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
  * TODO
  */
-public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&MessageType, SERVER extends ProtocolServer<CONTEXT,MESSAGE>>
+public class TestProtocolServer
     implements MessageProcessor
 {
     protected final TestMessageSource receiver;
@@ -45,31 +48,31 @@ public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&M
     private Logger logger = Logger.getLogger( getClass().getName() );
 
     private final LifeSupport life = new LifeSupport();
-    protected SERVER server;
-    protected CONTEXT context;
+    protected ProtocolServer server;
 
-    public TestProtocolServer( String serverId )
+    public TestProtocolServer( TimeoutStrategy timeoutStrategy, ProtocolServerFactory factory, String serverId )
     {
         this.receiver = new TestMessageSource();
         this.sender = new TestMessageSender();
+        this.timeouts = new TestTimeouts( receiver, timeoutStrategy );
 
-        init();
-        
+        server = factory.newProtocolServer( timeouts, receiver, sender );
+
+        server.addStateTransitionListener( new StateTransitionLogger( serverId, Logger.getAnonymousLogger(  ) ) );
+
         server.listeningAt( serverId );
 
         life.add( server );
     }
 
-    protected abstract void init();
-
-    public SERVER getServer()
+    public ProtocolServer getServer()
     {
         return server;
     }
 
-    public void verifyState( Verifier<CONTEXT> verifier )
+    public TestTimeouts getTimeouts()
     {
-        verifier.verify( context );
+        return timeouts;
     }
 
     @Override
@@ -105,9 +108,10 @@ public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&M
         return this;
     }
 
-    public void checkTimeouts()
+    public void tick(long time)
     {
-        timeouts.checkTimeouts();
+        // Time passes - check timeouts
+        timeouts.tick( time );
     }
 
     public class TestMessageSender
@@ -116,7 +120,7 @@ public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&M
         List<Message> messages = new ArrayList<Message>(  );
         
         @Override
-        public void process( Message message )
+        public void process( Message<? extends MessageType> message )
         {
             messages.add( message );
         }
@@ -140,7 +144,7 @@ public abstract class TestProtocolServer<CONTEXT,MESSAGE extends Enum<MESSAGE>&M
         }
 
         @Override
-        public void process( Message message )
+        public void process( Message<? extends MessageType> message )
         {
             for( MessageProcessor listener : listeners )
             {

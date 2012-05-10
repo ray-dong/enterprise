@@ -22,15 +22,11 @@ package org.neo4j.kernel.ha2;
 
 import java.net.URI;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.neo4j.com2.NetworkNode;
-import org.neo4j.com2.message.Message;
-import org.neo4j.com2.message.MessageProcessor;
-import org.neo4j.com2.message.MessageType;
 import org.neo4j.kernel.ConfigProxy;
 import org.neo4j.kernel.LifeSupport;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
-import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
+import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 import org.neo4j.kernel.ha2.timeout.TimeoutsService;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -40,37 +36,33 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public class NetworkedServerFactory
 {
     private LifeSupport life;
+    private ProtocolServerFactory protocolServerFactory;
+    private TimeoutStrategy timeoutStrategy;
     private StringLogger logger;
 
-    public NetworkedServerFactory( LifeSupport life, StringLogger logger )
+    public NetworkedServerFactory( LifeSupport life, ProtocolServerFactory protocolServerFactory, TimeoutStrategy timeoutStrategy, StringLogger logger )
     {
         this.life = life;
+        this.protocolServerFactory = protocolServerFactory;
+        this.timeoutStrategy = timeoutStrategy;
         this.logger = logger;
     }
 
-    public MultiPaxosServer newNetworkedServer(Map<String, String> configuration)
+    public ProtocolServer newNetworkedServer(Map<String, String> configuration)
     {
         NetworkNode.Configuration config = ConfigProxy.config( configuration, NetworkNode.Configuration.class );
         final NetworkNode node = new NetworkNode( config, logger );
         life.add( node );
 
-        MultiPaxosContext context = new MultiPaxosContext();
-        context.timeouts = life.add( new TimeoutsService( new FixedTimeoutStrategy( TimeUnit.SECONDS.toMillis( 10 ) ), new MessageProcessor()
-        {
-            @Override
-            public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> void process( Message<MESSAGETYPE> message )
-            {
-                node.receive( message );
-            }
-        }));
+        Timeouts timeouts = new TimeoutsService( timeoutStrategy, node );
 
-        final MultiPaxosServer server = new MultiPaxosServer( context, node, node );
+        final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeouts, node, node);
         node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
         {
             @Override
             public void listeningAt( URI me )
             {
-                server.listeningAt( me.toString() );
+                protocolServer.listeningAt( me.toString() );
             }
 
             @Override
@@ -83,8 +75,8 @@ public class NetworkedServerFactory
             {
             }
         } );
-        life.add( server );
+        life.add( protocolServer );
         
-        return server;
+        return protocolServer;
     }
 }

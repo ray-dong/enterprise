@@ -18,33 +18,28 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import org.neo4j.com2.message.MessageType;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Learner state machine messages
+ * TODO
  */
-public enum LearnerMessage
-    implements MessageType
+public class InMemoryAcceptorInstanceStore
+    implements AcceptorInstanceStore
 {
-    failure,
-    join,leave,
+    Map<InstanceId, AcceptorInstance> instances = new HashMap<InstanceId, AcceptorInstance>(  );
 
-    learn;
-
-    public static class LearnState
+    @Override
+    public AcceptorInstance getAcceptorInstance( InstanceId instanceId )
     {
-        private int v_vid;
-
-        public LearnState( int v_vid )
+        AcceptorInstance instance = instances.get( instanceId );
+        if (instance == null)
         {
-            this.v_vid = v_vid;
+            instance = new AcceptorInstance(instanceId);
+            instances.put( instanceId, instance );
         }
-
-        public int getV_vid()
-        {
-            return v_vid;
-        }
+        return instance;
     }
 }

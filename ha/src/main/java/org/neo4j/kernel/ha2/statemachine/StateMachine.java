@@ -29,77 +29,59 @@ import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageType;
 
 /**
- * TODO
+ * State machine that wraps a context and a state, which can change when a Message comes in.
+ * Incoming messages must be of the particular type that the state understands.
  */
-public class StateMachine<CONTEXT, MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>>
+public class StateMachine
 {
-    private CONTEXT context;
-    private Class<MESSAGETYPE> messageEnumType;
-    private STATE state;
+    private Object context;
+    private Class<? extends MessageType> messageEnumType;
+    private State<?,?> state;
 
-    private List<StateTransitionListener<MESSAGETYPE>> listeners = new ArrayList<StateTransitionListener<MESSAGETYPE>>();
+    private List<StateTransitionListener> listeners = new ArrayList<StateTransitionListener>();
 
-    public StateMachine(CONTEXT context, Class<MESSAGETYPE> messageEnumType, STATE state)
+    public StateMachine(Object context, Class<? extends MessageType> messageEnumType, State<?,?> state)
     {
         this.context = context;
         this.messageEnumType = messageEnumType;
         this.state = state;
     }
 
-    public Class<MESSAGETYPE> getMessageType()
+    public Class<? extends MessageType> getMessageType()
     {
         return messageEnumType;
     }
 
-    public CONTEXT getContext()
-    {
-        return context;
-    }
-
-    public STATE getState()
+    public State<?,?> getState()
     {
         return state;
     }
 
-    public void checkValidProxyInterface(Class<?> proxyInterface)
-        throws IllegalArgumentException
-    {
-        for( Method method : proxyInterface.getMethods() )
-        {
-            Enum.valueOf( messageEnumType, method.getName() );
-            
-            if (!(method.getReturnType().equals( Void.TYPE ) || method.getReturnType().equals( Future.class )))
-            {
-                throw new IllegalArgumentException( "Methods must return either void or Future" );
-            }
-        }
-    }
-
-    public void addStateTransitionListener( StateTransitionListener<MESSAGETYPE> listener
+    public void addStateTransitionListener( StateTransitionListener listener
     )
     {
-        List<StateTransitionListener<MESSAGETYPE>> newlisteners = new ArrayList<StateTransitionListener<MESSAGETYPE>>(listeners);
+        List<StateTransitionListener> newlisteners = new ArrayList<StateTransitionListener>(listeners);
         newlisteners.add( listener );
         listeners = newlisteners;
     }
 
-    public void removeStateTransitionListener(StateTransitionListener<MESSAGETYPE> listener)
+    public void removeStateTransitionListener(StateTransitionListener listener)
     {
-        List<StateTransitionListener<MESSAGETYPE>> newlisteners = new ArrayList<StateTransitionListener<MESSAGETYPE>>(listeners);
+        List<StateTransitionListener> newlisteners = new ArrayList<StateTransitionListener>(listeners);
         newlisteners.remove(listener);
         listeners = newlisteners;
     }
 
-    public synchronized void handle( Message<MESSAGETYPE> message, MessageProcessor outgoing )
+    public synchronized void handle( Message<? extends MessageType> message, MessageProcessor outgoing )
     {
         try
         {
-            STATE oldState = state;
-            STATE newState = state.handle( context, message, outgoing );
+            State<Object,MessageType> oldState = (State<Object, MessageType>) state;
+            State<?,?> newState = oldState.handle( (Object) context, (Message<MessageType>) message, outgoing );
             state = newState;
 
-            StateTransition<MESSAGETYPE> transition = new StateTransition<MESSAGETYPE>( oldState, message, newState );
-            for (StateTransitionListener<MESSAGETYPE> listener : listeners)
+            StateTransition transition = new StateTransition( oldState, message, newState );
+            for (StateTransitionListener listener : listeners)
             {
                 try
                 {
@@ -116,5 +98,11 @@ public class StateMachine<CONTEXT, MESSAGETYPE extends Enum<MESSAGETYPE> & Messa
         {
             throwable.printStackTrace();
         }
+    }
+
+    @Override
+    public String toString()
+    {
+        return state.toString()+": "+context.toString();
     }
 }

@@ -18,33 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
-
-import org.neo4j.com2.message.MessageType;
+package org.neo4j.kernel.ha2;
 
 /**
- * Learner state machine messages
- */
-public enum LearnerMessage
-    implements MessageType
+* Listener for binding to a server address.
+*/
+public interface BindingListener
 {
-    failure,
-    join,leave,
-
-    learn;
-
-    public static class LearnState
-    {
-        private int v_vid;
-
-        public LearnState( int v_vid )
-        {
-            this.v_vid = v_vid;
-        }
-
-        public int getV_vid()
-        {
-            return v_vid;
-        }
-    }
+    void listeningAt( String me );
 }

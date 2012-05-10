@@ -32,7 +32,7 @@ import static org.neo4j.com2.message.Message.*;
  * State Machine for implementation of Atomic Broadcast client interface
  */
 public enum AtomicBroadcastState
-    implements State<MultiPaxosContext, AtomicBroadcastMessage, AtomicBroadcastState>
+    implements State<MultiPaxosContext, AtomicBroadcastMessage>
 {
     start
         {

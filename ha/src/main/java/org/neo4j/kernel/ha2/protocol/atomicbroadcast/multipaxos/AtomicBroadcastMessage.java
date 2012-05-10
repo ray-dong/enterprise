@@ -28,34 +28,7 @@ import org.neo4j.com2.message.MessageType;
 public enum AtomicBroadcastMessage
     implements MessageType
 {
-    failure,
-    joined, join(failure, joined),left, leave(failure, left), // Group management
+    joined, join,left, leave, // Group management
     possibleServers,fail,recover, // Node management
-    broadcast(failure, ProposerMessage.accepted), addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast
-
-    private MessageType failureMessage;
-    private MessageType[] next;
-
-    private AtomicBroadcastMessage()
-    {
-        next = new AtomicBroadcastMessage[0];
-    }
-
-    private AtomicBroadcastMessage( MessageType failureMessage, MessageType... next )
-    {
-        this.failureMessage = failureMessage;
-        this.next = next;
-    }
-
-    @Override
-    public MessageType[] next()
-    {
-        return next;
-    }
-
-    @Override
-    public MessageType failureMessage()
-    {
-        return failureMessage;
-    }
+    broadcast, addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast
 }

@@ -21,13 +21,12 @@
 package org.neo4j.kernel.ha2.statemachine;
 
 import java.util.logging.Logger;
-import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO
  */
-public class StateTransitionLogger<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
-        implements StateTransitionListener<MESSAGETYPE>
+public class StateTransitionLogger
+        implements StateTransitionListener
 {
     private String participant;
     private Logger logger;
@@ -41,7 +40,7 @@ public class StateTransitionLogger<MESSAGETYPE extends Enum<MESSAGETYPE> & Messa
     public void stateTransition(StateTransition transition)
     {
         if (transition.getMessage().getPayload() instanceof String)
-            logger.warning(participant+": "+
+            logger.info(participant+": "+
                                transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
                                                                                                                                transition.getNewState().toString());
         else

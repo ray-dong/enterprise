@@ -32,37 +32,11 @@ public enum CoordinatorMessage
     failure,
     join,leave,
     phase1Failure,
-    propose(phase1Failure,AcceptorMessage.accept), // If no accept message is sent out, it means not enough promises have come in
+    propose, // If no accept message is sent out, it means not enough promises have come in
     promise, // phase 1b
     denial, // phase 1b denial
     phase2Failure,
     accepted; // phase 2b
-
-    private MessageType failureMessage;
-    private MessageType[] next;
-
-    private CoordinatorMessage()
-    {
-        next = new CoordinatorMessage[0];
-    }
-
-    private CoordinatorMessage( MessageType failureMessage, MessageType... next )
-    {
-        this.failureMessage = failureMessage;
-        this.next = next;
-    }
-
-    @Override
-    public MessageType[] next()
-    {
-        return next;
-    }
-
-    @Override
-    public MessageType failureMessage()
-    {
-        return failureMessage;
-    }
 
     public static class PromiseState
         implements Serializable

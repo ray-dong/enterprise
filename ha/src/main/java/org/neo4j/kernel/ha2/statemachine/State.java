@@ -25,9 +25,11 @@ import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageType;
 
 /**
- * TODO
+ * Implemented by states in a state machine. Each state must
+ * implement the handle method, to perform different things depending
+ * on the message that comes in.
  */
-public interface State<CONTEXT, MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType, STATE extends State<CONTEXT, MESSAGETYPE, STATE>>
+public interface State<CONTEXT, MESSAGETYPE extends MessageType>
 {
-    public STATE handle( CONTEXT context, Message<MESSAGETYPE> message, MessageProcessor outgoing ) throws Throwable;
+    public State<?,?> handle( CONTEXT context, Message<MESSAGETYPE> message, MessageProcessor outgoing ) throws Throwable;
 }

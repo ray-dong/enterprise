@@ -32,53 +32,27 @@ public enum ProposerMessage
     failure,
     join,leave,
     phase1Timeout,
-    propose( phase1Timeout, AcceptorMessage.accept), // If no accept message is sent out, it means not enough promises have come in
+    propose, // If no accept message is sent out, it means not enough promises have come in
     promise, // phase 1b
     reject, // phase 1b reject
     phase2Timeout,
     accepted; // phase 2b
 
-    private MessageType failureMessage;
-    private MessageType[] next;
-
-    private ProposerMessage()
-    {
-        next = new ProposerMessage[0];
-    }
-
-    private ProposerMessage( MessageType failureMessage, MessageType... next )
-    {
-        this.failureMessage = failureMessage;
-        this.next = next;
-    }
-
-    @Override
-    public MessageType[] next()
-    {
-        return next;
-    }
-
-    @Override
-    public MessageType failureMessage()
-    {
-        return failureMessage;
-    }
-
     public static class PromiseState
         implements Serializable
     {
-        private long instance;
+        private InstanceId instance;
         private long ballot;
         private Object value;
 
-        public PromiseState( long instance, long ballot, Object value )
+        public PromiseState( InstanceId instance, long ballot, Object value )
         {
             this.instance = instance;
             this.ballot = ballot;
             this.value = value;
         }
 
-        public long getInstance()
+        public InstanceId getInstance()
         {
             return instance;
         }
@@ -97,14 +71,14 @@ public enum ProposerMessage
     public static class DenialState
         implements Serializable
     {
-        private long instance;
+        private InstanceId instance;
 
-        public DenialState( long instance )
+        public DenialState( InstanceId instance )
         {
             this.instance = instance;
         }
 
-        public long getInstance()
+        public InstanceId getInstance()
         {
             return instance;
         }
@@ -113,14 +87,14 @@ public enum ProposerMessage
     public static class AcceptedState
         implements Serializable
     {
-        private long instance;
+        private InstanceId instance;
 
-        public AcceptedState( long instance )
+        public AcceptedState( InstanceId instance )
         {
             this.instance = instance;
         }
 
-        public long getInstance()
+        public InstanceId getInstance()
         {
             return instance;
         }

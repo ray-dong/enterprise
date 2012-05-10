@@ -20,46 +20,51 @@
 
 package org.neo4j.kernel.ha2;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Logger;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageType;
-import org.neo4j.helpers.collection.Visitor;
+import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 
 /**
- * TODO
+ * This mocks message delivery, message loss, and time for timeouts and message latency
+ * between protocol servers.
  */
-public abstract class NetworkMock<CONTEXT,MESSAGE extends Enum<MESSAGE>&MessageType, SERVER extends ProtocolServer<CONTEXT,MESSAGE> >
+public class NetworkMock
 {
-    Map<String, TestProtocolServer<CONTEXT,MESSAGE,SERVER>> participants = new HashMap<String, TestProtocolServer<CONTEXT,MESSAGE,SERVER>>();
+    Map<String, TestProtocolServer> participants = new HashMap<String, TestProtocolServer>();
 
-    private final NetworkFailureStrategy failureStrategy;
+    private List<MessageDelivery> messageDeliveries = new ArrayList<MessageDelivery>();
 
-    public NetworkMock()
+    private long now = 0;
+    private long tickDuration;
+    private ProtocolServerFactory factory;
+    private final NetworkLatencyStrategy strategy;
+    private TimeoutStrategy timeoutStrategy;
+
+    public NetworkMock( long tickDuration, ProtocolServerFactory factory, NetworkLatencyStrategy strategy, TimeoutStrategy timeoutStrategy )
     {
-        this(new PerfectNetworkStrategy());
+        this.tickDuration = tickDuration;
+        this.factory = factory;
+        this.strategy = strategy;
+        this.timeoutStrategy = timeoutStrategy;
     }
 
-    public NetworkMock( NetworkFailureStrategy failureStrategy )
+    public TestProtocolServer addServer( String serverId )
     {
-        this.failureStrategy = failureStrategy;
-    }
+        TestProtocolServer server = newTestProtocolServer(serverId);
 
-    public TestProtocolServer<CONTEXT,MESSAGE,SERVER> addServer( String serverId )
-    {
-        TestProtocolServer<CONTEXT,MESSAGE,SERVER> server = newTestProtocolServer(serverId);
-
-        debug( serverId, "joins ring" );
+        debug( serverId, "joins cluster" );
 
         participants.put( serverId, server );
 
         return server;
     }
 
-    protected abstract TestProtocolServer<CONTEXT,MESSAGE,SERVER> newTestProtocolServer(String serverId);
+    protected TestProtocolServer newTestProtocolServer(String serverId)
+    {
+        return new TestProtocolServer( timeoutStrategy, factory, serverId );
+    }
 
     private void debug( String participant, String string )
     {
@@ -68,7 +73,7 @@ public abstract class NetworkMock<CONTEXT,MESSAGE extends Enum<MESSAGE>&MessageT
 
     public void removeServer( String serverId )
     {
-        debug( serverId, "leaves ring" );
+        debug( serverId, "leaves cluster" );
         TestProtocolServer server = participants.get(serverId);
         server.stop();
 
@@ -84,73 +89,115 @@ public abstract class NetworkMock<CONTEXT,MESSAGE extends Enum<MESSAGE>&MessageT
             testServer.sendMessages( messages );
         }
         
-        // Now send them
-        int nrOfReceivedMessages = 0;
+        // Now send them and figure out latency
         for( Message message : messages )
         {
             String to = message.getHeader( Message.TO );
             if ( to.equals( Message.BROADCAST ))
             {
-                for( Map.Entry<String, TestProtocolServer<CONTEXT,MESSAGE,SERVER>> testServer : participants.entrySet() )
+                for( Map.Entry<String, TestProtocolServer> testServer : participants.entrySet() )
                 {
                     if (!testServer.getKey().equals( message.getHeader( Message.FROM ) ))
                     {
-                        if (failureStrategy.isLost( message, testServer.getKey() ))
+                        long delay = strategy.messageDelay(message, testServer.getKey());
+                        if (delay == NetworkLatencyStrategy.LOST)
                         {
                             Logger.getLogger("").info( "Broadcasted message to "+testServer.getKey()+" was lost");
 
                         } else
                         {
-                            Logger.getLogger("").info( "Broadcast to "+testServer.getKey()+": "+message);
-                            testServer.getValue().process( message );
-                            nrOfReceivedMessages++;
+                            Logger.getLogger("").info("Broadcast to " + testServer.getKey() + ": " + message);
+                            messageDeliveries.add(new MessageDelivery(now+delay, message, testServer.getValue()));
                         }
                     }
                 }
             } else
             {
-                if (failureStrategy.isLost( message, to ))
+                long delay = strategy.messageDelay(message, to);
+                if (delay == NetworkLatencyStrategy.LOST)
                 {
                     Logger.getLogger("").info( "Send message to "+to+" was lost");
                 } else
                 {
-                    TestProtocolServer<CONTEXT,MESSAGE,SERVER> server = participants.get( to );
-                    Logger.getLogger("").info( "Send to "+to+": "+message);
-                    server.process( message );
-                    nrOfReceivedMessages++;
+                    TestProtocolServer server = participants.get( to );
+                    Logger.getLogger("").info("Send to " + to + ": " + message);
+                    messageDeliveries.add(new MessageDelivery(now+delay, message, server));
                 }
             }
         }
-        return nrOfReceivedMessages;
+
+        // Deliver messages whose delivery time has passed
+        now += tickDuration;
+
+        Iterator<MessageDelivery> iter = messageDeliveries.iterator();
+        while (iter.hasNext())
+        {
+            MessageDelivery messageDelivery = iter.next();
+            if (messageDelivery.getMessageDeliveryTime() <= now)
+            {
+                messageDelivery.getServer().process(messageDelivery.getMessage());
+                iter.remove();
+            }
+        }
+
+        return messageDeliveries.size();
     }
     
     public void tickUntilDone()
     {
         do
         {
-            while (tick()>0){}
+            while (tick()+totalCurrentTimeouts()>0){}
             
             for( TestProtocolServer testServer : participants.values() )
             {
-                testServer.checkTimeouts();
+                testServer.tick(tickDuration);
             }
         } while (tick() > 0);
     }
-    
-    public void verifyState( String serverId, Verifier<CONTEXT> verifier )
+
+    private int totalCurrentTimeouts()
     {
-        TestProtocolServer participant = participants.get( serverId );
-        if ( participant == null ) 
-            throw new IllegalArgumentException( "Unknown server id '" + serverId + "'" );
-        participant.verifyState( verifier );
+        int count = 0;
+        for (TestProtocolServer testProtocolServer : participants.values())
+        {
+            count += testProtocolServer.getTimeouts().getTimeouts().size();
+        }
+        return count;
     }
 
-    public void visitServers( Visitor<SERVER> visitor )
+    private static class MessageDelivery
     {
-        for( TestProtocolServer<CONTEXT,MESSAGE,SERVER> testServer : participants.values() )
+        long messageDeliveryTime;
+        Message<? extends MessageType> message;
+        TestProtocolServer server;
+
+        private MessageDelivery(long messageDeliveryTime, Message<? extends MessageType> message, TestProtocolServer server)
         {
-            if (!visitor.visit( testServer.getServer() ))
-                return;
+            this.messageDeliveryTime = messageDeliveryTime;
+            this.message = message;
+            this.server = server;
+        }
+
+        public long getMessageDeliveryTime()
+        {
+            return messageDeliveryTime;
+        }
+
+        public Message<? extends MessageType> getMessage()
+        {
+            return message;
+        }
+
+        public TestProtocolServer getServer()
+        {
+            return server;
+        }
+
+        @Override
+        public String toString()
+        {
+            return "Deliver "+message.getMessageType().name()+" to "+server+" at "+messageDeliveryTime;
         }
     }
 }

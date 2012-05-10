@@ -31,7 +31,7 @@ import static org.neo4j.com2.message.Message.internal;
  * State Machine for implementation of Atomic Broadcast client interface
  */
 public enum AtomicBroadcastState
-    implements State<RingPaxosContext, AtomicBroadcastMessage, AtomicBroadcastState>
+    implements State<RingPaxosContext, AtomicBroadcastMessage>
 {
     start
         {

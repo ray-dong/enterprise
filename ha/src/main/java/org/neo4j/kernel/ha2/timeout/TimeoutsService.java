@@ -27,6 +27,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
+import org.neo4j.com2.message.MessageType;
 import org.neo4j.helpers.DaemonThreadFactory;
 import org.neo4j.kernel.Lifecycle;
 
@@ -74,7 +75,7 @@ public class TimeoutsService
     {
     }
 
-    public void setTimeout(Object key, Message timeoutMessage)
+    public void setTimeout(Object key, Message<? extends MessageType> timeoutMessage)
     {
         Timeout timeout = new Timeout( key, timeoutMessage );
         timeouts.put( key, timeout );
@@ -93,9 +94,9 @@ public class TimeoutsService
     {
         private boolean cancelled = false;
         private Object key;
-        private Message message;
+        private Message<? extends MessageType> message;
 
-        private Timeout( Object key, Message message )
+        private Timeout( Object key, Message<? extends MessageType> message )
         {
             this.key = key;
             this.message = message;

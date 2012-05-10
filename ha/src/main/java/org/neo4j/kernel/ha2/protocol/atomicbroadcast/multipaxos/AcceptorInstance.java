@@ -25,9 +25,14 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
  */
 public class AcceptorInstance
 {
-    long instanceId = -1;
+    InstanceId instanceId = null;
     long ballot = -1;
     Object value;
+
+    public AcceptorInstance( InstanceId instanceId )
+    {
+        this.instanceId = instanceId;
+    }
 
     public void set( AcceptorMessage.AcceptState acceptState )
     {

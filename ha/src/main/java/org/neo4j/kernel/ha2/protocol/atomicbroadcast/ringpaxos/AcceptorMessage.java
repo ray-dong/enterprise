@@ -33,34 +33,8 @@ public enum AcceptorMessage
     failure,
     join,leave,
     prepare, // phase 1a/1b
-    accept(CoordinatorMessage.phase2Failure, CoordinatorMessage.accepted), // phase 2a/2b - timeout if accepted is not received fast enough
+    accept, // phase 2a/2b - timeout if accepted is not received fast enough
     accepted;
-
-    private MessageType failureMessage;
-    private MessageType[] next;
-
-    private AcceptorMessage()
-    {
-        next = new AcceptorMessage[0];
-    }
-
-    private AcceptorMessage( MessageType failureMessage, MessageType... next )
-    {
-        this.failureMessage = failureMessage;
-        this.next = next;
-    }
-
-    @Override
-    public MessageType[] next()
-    {
-        return next;
-    }
-
-    @Override
-    public MessageType failureMessage()
-    {
-        return failureMessage;
-    }
 
     public static class PrepareState
         implements Serializable

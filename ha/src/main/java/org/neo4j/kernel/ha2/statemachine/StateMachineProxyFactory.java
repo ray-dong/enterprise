@@ -31,41 +31,35 @@ import java.util.concurrent.TimeoutException;
 import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageProcessor;
 import org.neo4j.com2.message.MessageType;
+import org.neo4j.kernel.ha2.BindingListener;
+import org.neo4j.kernel.ha2.ConnectedStateMachines;
 
 /**
  * TODO
  */
-public class StateMachineProxyFactory<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
-    implements MessageProcessor
+public class StateMachineProxyFactory
+    implements MessageProcessor, BindingListener
 {
-    private StateMachine<?,MESSAGETYPE,?> stateMachine;
-    private MessageProcessor incoming;
+    private ConnectedStateMachines stateMachines;
+    private StateMachine stateMachine;
     private StateMachineConversations conversations;
     private String serverId;
-    private Class<MESSAGETYPE> messageTypeEnum;
 
     private Map<String, ResponseFuture> responseFutureMap = new ConcurrentHashMap<String, ResponseFuture>(  );
     
     
-    public StateMachineProxyFactory(String serverId, Class<MESSAGETYPE> messageTypeEnum, StateMachine<?,MESSAGETYPE,?> stateMachine, MessageProcessor incoming, StateMachineConversations conversations )
+    public StateMachineProxyFactory(ConnectedStateMachines stateMachines, StateMachineConversations conversations )
     {
-        this.serverId = serverId;
-        this.messageTypeEnum = messageTypeEnum;
-        this.stateMachine = stateMachine;
-        this.incoming = incoming;
+        this.stateMachines = stateMachines;
         this.conversations = conversations;
+        this.stateMachine = stateMachines.getStateMachines().iterator().next();
     }
     
     public <CLIENT> CLIENT newProxy(Class<CLIENT> proxyInterface)
     {
-        stateMachine.checkValidProxyInterface( proxyInterface );
+        stateMachines.checkValidProxyInterface( proxyInterface );
 
         return proxyInterface.cast( Proxy.newProxyInstance( proxyInterface.getClassLoader(), new Class<?>[]{ proxyInterface }, new StateMachineProxyHandler( this ) ) );
-    }
-
-    public void addStateTransitionListener( StateTransitionListener<MESSAGETYPE> stateTransitionListener )
-    {
-        stateMachine.addStateTransitionListener( stateTransitionListener );
     }
 
     Object invoke( Method method, Object arg )
@@ -73,22 +67,35 @@ public class StateMachineProxyFactory<MESSAGETYPE extends Enum<MESSAGETYPE> & Me
     {
         String conversationId = conversations.getNextConversationId();
 
-        MESSAGETYPE typeAsEnum = Enum.valueOf( messageTypeEnum, method.getName() );
-        Message<MESSAGETYPE> message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
-
-        if (method.getReturnType().equals( Void.TYPE ))
+        try
         {
-            incoming.process( message );
-            return null;
-        }
-        else
-        {
-            ResponseFuture future = new ResponseFuture( typeAsEnum );
-            responseFutureMap.put( conversationId, future );
-            incoming.process( message );
+            MessageType typeAsEnum = (MessageType) Enum.valueOf(  (Class<? extends Enum>) stateMachine.getMessageType(), method.getName() );
+            Message<?> message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
 
-            return future;
+            if (method.getReturnType().equals( Void.TYPE ))
+            {
+                stateMachines.process( message );
+                return null;
+            }
+            else
+            {
+                ResponseFuture future = new ResponseFuture( typeAsEnum );
+                responseFutureMap.put( conversationId, future );
+                stateMachines.process( message );
+
+                return future;
+            }
         }
+        catch( IllegalArgumentException e )
+        {
+            throw new IllegalStateException( "No state machine can handle the method "+method.getName() );
+        }
+    }
+
+    @Override
+    public void listeningAt( String me )
+    {
+        serverId = me;
     }
 
     @Override
@@ -155,17 +162,7 @@ public class StateMachineProxyFactory<MESSAGETYPE extends Enum<MESSAGETYPE> & Me
 
         private boolean isResponse( Message response )
         {
-            if (initiatedByMessageType.next().length == 0)
-                return true;
-            else
-            {
-                for( MessageType messageType : initiatedByMessageType.next() )
-                {
-                    if (response.getMessageType().equals( messageType ))
-                        return true;
-                }
-                return false;
-            }
+            return (response.getMessageType().name().equals( initiatedByMessageType.name()+"Response" ));
         }
 
         @Override
@@ -203,7 +200,7 @@ public class StateMachineProxyFactory<MESSAGETYPE extends Enum<MESSAGETYPE> & Me
         private Object getResult()
             throws InterruptedException, ExecutionException
         {
-            if (response.getMessageType().equals( initiatedByMessageType.failureMessage() ))
+            if (response.getMessageType().name().equals( initiatedByMessageType.name() + "Failure" ))
             {
                 // Call timed out
                 if (response.getPayload() != null)

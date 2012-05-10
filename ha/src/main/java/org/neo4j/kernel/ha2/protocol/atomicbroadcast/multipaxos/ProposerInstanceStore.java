@@ -18,39 +18,26 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import java.util.Random;
-import org.neo4j.com2.message.Message;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- * Randomly drops messages.
+ * TODO
  */
-public class RandomDropNetworkFailureStrategy
-    implements NetworkFailureStrategy
+public class ProposerInstanceStore
 {
-    Random random;
-    private double rate;
+    Map<InstanceId, ProposerInstance> instances = new HashMap<InstanceId, ProposerInstance>(  );
 
-    /**
-     *
-     * @param seed Provide a seed for the Random, in order to produce repeatable tests.
-     * @param rate 1.0=no dropped messages, 0.0=all messages are lost
-     */
-    public RandomDropNetworkFailureStrategy( long seed, double rate )
+    public ProposerInstance getProposerInstance( InstanceId instanceId )
     {
-        setRate( rate );
-        this.random = new Random( seed );
-    }
-
-    public void setRate( double rate )
-    {
-        this.rate = rate;
-    }
-
-    @Override
-    public boolean isLost( Message<?> message, String serverIdTo )
-    {
-        return random.nextDouble() > rate;
+        ProposerInstance instance = instances.get( instanceId );
+        if (instance == null)
+        {
+            instance = new ProposerInstance();
+            instances.put( instanceId, instance );
+        }
+        return instance;
     }
 }

@@ -27,35 +27,35 @@ import java.util.Map;
 /**
  * Message for state machines which can be sent out in the cluster as well.
  */
-public class Message<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
+public class Message<MESSAGETYPE extends MessageType>
     implements Serializable
 {
-    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message)
     {
         return broadcast(message, null);
     }
 
-    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message, Object payload)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message, Object payload)
     {
         return new Message<MESSAGETYPE>(message, payload).setHeader( TO, BROADCAST );
     }
 
-    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to)
     {
         return to( message, to, null );
     }
     
-    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to, Object payload)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to, Object payload)
     {
         return new Message<MESSAGETYPE>(message, payload).setHeader( TO, to.toString() );
     }
     
-    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message)
     {
         return internal( message, null );
     }
     
-    public static <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message, Object payload)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message, Object payload)
     {
         return new Message<MESSAGETYPE>( message, payload );
     }
@@ -118,7 +118,7 @@ public class Message<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
         return value;
     }
 
-    public <MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType> Message<MESSAGETYPE> copyHeadersTo( Message<MESSAGETYPE> message, String... names )
+    public Message<? extends MessageType> copyHeadersTo( Message<? extends MessageType> message, String... names )
     {
         if (names.length == 0)
         {

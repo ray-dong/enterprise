@@ -21,13 +21,14 @@
 package org.neo4j.kernel.ha2.timeout;
 
 import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * TODO
  */
 public interface Timeouts
 {
-    void setTimeout(Object key, Message timeoutMessage);
+    void setTimeout(Object key, Message<? extends MessageType> timeoutMessage);
 
     void cancelTimeout(Object key);
 }

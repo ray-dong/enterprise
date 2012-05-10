@@ -18,33 +18,35 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2;
 
+import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageType;
 
 /**
- * Learner state machine messages
+ * Ask a set of network strategies about a message delay. Anyone says -1, then it is lost.
  */
-public enum LearnerMessage
-    implements MessageType
+public class MultipleFailureLatencyStrategy
+        implements NetworkLatencyStrategy
 {
-    failure,
-    join,leave,
+    private final NetworkLatencyStrategy[] strategies;
 
-    learn;
-
-    public static class LearnState
+    public MultipleFailureLatencyStrategy(NetworkLatencyStrategy... strategies)
     {
-        private int v_vid;
+        this.strategies = strategies;
+    }
 
-        public LearnState( int v_vid )
+    @Override
+    public long messageDelay(Message<? extends MessageType> message, String serverIdTo)
+    {
+        long delay = 0;
+        for (NetworkLatencyStrategy strategy : strategies)
         {
-            this.v_vid = v_vid;
+            delay = strategy.messageDelay(message, serverIdTo);
+            if (delay == NetworkLatencyStrategy.LOST)
+                return delay;
         }
 
-        public int getV_vid()
-        {
-            return v_vid;
-        }
+        return delay;
     }
 }

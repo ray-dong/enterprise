@@ -38,7 +38,7 @@ public class ProposerInstance
         delivered
     }
 
-    long id = -1;
+    InstanceId id = null;
     State state = State.empty;
     long ballot = 0;
     List<ProposerMessage.PromiseState> promises = new ArrayList<ProposerMessage.PromiseState>();
@@ -48,7 +48,7 @@ public class ProposerInstance
     Object value_2;
     boolean clientValue = false;
 
-    public void propose( long instanceId, long ballot )
+    public void propose( InstanceId instanceId, long ballot )
     {
         this.id = instanceId;
         this.state = State.p1_pending;
@@ -108,7 +108,6 @@ public class ProposerInstance
 
     public void delivered()
     {
-        id = -1;
         state = State.empty;
         ballot = 0;
         value_2 = null;

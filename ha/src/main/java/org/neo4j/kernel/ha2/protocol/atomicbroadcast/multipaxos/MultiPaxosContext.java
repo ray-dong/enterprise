@@ -54,24 +54,16 @@ public class MultiPaxosContext
 
     // Proposer/coordinator state
     Deque<Object> pendingValues = new LinkedList<Object>();
-    Map<Long,Object> bookedInstances = new HashMap<Long,Object>(  );
+    Map<InstanceId,Object> bookedInstances = new HashMap<InstanceId,Object>(  );
     public long lastInstanceId = 0;
-    List<ProposerInstance> proposerInstances = new ArrayList<ProposerInstance>(100);
+    ProposerInstanceStore proposerInstances = new ProposerInstanceStore();
 
     // Learner state
     List<LearnerInstance> learnerInstances = new ArrayList<LearnerInstance>(100);
     long lastLearnedInstanceId = -1;
 
-    // Coordinator state
-
     // Acceptor state
-    List<AcceptorInstance> acceptorInstances = new ArrayList<AcceptorInstance>( 100 );
-
-    long rnd = 0;
-    long v_rnd = 0;
-    Object v_val = null;
-    List<String> ring;
-    int v_vid;
+    AcceptorInstanceStore acceptorInstances = new InMemoryAcceptorInstanceStore();
 
     public void addAtomicBroadcastListener( AtomicBroadcastListener listener )
     {
@@ -146,8 +138,6 @@ public class MultiPaxosContext
     
     public void learnValue( final Object value )
     {
-        // TODO Use listener list to ensure ordering is correct
-
         Listeners.notifyListeners( listeners, new Listeners.Notification<AtomicBroadcastListener>()
                 {
                     @Override
@@ -158,38 +148,14 @@ public class MultiPaxosContext
                 } );
     }
 
-    public boolean isFirst()
-    {
-        return ring.get( 0 ).equals( me );
-    }
-
-    public String getSuccessor()
-    {
-        return ring.get( ring.indexOf( me )+1 );
-    }
-
-    public boolean isNotLast()
-    {
-        return ring.indexOf( me ) < ring.size()-1;
-    }
-
-    public boolean isLastAcceptor()
-    {
-        return ring.indexOf( me ) == ring.size()-2;
-    }
-
     public int getLearnerInstanceIndex( long instanceId )
     {
         return (int)(instanceId%learnerInstances.size());
     }
 
-    public int getProposerInstanceIndex( long instanceId )
-    {
-        return (int)(instanceId%proposerInstances.size());
-    }
 
-    public int getAcceptorInstanceIndex( long instanceId )
+    public InstanceId newInstanceId()
     {
-        return (int)(instanceId%acceptorInstances.size());
+        return new InstanceId( lastInstanceId++);
     }
 }

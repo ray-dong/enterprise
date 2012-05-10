@@ -29,6 +29,7 @@ import org.neo4j.helpers.Specifications;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.timeout.TestTimeouts;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 import static org.neo4j.helpers.collection.Iterables.*;
 
@@ -37,7 +38,7 @@ import static org.neo4j.helpers.collection.Iterables.*;
  */
 public class RingPaxosContext
 {
-    public TestTimeouts timeouts;
+    public Timeouts timeouts;
 
     private String me;
     private List<String> possibleServers = new ArrayList<String>(  );

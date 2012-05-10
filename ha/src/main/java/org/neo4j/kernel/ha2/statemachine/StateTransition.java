@@ -24,32 +24,33 @@ import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageType;
 
 /**
- * TODO
+ * A single state transition that occurred in
+ * a state machine as a consequence of handling a message.
  */
-public class StateTransition<MESSAGETYPE extends Enum<MESSAGETYPE> & MessageType>
+public class StateTransition
 {
-    private Object oldState;
-    private Message<MESSAGETYPE> message;
-    private Object newState;
+    private State<?,?> oldState;
+    private Message<? extends MessageType> message;
+    private State<?,?> newState;
 
-    public StateTransition( Object oldState, Message<MESSAGETYPE> message, Object newState )
+    public StateTransition( State<?,?> oldState, Message<? extends MessageType> message, State<?,?> newState )
     {
         this.oldState = oldState;
         this.message = message;
         this.newState = newState;
     }
 
-    public Object getOldState()
+    public State<?,?> getOldState()
     {
         return oldState;
     }
 
-    public Message<MESSAGETYPE> getMessage()
+    public Message<? extends MessageType> getMessage()
     {
         return message;
     }
 
-    public Object getNewState()
+    public State<?,?> getNewState()
     {
         return newState;
     }

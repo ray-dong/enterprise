@@ -34,45 +34,19 @@ public enum LearnerMessage
 
     learn;
 
-    private MessageType failureMessage;
-    private MessageType[] next;
-
-    private LearnerMessage()
-    {
-        next = new LearnerMessage[0];
-    }
-
-    private LearnerMessage( MessageType failureMessage, MessageType... next )
-    {
-        this.failureMessage = failureMessage;
-        this.next = next;
-    }
-
-    @Override
-    public MessageType[] next()
-    {
-        return next;
-    }
-
-    @Override
-    public MessageType failureMessage()
-    {
-        return failureMessage;
-    }
-
     public static class LearnState
         implements Serializable
     {
-        private long instanceId;
+        private InstanceId instanceId;
         private Object value;
 
-        public LearnState( long instanceId, Object value )
+        public LearnState( InstanceId instanceId, Object value )
         {
             this.instanceId = instanceId;
             this.value = value;
         }
 
-        public long getInstanceId()
+        public InstanceId getInstanceId()
         {
             return instanceId;
         }

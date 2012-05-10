@@ -21,16 +21,29 @@
 package org.neo4j.kernel.ha2;
 
 import org.neo4j.com2.message.Message;
+import org.neo4j.com2.message.MessageType;
 
 /**
  * Messages never gets lost
  */
-public class PerfectNetworkStrategy
-    implements NetworkFailureStrategy
+public class FixedNetworkLatencyStrategy
+    implements NetworkLatencyStrategy
 {
-    @Override
-    public boolean isLost( Message<?> message, String serverIdTo )
+    private long delay = 0;
+
+    public FixedNetworkLatencyStrategy()
     {
-        return false;
+        this(0);
+    }
+
+    public FixedNetworkLatencyStrategy(long delay)
+    {
+        this.delay = delay;
+    }
+
+    @Override
+    public long messageDelay(Message<? extends MessageType> message, String serverIdTo)
+    {
+        return delay;
     }
 }

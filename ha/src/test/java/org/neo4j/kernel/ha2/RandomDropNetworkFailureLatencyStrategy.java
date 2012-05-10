@@ -18,33 +18,40 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2;
 
+import java.util.Random;
+import org.neo4j.com2.message.Message;
 import org.neo4j.com2.message.MessageType;
 
 /**
- * Learner state machine messages
+ * Randomly drops messages.
  */
-public enum LearnerMessage
-    implements MessageType
+public class RandomDropNetworkFailureLatencyStrategy
+    implements NetworkLatencyStrategy
 {
-    failure,
-    join,leave,
+    Random random;
+    private double rate;
 
-    learn;
-
-    public static class LearnState
+    /**
+     *
+     * @param seed Provide a seed for the Random, in order to produce repeatable tests.
+     * @param rate 1.0=no dropped messages, 0.0=all messages are lost
+     */
+    public RandomDropNetworkFailureLatencyStrategy(long seed, double rate)
     {
-        private int v_vid;
+        setRate( rate );
+        this.random = new Random( seed );
+    }
 
-        public LearnState( int v_vid )
-        {
-            this.v_vid = v_vid;
-        }
+    public void setRate( double rate )
+    {
+        this.rate = rate;
+    }
 
-        public int getV_vid()
-        {
-            return v_vid;
-        }
+    @Override
+    public long messageDelay(Message<? extends MessageType> message, String serverIdTo)
+    {
+        return random.nextDouble() > rate ? 0 : NetworkLatencyStrategy.LOST;
     }
 }

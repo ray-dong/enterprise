@@ -25,13 +25,15 @@ import java.util.concurrent.ExecutionException;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
-import org.neo4j.kernel.ha2.MultiPaxosServer;
+import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
+import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
+import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 
-import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.*;
 
 /**
  * TODO
@@ -53,7 +55,7 @@ public class MultiPaxosTest
     public void testDecision()
         throws ExecutionException, InterruptedException
     {
-        network = new MultiPaxosNetworkMock();
+        network = new NetworkMock(50, new MultiPaxosServerFactory(), new FixedNetworkLatencyStrategy(0), new FixedTimeoutStrategy( 1000 ));
 
         member1 = newMember( ID1, POSSIBLE_SERVERS );
         member2 = newMember( ID2, POSSIBLE_SERVERS );
@@ -62,9 +64,9 @@ public class MultiPaxosTest
         Map<String, String> map1 = new AtomicBroadcastMap<String,String>(member1);
         Map<String, String> map2 = new AtomicBroadcastMap<String,String>(member2);
 
-        map1.put( "foo", "bar" );
+        map1.put("foo", "bar");
         network.tickUntilDone();
-        Object foo = map2.get( "foo" );
+        Object foo = map1.get( "foo" );
         Assert.assertThat( foo.toString(), equalTo( "bar" ) );
 
         map1.put( "bar", "foo" );
@@ -85,7 +87,7 @@ public class MultiPaxosTest
 
     private AtomicBroadcast newMember( String id, String... possibleServers )
     {
-        TestProtocolServer<MultiPaxosContext, AtomicBroadcastMessage, MultiPaxosServer> server = network.addServer( id );
+        TestProtocolServer server = network.addServer( id );
         AtomicBroadcast member = server.newClient( AtomicBroadcast.class );
         member.possibleServers( possibleServers );
         member.join();

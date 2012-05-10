@@ -32,47 +32,21 @@ public enum AcceptorMessage
     failure,
     join,leave,
     prepare, // phase 1a/1b
-    accept( ProposerMessage.phase2Timeout, LearnerMessage.learn); // phase 2a/2b - timeout if resulting learn is not fast enough
-
-    private MessageType failureMessage;
-    private MessageType[] next;
-
-    private AcceptorMessage()
-    {
-        next = new AcceptorMessage[0];
-    }
-
-    private AcceptorMessage( MessageType failureMessage, MessageType... next )
-    {
-        this.failureMessage = failureMessage;
-        this.next = next;
-    }
-
-    @Override
-    public MessageType[] next()
-    {
-        return next;
-    }
-
-    @Override
-    public MessageType failureMessage()
-    {
-        return failureMessage;
-    }
+    accept; // phase 2a/2b - timeout if resulting learn is not fast enough
 
     public static class PrepareState
         implements Serializable
     {
-        private final long instanceId;
+        private final InstanceId instanceId;
         private final long ballot;
 
-        public PrepareState( long instanceId, long ballot )
+        public PrepareState( InstanceId instanceId, long ballot )
         {
             this.instanceId = instanceId;
             this.ballot = ballot;
         }
 
-        public long getInstanceId()
+        public InstanceId getInstanceId()
         {
             return instanceId;
         }
@@ -86,18 +60,18 @@ public enum AcceptorMessage
     public static class AcceptState
         implements Serializable
     {
-        private long instance;
+        private InstanceId instance;
         private long ballot;
         private Object value;
 
-        public AcceptState( long instance, long ballot, Object value )
+        public AcceptState( InstanceId instance, long ballot, Object value )
         {
             this.instance = instance;
             this.ballot = ballot;
             this.value = value;
         }
 
-        public long getInstance()
+        public InstanceId getInstance()
         {
             return instance;
         }
