@@ -30,9 +30,9 @@ public class MockedMasterElectionClient extends AbstractMasterElectionClient
     public MockedMasterElectionClient( MockedDistributedElection distributed )
     {
         this.distributed = distributed;
+        requestMaster();
     }
     
-    @Override
     public void requestMaster()
     {
         Pair<URL, Integer> currentMaster = distributed.currentMaster();
@@ -41,17 +41,6 @@ public class MockedMasterElectionClient extends AbstractMasterElectionClient
             distributeNewMasterElected( currentMaster.first(), currentMaster.other() );
             distributeNewMasterBecameAvailable( currentMaster.first() );
         }
-    }
-
-    @Override
-    public MasterElectionInput askForMasterElectionInput()
-    {
-        throw new UnsupportedOperationException( "Not needed when mocked" );
-    }
-
-    @Override
-    public void shutdown()
-    {
     }
 
     public void distributeNewMasterElected( URL masterUrl, int masterServerId )

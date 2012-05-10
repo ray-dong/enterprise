@@ -74,7 +74,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     private volatile int masterServerId = -1;
     private volatile DatabaseState databaseState = DatabaseState.TBD;
     private volatile MasterServer server;
-    final MasterElectionClient masterElectionClient;
+    private MasterElectionClient masterElectionClient;
     private final StateSwitchBlock switchBlock = new StateSwitchBlock();
     
     // TODO configurable
@@ -206,9 +206,14 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         };
         
         run();
-        
-        masterElectionClient = createMasterElectionClient();
-        masterElectionClient.requestMaster();
+    }
+    
+    @Override
+    protected void create()
+    {
+        super.create();
+        masterElectionClient = life.add( createMasterElectionClient() );
+        masterElectionClient.addMasterChangeListener( this );
     }
     
     public boolean isMaster()
@@ -225,10 +230,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     protected MasterElectionClient createMasterElectionClient()
     {
-        MasterElectionClient client = new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
-        // TODO Maybe adding of the listener shouldn't be in here
-        client.addMasterChangeListener( this );
-        return client;
+        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
     }
     
     @Override
@@ -251,7 +253,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     public void shutdown()
     {
         databaseState.shutdown( this );
-        masterElectionClient.shutdown();
+//        masterElectionClient.shutdown();
         super.shutdown();
     }
     
@@ -601,10 +603,9 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         @Override
         public void handle( Exception e )
         {
-            // TODO Block incoming transactions and rollback active ones or something.
             db.enterDatabaseStateSwitchBlockade();
             db.databaseState = db.databaseState.becomeUndecided( db );
-            db.masterElectionClient.requestMaster();
+//            db.masterElectionClient.masterCommunicationFailed();
         }
     }
 }

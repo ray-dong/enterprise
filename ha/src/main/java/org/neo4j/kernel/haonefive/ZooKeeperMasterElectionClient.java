@@ -39,11 +39,12 @@ import org.neo4j.kernel.ha.zookeeper.ZooClient;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperBroker;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperMachine;
 import org.neo4j.kernel.impl.util.StringLogger;
+import org.neo4j.kernel.lifecycle.Lifecycle;
 
 public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
-        implements ZooClientFactory, SlaveDatabaseOperations, ClusterEventReceiver
+        implements ZooClientFactory, SlaveDatabaseOperations, ClusterEventReceiver, Lifecycle
 {
-    private final Broker broker;
+    private Broker broker;
     private ZooClient zooClient;
     private final Config config;
     private final HaServiceSupplier stuff;
@@ -51,22 +52,13 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     private final String storeDir;
     private Machine currentMaster = ZooKeeperMachine.NO_MACHINE;
     
-    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter, String storeDir )
+    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter,
+            String storeDir )
     {
         this.stuff = stuff;
         this.config = config;
         this.storeIdGetter = storeIdGetter;
         this.storeDir = storeDir;
-        broker = new ZooKeeperBroker( config, this );
-    }
-    
-    @Override
-    public void requestMaster()
-    {
-        if ( currentMaster.getMachineId() == -1 )
-            if ( !figureOutCurrentMaster() )
-                return;
-        pingListenersAboutCurrentMaster();
     }
     
     private boolean figureOutCurrentMaster()
@@ -168,13 +160,6 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
             throw new RuntimeException( e );
         }
     }
-
-    @Override
-    public MasterElectionInput askForMasterElectionInput()
-    {
-        Pair<Long, Integer> lastTx = getLastTxData();
-        return new MasterElectionInput( lastTx.first(), lastTx.other() );
-    }
     
     @Override
     public Pair<Long, Integer> getLastTxData()
@@ -189,8 +174,37 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
         broker.restart();
     }
     
-    public void shutdown()
+    @Override
+    public void init() throws Throwable
     {
-        broker.shutdown();
+        broker = new ZooKeeperBroker( config, this );
+    }
+
+    @Override
+    public void start() throws Throwable
+    {
+        // TODO Start the process of finding a master, but not like this.
+        new Thread()
+        {
+            @Override
+            public void run()
+            {
+                if ( currentMaster.getMachineId() == -1 )
+                    if ( !figureOutCurrentMaster() )
+                        return;
+                pingListenersAboutCurrentMaster();
+            }
+        }.start();
+    }
+
+    @Override
+    public void stop() throws Throwable
+    {
+    }
+    
+    @Override
+    public void shutdown() throws Throwable
+    {
+        broker.shutdown();   
     }
 }

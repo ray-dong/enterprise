@@ -108,7 +108,6 @@ public abstract class MockedElectionTest
             }
         };
         dbs[serverId] = db;
-        db.masterElectionClient.addMasterChangeListener( db );
         return db;
     }
     

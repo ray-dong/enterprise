@@ -24,6 +24,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static junit.framework.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.neo4j.com.SlaveContext.lastAppliedTx;
+import static org.neo4j.helpers.Exceptions.launderedException;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.kernel.configuration.Config.DEFAULT_DATA_SOURCE_NAME;
 
@@ -134,7 +135,7 @@ public class TestZooKeeperMasterElectionBlackBox
         instance.setLastTx( previous.lastTx, previous.masterIdForLastTx );
         shutDownInstances[id] = null;
         instances[id] = instance;
-        instance.client.requestMaster();
+//        instance.client.requestMaster();
     }
 
     private int rightfulMaster()
@@ -212,15 +213,15 @@ public class TestZooKeeperMasterElectionBlackBox
             instances[i] = newInstance( i );
         
         // This mimics what ha graphdb will do after its master election client has been created.
-        for ( Instance instance : instances )
-            instance.client.requestMaster();
+//        for ( Instance instance : instances )
+//            instance.client.requestMaster();
     }
 
     private class Instance implements
             HaServiceSupplier, // Trim this down. ZooKeeperMasterElectionClient doesn't need it all
             MasterChangeListener
     {
-        private final MasterElectionClient client;
+        private final ZooKeeperMasterElectionClient client;
         private long lastTx = 1;
         private int masterIdForLastTx = -1;
         private final int id;
@@ -234,6 +235,15 @@ public class TestZooKeeperMasterElectionBlackBox
             this.id = id;
             this.client = new ZooKeeperMasterElectionClient( this, config( id ), storeIdGetter, storeDir );
             this.client.addMasterChangeListener( this );
+            try
+            {
+                this.client.init();
+                this.client.start();
+            }
+            catch ( Throwable e )
+            {
+                throw launderedException( e );
+            }
         }
 
         public void invalidateMaster()
@@ -252,7 +262,15 @@ public class TestZooKeeperMasterElectionBlackBox
 
         public void shutdown()
         {
-            client.shutdown();
+            try
+            {
+                client.stop();
+                client.shutdown();
+            }
+            catch ( Throwable e )
+            {
+                throw launderedException( e );
+            }
         }
         
         public void setLastTx( long lastTx, int masterId )
