@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2;
 
 import java.util.Random;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
 

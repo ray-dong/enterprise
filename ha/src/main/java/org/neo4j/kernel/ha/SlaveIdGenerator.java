@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.kernel.ha;
 
 import java.io.File;
@@ -26,11 +27,10 @@ import java.util.Map;
 import org.neo4j.com.ComException;
 import org.neo4j.com.Response;
 import org.neo4j.helpers.Pair;
-import org.neo4j.kernel.CommonFactories;
+import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.ha.zookeeper.Machine;
-import org.neo4j.kernel.ha.zookeeper.ZooKeeperException;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.IdRange;
@@ -42,32 +42,33 @@ public class SlaveIdGenerator implements IdGenerator
     public static class SlaveIdGeneratorFactory implements IdGeneratorFactory
     {
         private final Broker broker;
-        private final ResponseReceiver receiver;
+        private final SlaveDatabaseOperations databaseOperations;
         private final Map<IdType, SlaveIdGenerator> generators =
                 new EnumMap<IdType, SlaveIdGenerator>( IdType.class );
-        private final IdGeneratorFactory localFactory =
-                CommonFactories.defaultIdGeneratorFactory();
+        private final IdGeneratorFactory localFactory = new DefaultIdGeneratorFactory();
 
-        public SlaveIdGeneratorFactory( Broker broker, ResponseReceiver receiver )
+        public SlaveIdGeneratorFactory( Broker broker, SlaveDatabaseOperations databaseOperations )
         {
             this.broker = broker;
-            this.receiver = receiver;
+            this.databaseOperations = databaseOperations;
         }
 
+        @Override
         public IdGenerator open( FileSystemAbstraction fs, String fileName, int grabSize, IdType idType, long highestIdInUse, boolean startup )
         {
             if ( startup ) new File( fileName ).delete();
             IdGenerator localIdGenerator = localFactory.open( fs, fileName, grabSize,
                     idType, highestIdInUse, startup );
-            SlaveIdGenerator generator = new SlaveIdGenerator( idType, highestIdInUse, broker,
-                    receiver, localIdGenerator );
+            SlaveIdGenerator generator = new SlaveIdGenerator( idType, highestIdInUse, broker, databaseOperations,
+                    localIdGenerator );
             generators.put( idType, generator );
             return generator;
         }
 
-        public void create( FileSystemAbstraction fs, String fileName )
+        @Override
+        public void create( FileSystemAbstraction fs, String fileName, long highId )
         {
-            localFactory.create( fs, fileName );
+            localFactory.create( fs, fileName, highId );
         }
 
         public IdGenerator get( IdType idType )
@@ -85,7 +86,7 @@ public class SlaveIdGenerator implements IdGenerator
     };
 
     private final Broker broker;
-    private final ResponseReceiver receiver;
+    private final SlaveDatabaseOperations databaseOperations;
     private volatile long highestIdInUse;
     private volatile long defragCount;
     private volatile IdRangeIterator idQueue = EMPTY_ID_RANGE_ITERATOR;
@@ -94,11 +95,11 @@ public class SlaveIdGenerator implements IdGenerator
     private final IdGenerator localIdGenerator;
 
     public SlaveIdGenerator( IdType idType, long highestIdInUse, Broker broker,
-            ResponseReceiver receiver, IdGenerator localIdGenerator )
+            SlaveDatabaseOperations databaseOperations, IdGenerator localIdGenerator )
     {
         this.idType = idType;
         this.broker = broker;
-        this.receiver = receiver;
+        this.databaseOperations = databaseOperations;
         this.localIdGenerator = localIdGenerator;
     }
 
@@ -153,14 +154,9 @@ public class SlaveIdGenerator implements IdGenerator
             }
             return nextId;
         }
-        catch ( ZooKeeperException e )
+        catch ( RuntimeException e )
         {
-            receiver.newMaster( e );
-            throw e;
-        }
-        catch ( ComException e )
-        {
-            receiver.newMaster( e );
+            databaseOperations.exceptionHappened( e );
             throw e;
         }
     }

@@ -20,18 +20,25 @@
 
 package org.neo4j.kernel.ha2;
 
+import static org.neo4j.com_2.message.Message.CONVERSATION_ID;
+import static org.neo4j.com_2.message.Message.CREATED_BY;
+
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.Future;
 import java.util.logging.Logger;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
-
-import static org.neo4j.com_2.message.Message.*;
 
 /**
  * TODO

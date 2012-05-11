@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.ha;
 
 import static org.junit.Assert.assertEquals;
@@ -25,10 +26,6 @@ import static org.neo4j.backup.TestBackupToolEmbedded.PATH;
 import static org.neo4j.backup.TestBackupToolEmbedded.createSomeData;
 import static org.neo4j.backup.TestBackupToolEmbedded.runBackupToolFromOtherJvmToGetExitCode;
 import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.Config.ENABLE_ONLINE_BACKUP;
-import static org.neo4j.kernel.HaConfig.CONFIG_KEY_COORDINATORS;
-import static org.neo4j.kernel.HaConfig.CONFIG_KEY_SERVER;
-import static org.neo4j.kernel.HaConfig.CONFIG_KEY_SERVER_ID;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -37,11 +34,16 @@ import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
-import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
+import org.neo4j.backup.OnlineBackupSettings;
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.factory.GraphDatabaseSetting;
+import org.neo4j.graphdb.index.IndexProvider;
+import org.neo4j.helpers.Service;
 import org.neo4j.kernel.HighlyAvailableGraphDatabase;
+import org.neo4j.kernel.KernelExtension;
+import org.neo4j.kernel.ha.HaSettings;
+import org.neo4j.kernel.impl.cache.CacheProvider;
 import org.neo4j.test.DbRepresentation;
 import org.neo4j.test.ha.LocalhostZooKeeperCluster;
 
@@ -51,23 +53,26 @@ public class TestBackupToolHa
     private List<GraphDatabaseService> instances;
     private DbRepresentation representation;
     
-    @Before
-    public void before() throws Exception
+    public void startCluster( String clusterName ) throws Exception
     {
         FileUtils.deleteDirectory( new File( PATH ) );
         FileUtils.deleteDirectory( new File( BACKUP_PATH ) );
 
-        zk = new LocalhostZooKeeperCluster( TestBackupToolHa.class, 2181, 2182, 2183 );
+        zk = LocalhostZooKeeperCluster.singleton().clearDataAndVerifyConnection();
         instances = new ArrayList<GraphDatabaseService>();
         for ( int i = 0; i < 3; i++ )
         {
             String storeDir = new File( PATH, "" + i ).getAbsolutePath();
             Map<String, String> config = stringMap(
-                    CONFIG_KEY_SERVER_ID, "" + i,
-                    CONFIG_KEY_SERVER, "localhost:" + (6666+i),
-                    CONFIG_KEY_COORDINATORS, zk.getConnectionString(),
-                    ENABLE_ONLINE_BACKUP, "port=" + (4444+i) );
-            GraphDatabaseService instance = new HighlyAvailableGraphDatabase( storeDir, config );
+                HaSettings.server_id.name(), "" + i,
+                    HaSettings.server.name(), "localhost:" + (6666+i),
+                    HaSettings.coordinators.name(), zk.getConnectionString(),
+                    OnlineBackupSettings.online_backup_enabled.name(), GraphDatabaseSetting.TRUE,
+                    OnlineBackupSettings.online_backup_port.name(), ""+(4444+i) );
+            if ( clusterName != null )
+                config.put( HaSettings.cluster_name.name(), clusterName );
+            GraphDatabaseService instance = new HighlyAvailableGraphDatabase( storeDir, config,
+                    Service.load( IndexProvider.class ), Service.load( KernelExtension.class ), Service.load( CacheProvider.class ) );
             instances.add( instance );
         }
         
@@ -78,27 +83,62 @@ public class TestBackupToolHa
     @After
     public void after() throws Exception
     {
-        for ( GraphDatabaseService instance : instances )
+        if( instances != null ) 
         {
-            instance.shutdown();
+            for ( GraphDatabaseService instance : instances )
+            {
+                instance.shutdown();
+            }
         }
-        zk.shutdown();
     }
     
     @Test
-    @Ignore("getting build back to green")
-    public void makeSureBackupCanBePerformedFromCluster() throws Exception
+    public void makeSureBackupCanBePerformedFromClusterWithDefaultName() throws Exception
     {
-        assertEquals(
-                0,
-                runBackupToolFromOtherJvmToGetExitCode( "-full", "-from",
-                        "ha://localhost:2181", "-to", BACKUP_PATH ) );
+        testBackupFromCluster( null, null );
+    }
+
+    @Test
+    public void makeSureBackupCanBePerformedFromClusterWithCustomName() throws Exception
+    {
+        String clusterName = "local.jvm.cluster";
+        testBackupFromCluster( clusterName, clusterName );
+    }
+    
+    @Test
+    public void makeSureBackupCannotBePerformedFromNonExistentCluster() throws Exception
+    {
+        String clusterName = "local.jvm.cluster";
+        startCluster( clusterName );
+        assertEquals( 1, runBackupToolFromOtherJvmToGetExitCode(
+                backupArguments( true, "ha://localhost:2181", BACKUP_PATH, null ) ) );
+    }
+    
+    private void testBackupFromCluster( String clusterName, String askForCluster ) throws Exception
+    {
+        startCluster( clusterName );
+        assertEquals( 0, runBackupToolFromOtherJvmToGetExitCode(
+                backupArguments( true, "ha://localhost:2181", BACKUP_PATH, clusterName ) ) );
         assertEquals( representation, DbRepresentation.of( BACKUP_PATH ) );
         DbRepresentation newRepresentation = createSomeData( instances.get( 2 ) );
-        assertEquals(
-                0,
-                runBackupToolFromOtherJvmToGetExitCode( "-incremental",
-                        "-from", "ha://localhost:2182", "-to", BACKUP_PATH ) );
+        assertEquals( 0, runBackupToolFromOtherJvmToGetExitCode(
+                backupArguments( false, "ha://localhost:2182", BACKUP_PATH, clusterName ) ) );
         assertEquals( newRepresentation, DbRepresentation.of( BACKUP_PATH ) );
+    }
+    
+    private String[] backupArguments( boolean trueForFull, String from, String to, String clusterName )
+    {
+        List<String> args = new ArrayList<String>();
+        args.add( trueForFull ? "-full" : "-incremental" );
+        args.add( "-from" );
+        args.add( from );
+        args.add( "-to" );
+        args.add( to );
+        if ( clusterName != null )
+        {
+            args.add( "-cluster" );
+            args.add( clusterName );
+        }
+        return args.toArray( new String[args.size()] );
     }
 }

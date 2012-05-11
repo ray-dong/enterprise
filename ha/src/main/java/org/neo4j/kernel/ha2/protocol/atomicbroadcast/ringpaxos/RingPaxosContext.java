@@ -20,18 +20,19 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
 
+import static org.neo4j.helpers.collection.Iterables.iterable;
+import static org.neo4j.helpers.collection.Iterables.toList;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.Specifications;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
-import org.neo4j.kernel.ha2.timeout.TestTimeouts;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-
-import static org.neo4j.helpers.collection.Iterables.*;
 
 /**
  * Context shared by all Ring Paxos state machines.

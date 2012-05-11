@@ -20,8 +20,13 @@
 
 package org.neo4j.kernel.ha2;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;

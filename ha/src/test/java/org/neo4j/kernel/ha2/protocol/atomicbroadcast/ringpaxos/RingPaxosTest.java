@@ -20,8 +20,12 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
 
+import static org.hamcrest.CoreMatchers.equalTo;
+
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+
+import org.junit.Assert;
 import org.junit.Test;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
 import org.neo4j.kernel.ha2.NetworkMock;
@@ -29,10 +33,7 @@ import org.neo4j.kernel.ha2.RingPaxosServerFactory;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
-import org.junit.Assert;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
-
-import static org.hamcrest.CoreMatchers.equalTo;
 
 /**
  * TODO

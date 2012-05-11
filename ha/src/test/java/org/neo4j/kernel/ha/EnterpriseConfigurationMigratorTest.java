@@ -28,7 +28,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.neo4j.com.Server;
 import org.neo4j.helpers.collection.MapUtil;
-import org.neo4j.kernel.ConfigurationMigrator;
+import org.neo4j.kernel.configuration.ConfigurationMigrator;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 /**

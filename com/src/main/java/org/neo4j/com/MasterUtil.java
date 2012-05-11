@@ -19,8 +19,6 @@
  */
 package org.neo4j.com;
 
-import static org.neo4j.com.SlaveContext.lastAppliedTx;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -38,12 +36,13 @@ import java.util.Set;
 import org.neo4j.com.SlaveContext.Tx;
 import org.neo4j.graphdb.event.ErrorState;
 import org.neo4j.helpers.Exceptions;
+import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Predicate;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.helpers.collection.ClosableIterable;
 import org.neo4j.helpers.collection.IteratorUtil;
-import org.neo4j.kernel.Config;
-import org.neo4j.kernel.GraphDatabaseSPI;
+import org.neo4j.kernel.GraphDatabaseAPI;
+import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
@@ -51,10 +50,11 @@ import org.neo4j.kernel.impl.transaction.xaframework.InMemoryLogBuffer;
 import org.neo4j.kernel.impl.transaction.xaframework.LogBuffer;
 import org.neo4j.kernel.impl.transaction.xaframework.LogExtractor;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
+import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLog;
 
 public class MasterUtil
 {
-    private static File getBaseDir( GraphDatabaseSPI graphDb )
+    private static File getBaseDir( GraphDatabaseAPI graphDb )
     {
         File file = new File( graphDb.getStoreDir() );
         try
@@ -91,7 +91,7 @@ public class MasterUtil
         return path;
     }
     
-    public static Tx[] rotateLogs( GraphDatabaseSPI graphDb )
+    public static Tx[] rotateLogs( GraphDatabaseAPI graphDb )
     {
         XaDataSourceManager dsManager = graphDb.getXaDataSourceManager();
         Collection<XaDataSource> sources = dsManager.getAllRegisteredDataSources();
@@ -102,7 +102,9 @@ public class MasterUtil
         {
             try
             {
-                appliedTransactions[i++] = lastAppliedTx( ds.getName(), ds.getXaContainer().getResourceManager().rotateLogicalLog() );
+                appliedTransactions[i++] = SlaveContext.lastAppliedTx( ds.getName(), ds.getXaContainer()
+                    .getResourceManager()
+                    .rotateLogicalLog() );
             }
             catch ( IOException e )
             {
@@ -118,7 +120,7 @@ public class MasterUtil
         return appliedTransactions;
     }
 
-    public static SlaveContext rotateLogsAndStreamStoreFiles( GraphDatabaseSPI graphDb,
+    public static SlaveContext rotateLogsAndStreamStoreFiles( GraphDatabaseAPI graphDb,
             boolean includeLogicalLogs, StoreWriter writer )
     {
         File baseDir = getBaseDir( graphDb );
@@ -279,7 +281,7 @@ public class MasterUtil
      *            those that evaluate to true
      * @return The response, packed with the latest transactions
      */
-    public static <T> Response<T> packResponse( GraphDatabaseSPI graphDb,
+    public static <T> Response<T> packResponse( GraphDatabaseAPI graphDb,
             SlaveContext context, T response, Predicate<Long> filter )
     {
         List<Triplet<String, Long, TxExtractor>> stream = new ArrayList<Triplet<String, Long, TxExtractor>>();
@@ -329,7 +331,7 @@ public class MasterUtil
      * @return A {@link Response} object containing a transaction stream with
      *         the requested transactions from the specified data source.
      */
-    public static Response<Void> getTransactions( GraphDatabaseSPI graphDb,
+    public static Response<Void> getTransactions( GraphDatabaseAPI graphDb,
             String dataSourceName, long startTx, long endTx )
     {
         List<Triplet<String, Long, TxExtractor>> stream = new ArrayList<Triplet<String, Long, TxExtractor>>();
@@ -372,7 +374,7 @@ public class MasterUtil
         };
     }
 
-    public static <T> Response<T> packResponseWithoutTransactionStream( GraphDatabaseSPI graphDb,
+    public static <T> Response<T> packResponseWithoutTransactionStream( GraphDatabaseAPI graphDb,
             SlaveContext context, T response )
     {
         XaDataSource ds = graphDb.getXaDataSourceManager().getNeoStoreDataSource();
@@ -390,7 +392,7 @@ public class MasterUtil
         }
     };
 
-    public static <T> void applyReceivedTransactions( Response<T> response, GraphDatabaseSPI graphDb, TxHandler txHandler ) throws IOException
+    public static <T> void applyReceivedTransactions( Response<T> response, GraphDatabaseAPI graphDb, TxHandler txHandler ) throws IOException
     {
         XaDataSourceManager dataSourceManager = graphDb.getXaDataSourceManager();
         try
@@ -457,5 +459,46 @@ public class MasterUtil
             {   // Do nothing
             }
         };
+    }
+    
+    public static SlaveContext getSlaveContext( XaDataSourceManager dsManager, long sessionId, int machineId, int eventIdentifier )
+    {
+        try
+        {
+            Collection<XaDataSource> dataSources = dsManager.getAllRegisteredDataSources();
+            Tx[] txs = new Tx[dataSources.size()];
+            int i = 0;
+            Pair<Integer,Long> master = null;
+            for ( XaDataSource dataSource : dataSources )
+            {
+                long txId = dataSource.getLastCommittedTxId();
+                if( dataSource.getName().equals( Config.DEFAULT_DATA_SOURCE_NAME ) )
+                {
+                    master = dataSource.getMasterForCommittedTx( txId );
+                }
+                txs[i++] = SlaveContext.lastAppliedTx( dataSource.getName(), txId );
+            }
+            return new SlaveContext( sessionId, machineId, eventIdentifier, txs, master.first(), master.other() );
+        }
+        catch ( IOException e )
+        {
+            throw new RuntimeException( e );
+        }
+    }
+
+    public static SlaveContext getSlaveContext( XaDataSource dataSource, long sessionId, int machineId, int eventIdentifier )
+    {
+        try
+        {
+            long txId = dataSource.getLastCommittedTxId();
+            Tx[] txs = new Tx[] { SlaveContext.lastAppliedTx( dataSource.getName(), txId ) };
+            Pair<Integer,Long> master = dataSource.getName().equals( Config.DEFAULT_DATA_SOURCE_NAME ) ?
+                    dataSource.getMasterForCommittedTx( txId ) : Pair.of( XaLogicalLog.MASTER_ID_REPRESENTING_NO_MASTER, 0L );
+            return new SlaveContext( sessionId, machineId, eventIdentifier, txs, master.first(), master.other() );
+        }
+        catch ( IOException e )
+        {
+            throw new RuntimeException( e );
+        }
     }
 }

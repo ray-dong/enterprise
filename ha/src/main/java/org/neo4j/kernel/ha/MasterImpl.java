@@ -48,7 +48,7 @@ import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Predicate;
 import org.neo4j.kernel.DeadlockDetectedException;
-import org.neo4j.kernel.GraphDatabaseSPI;
+import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.core.LockReleaser;
 import org.neo4j.kernel.impl.core.NodeManager;
@@ -70,14 +70,14 @@ public class MasterImpl implements Master
     private static final int ID_GRAB_SIZE = 1000;
     public static final int UNFINISHED_TRANSACTION_CLEANUP_DELAY = 5;
 
-    private final GraphDatabaseSPI graphDb;
+    private final GraphDatabaseAPI graphDb;
     private final StringLogger msgLog;
 
     private final Map<SlaveContext, MasterTransaction> transactions = synchronizedMap( new HashMap<SlaveContext, MasterTransaction>() );
     private final ScheduledExecutorService unfinishedTransactionsExecutor;
     private int unfinishedTransactionThreshold;
 
-    public MasterImpl( GraphDatabaseSPI db, int timeOut )
+    public MasterImpl( GraphDatabaseAPI db, int timeOut )
     {
         this.graphDb = db;
         this.msgLog = graphDb.getMessageLog();
@@ -129,7 +129,7 @@ public class MasterImpl implements Master
         }, UNFINISHED_TRANSACTION_CLEANUP_DELAY, UNFINISHED_TRANSACTION_CLEANUP_DELAY, TimeUnit.SECONDS );
     }
 
-    public GraphDatabaseSPI getGraphDb()
+    public GraphDatabaseAPI getGraphDb()
     {
         return this.graphDb;
     }

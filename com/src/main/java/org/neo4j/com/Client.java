@@ -76,6 +76,7 @@ public abstract class Client<M> implements ChannelPipelineFactory
     private final byte applicationProtocolVersion;
     private final StoreIdGetter storeIdGetter;
     private final ResourceReleaser resourcePoolReleaser;
+    private final ConnectionLostHandler connectionLostHandler;
 
     public Client( String hostNameOrIp, int port, StringLogger logger,
             StoreIdGetter storeIdGetter, int frameLength,
@@ -98,6 +99,7 @@ public abstract class Client<M> implements ChannelPipelineFactory
         this.frameLength = frameLength;
         this.applicationProtocolVersion = applicationProtocolVersion;
         this.readTimeout = readTimeout;
+        this.connectionLostHandler = connectionLostHandler;
         channelPool = new ResourcePool<Triplet<Channel, ChannelBuffer, ByteBuffer>>(
                 maxConcurrentChannels, maxUnusedPoolSize )
         {
@@ -222,6 +224,9 @@ public abstract class Client<M> implements ChannelPipelineFactory
         }
         catch ( Throwable e )
         {
+            if ( e instanceof ComException )
+                connectionLostHandler.handle( (ComException) e );
+            
             success = false;
             if ( channelContext != null )
             {

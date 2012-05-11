@@ -17,7 +17,18 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.neo4j.kernel.ha.zookeeper;
+
+import static org.neo4j.kernel.ha.HaSettings.allow_init_cluster;
+import static org.neo4j.kernel.ha.HaSettings.cluster_name;
+import static org.neo4j.kernel.ha.HaSettings.lock_read_timeout;
+import static org.neo4j.kernel.ha.HaSettings.max_concurrent_channels_per_slave;
+import static org.neo4j.kernel.ha.HaSettings.read_timeout;
+import static org.neo4j.kernel.ha.HaSettings.server;
+import static org.neo4j.kernel.ha.HaSettings.server_id;
+import static org.neo4j.kernel.ha.HaSettings.slave_coordinator_update_mode;
+import static org.neo4j.kernel.ha.HaSettings.zk_session_timeout;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -25,7 +36,10 @@ import java.net.UnknownHostException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
+import java.util.Random;
 
 import javax.management.remote.JMXServiceURL;
 
@@ -36,21 +50,22 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.Watcher.Event.KeeperState;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooKeeper;
-import org.neo4j.backup.OnlineBackupExtension;
-import org.neo4j.com.Client;
-import org.neo4j.com.Server;
+import org.neo4j.backup.OnlineBackupSettings;
 import org.neo4j.com.StoreIdGetter;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.helpers.Pair;
-import org.neo4j.kernel.ConfigurationPrefix;
-import org.neo4j.kernel.GraphDatabaseSPI;
+import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.HaConfig;
+import org.neo4j.kernel.InformativeStackTrace;
 import org.neo4j.kernel.SlaveUpdateMode;
+import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.ha.ClusterEventReceiver;
 import org.neo4j.kernel.ha.ConnectionInformation;
+import org.neo4j.kernel.ha.HaSettings;
 import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.MasterServer;
-import org.neo4j.kernel.ha.ResponseReceiver;
+import org.neo4j.kernel.ha.SlaveDatabaseOperations;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.transaction.xaframework.LogExtractor;
 import org.neo4j.kernel.impl.transaction.xaframework.NullLogBuffer;
@@ -59,38 +74,13 @@ import org.neo4j.kernel.impl.util.StringLogger;
 
 public class ZooClient extends AbstractZooKeeperManager
 {
-    @ConfigurationPrefix("ha.")
-    public interface Configuration
-        extends OnlineBackupExtension.Configuration
-    {
-        String coordinators();
-        int read_timeout(int def);
-        int lock_read_timeout(int def);
-
-        int max_concurrent_channels_per_slave( int def );
-
-        int server_id();
-
-        String server( String def );
-
-        SlaveUpdateMode slave_coordinator_update_mode( SlaveUpdateMode def );
-
-        String cluster_name( String def );
-
-        boolean allow_init_cluster( boolean def );
-        
-        int zk_session_timeout( int def );
-    }
-    
     static final String MASTER_NOTIFY_CHILD = "master-notify";
     static final String MASTER_REBOUND_CHILD = "master-rebound";
+    static final String CALL_FOR_DATA = "call-for-data";
 
-    private ZooKeeper zooKeeper;
+    private final ZooKeeper zooKeeper;
     private final int machineId;
     private String sequenceNr;
-
-    private long committedTx;
-    private int masterForCommittedTx;
 
     private final Object keeperStateMonitor = new Object();
     private volatile KeeperState keeperState = KeeperState.Disconnected;
@@ -103,37 +93,47 @@ public class ZooClient extends AbstractZooKeeperManager
 
     private final String storeDir;
     private long sessionId = -1;
-    private StoreIdGetter storeIdGetter;
-    private Configuration conf;
-    private final ResponseReceiver receiver;
+    private Config conf;
+    private final SlaveDatabaseOperations localDatabase;
+    private final ClusterEventReceiver clusterReceiver;
     private final int backupPort;
     private final boolean writeLastCommittedTx;
     private final String clusterName;
     private final boolean allowCreateCluster;
 
-    public ZooClient( String storeDir, StringLogger stringLogger, StoreIdGetter storeIdGetter, Configuration conf, ResponseReceiver receiver )
+    public ZooClient( String storeDir, StringLogger stringLogger, StoreIdGetter storeIdGetter, Config conf,
+            SlaveDatabaseOperations localDatabase, ClusterEventReceiver clusterReceiver )
     {
-        super( conf.coordinators(),
+        super( conf.get( HaSettings.coordinators ),
             storeIdGetter, stringLogger,
-            conf.read_timeout( Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS ),
-            conf.lock_read_timeout( conf.read_timeout( Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS ) ),
-            conf.max_concurrent_channels_per_slave( Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ),
-            conf.zk_session_timeout( HaConfig.CONFIG_DEFAULT_ZK_SESSION_TIMEOUT ));
+            conf.getInteger( read_timeout ),
+            conf.isSet( lock_read_timeout ) ? conf.getInteger( lock_read_timeout) : conf.getInteger( read_timeout ),
+            conf.getInteger( max_concurrent_channels_per_slave ),
+            conf.getInteger( zk_session_timeout ));
         this.storeDir = storeDir;
-        this.storeIdGetter = storeIdGetter;
         this.conf = conf;
-        this.receiver = receiver;
-        machineId = conf.server_id();
-        backupPort = conf.online_backup_port( Server.DEFAULT_BACKUP_PORT );
-        haServer = conf.server( defaultServer() );
-        writeLastCommittedTx = conf.slave_coordinator_update_mode( SlaveUpdateMode.async ).syncWithZooKeeper;
-        clusterName = conf.cluster_name(HaConfig.CONFIG_DEFAULT_HA_CLUSTER_NAME);
+        this.localDatabase = localDatabase;
+        this.clusterReceiver = clusterReceiver;
+        machineId = conf.getInteger( server_id );
+        backupPort = conf.getInteger( OnlineBackupSettings.online_backup_port );
+        haServer = conf.isSet(server) ? conf.get( server ) : defaultServer();
+        writeLastCommittedTx = conf.getEnum(SlaveUpdateMode.class, slave_coordinator_update_mode).syncWithZooKeeper;
+        clusterName = conf.get( cluster_name );
         sequenceNr = "not initialized yet";
-        allowCreateCluster = conf.allow_init_cluster(true);
+        allowCreateCluster = conf.getBoolean( allow_init_cluster );
 
         try
         {
-            zooKeeper = new ZooKeeper( getServers(), getSessionTimeout(), new WatcherImpl() );
+            /*
+             * Chicken and egg problem of sorts. The WatcherImpl might need zooKeeper instance
+             * before its constructor has returned, hence the "flushUnprocessedEvents" workaround.
+             * Without it the watcher might throw NPE on the initial (maybe SyncConnected) events,
+             * which would effectively prevent a client from feeling connected to its ZK cluster.
+             * See WatcherImpl for more detail on this.
+             */
+            WatcherImpl watcher = new WatcherImpl();
+            zooKeeper = new ZooKeeper( getServers(), getSessionTimeout(), watcher );
+            watcher.flushUnprocessedEvents( zooKeeper );
         }
         catch ( IOException e )
         {
@@ -156,20 +156,21 @@ public class ZooClient extends AbstractZooKeeperManager
         if ( host == null )
         {
             throw new IllegalStateException(
-                    "Could not auto configure host name, please supply " + HaConfig.CONFIG_KEY_SERVER );
+                    "Could not auto configure host name, please supply " + HaSettings.server.name() );
         }
         return host.getHostAddress() + ":" + HaConfig.CONFIG_DEFAULT_PORT;
     }
 
-    public Object instantiateMasterServer( GraphDatabaseSPI graphDb )
+    public Object instantiateMasterServer( GraphDatabaseAPI graphDb )
     {
-        int timeOut = conf.lock_read_timeout( conf.read_timeout( Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS ) );
+        int timeOut = conf.isSet( lock_read_timeout ) ? conf.getInteger( lock_read_timeout ) : conf.getInteger( read_timeout );
         return new MasterServer( new MasterImpl( graphDb, timeOut ),
                 Machine.splitIpAndPort( haServer ).other(), graphDb.getMessageLog(),
-                conf.max_concurrent_channels_per_slave( Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT ),
+                conf.getInteger( max_concurrent_channels_per_slave ),
                 clientLockReadTimeout, new BranchDetectingTxVerifier( graphDb ) );
     }
 
+    @Override
     protected int getMyMachineId()
     {
         return this.machineId;
@@ -181,7 +182,7 @@ public class ZooClient extends AbstractZooKeeperManager
     }
 
     @Override
-    public void waitForSyncConnected()
+    void waitForSyncConnected( WaitMode mode )
     {
         if ( keeperState == KeeperState.SyncConnected )
         {
@@ -191,6 +192,7 @@ public class ZooClient extends AbstractZooKeeperManager
         {
             throw new ZooKeeperException( "ZooKeeper client has been shutdwon" );
         }
+        WaitStrategy strategy = mode.getStrategy( this );
         long startTime = System.currentTimeMillis();
         long currentTime = startTime;
         synchronized ( keeperStateMonitor )
@@ -215,12 +217,12 @@ public class ZooClient extends AbstractZooKeeperManager
                 }
                 currentTime = System.currentTimeMillis();
             }
-            while ( ( currentTime - startTime ) < getSessionTimeout() );
+            while ( strategy.waitMore( ( currentTime - startTime ) ) );
 
             if ( keeperState != KeeperState.SyncConnected )
             {
-                throw new ZooKeeperTimedOutException(
-                        "Connection to ZooKeeper server timed out, keeper state=" + keeperState );
+                throw new ZooKeeperTimedOutException( "Connection to ZooKeeper server timed out, keeper state="
+                                                      + keeperState );
             }
         }
     }
@@ -231,26 +233,31 @@ public class ZooClient extends AbstractZooKeeperManager
         String path = root + "/" + child;
         try
         {
-            try
+            for ( int i = 0; i < 2; i++ )
             {
-                zooKeeper.getData( path, true, null );
-            }
-            catch ( KeeperException e )
-            {
-                if ( e.code() == KeeperException.Code.NONODE )
-                {   // Create it if it doesn't exist
-                    byte[] data = new byte[4];
-                    ByteBuffer.wrap( data ).putInt( -1 );
-                    try
-                    {
-                        zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
-                    }
-                    catch ( KeeperException ce )
-                    {
-                        if ( e.code() != KeeperException.Code.NODEEXISTS ) throw new ZooKeeperException( "Creation error", ce );
-                    }
+                try
+                {
+                    zooKeeper.getData( path, true, null );
+                    return;
                 }
-                else throw new ZooKeeperException( "Couldn't get or create " + child, e );
+                catch ( KeeperException e )
+                {
+                    if ( e.code() == KeeperException.Code.NONODE )
+                    {   // Create it if it doesn't exist
+                        byte[] data = new byte[4];
+                        ByteBuffer.wrap( data ).putInt( -1 );
+                        try
+                        {
+                            zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT );
+                        }
+                        catch ( KeeperException ce )
+                        {
+                            if ( e.code() != KeeperException.Code.NODEEXISTS && e.code() != KeeperException.Code.NONODE )
+                                throw new ZooKeeperException( "Creation error " + e.code() + " " + e.getPath(), ce );
+                        }
+                    }
+                    else throw new ZooKeeperException( "Couldn't get or create " + child, e );
+                }
             }
         }
         catch ( InterruptedException e )
@@ -259,8 +266,13 @@ public class ZooClient extends AbstractZooKeeperManager
             throw new ZooKeeperException( "Interrupted", e );
         }
     }
+    
+    protected void triggerDataChangeWatcher( String child )
+    {
+        while ( !setDataChangeWatcher( child, new Random().nextInt() ) );
+    }
 
-    protected void setDataChangeWatcher( String child, int currentMasterId )
+    protected boolean setDataChangeWatcher( String child, int value )
     {
         try
         {
@@ -273,47 +285,56 @@ public class ZooClient extends AbstractZooKeeperManager
                 data = zooKeeper.getData( path, true, null );
                 exists = true;
 
-                if ( ByteBuffer.wrap( data ).getInt() == currentMasterId )
+                if ( ByteBuffer.wrap( data ).getInt() == value )
                 {
-                    msgLog.logMessage( child + " not set, is already " + currentMasterId );
-                    return;
+                    msgLog.logMessage( child + " not set, is already " + value );
+                    return false;
                 }
             }
             catch ( KeeperException e )
             {
                 if ( e.code() != KeeperException.Code.NONODE )
                 {
-                    throw new ZooKeeperException( "Couldn't get master notify node", e );
+                    throw new ZooKeeperException( "Couldn't get master watch node " + child, e );
                 }
             }
 
             // Didn't exist or has changed
-            try
+            for ( int i = 0; i < 2; i++ )
             {
-                data = new byte[4];
-                ByteBuffer.wrap( data ).putInt( currentMasterId );
-                if ( !exists )
+                try
                 {
-                    zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE,
-                            CreateMode.PERSISTENT );
-                    msgLog.logMessage( child + " created with " + currentMasterId );
+                    data = new byte[4];
+                    ByteBuffer.wrap( data ).putInt( value );
+                    try
+                    {
+                        zooKeeper.create( path, data, ZooDefs.Ids.OPEN_ACL_UNSAFE,
+                                CreateMode.PERSISTENT );
+                        msgLog.logMessage( child + " created with " + value );
+                    }
+                    catch ( KeeperException e )
+                    {
+                        if ( e.code() != KeeperException.Code.NODEEXISTS && e.code() != KeeperException.Code.NONODE )
+                        {
+                            throw new ZooKeeperException( "Couldn't set data watcher " + child, e );
+                        }
+                        zooKeeper.setData( path, data, -1 );
+                        msgLog.logMessage( child + " set to " + value );
+                    }
+    
+                    // Add a watch for it
+                    zooKeeper.getData( path, true, null );
+                    return true;
                 }
-                else if ( currentMasterId != -1 )
+                catch ( KeeperException e )
                 {
-                    zooKeeper.setData( path, data, -1 );
-                    msgLog.logMessage( child + " set to " + currentMasterId );
+                    if ( e.code() != KeeperException.Code.NODEEXISTS && e.code() != KeeperException.Code.NONODE )
+                    {
+                        throw new ZooKeeperException( "Couldn't set data watcher node", e );
+                    }
                 }
-
-                // Add a watch for it
-                zooKeeper.getData( path, true, null );
             }
-            catch ( KeeperException e )
-            {
-                if ( e.code() != KeeperException.Code.NODEEXISTS )
-                {
-                    throw new ZooKeeperException( "Couldn't set master notify node", e );
-                }
-            }
+            return true;
         }
         catch ( InterruptedException e )
         {
@@ -369,7 +390,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 throw new ZooKeeperException( "Got interrupted", e );
             }
         } while ( rootData == null );
-        throw new IllegalStateException();
+        throw new IllegalStateException( "Root path couldn't be found" );
     }
 
     private void makeSureRootPathIsFound()
@@ -380,16 +401,16 @@ public class ZooClient extends AbstractZooKeeperManager
             if ( storeId != null )
             {   // There's a cluster in place, let's use that
                 rootPath = asRootPath( storeId );
-                if ( NeoStoreUtil.storeExists( storeDir ) )
-                {   // We have a local store, use and verify against it
-                    NeoStoreUtil store = new NeoStoreUtil( storeDir );
-                    committedTx = store.getLastCommittedTx();
-                    if ( !storeId.equals( store.asStoreId() ) ) throw new ZooKeeperException( "StoreId in database doesn't match that of the ZK cluster" );
-                }
-                else
-                {   // No local store
-                    committedTx = 1;
-                }
+//                if ( NeoStoreUtil.storeExists( storeDir ) )
+//                {   // We have a local store, use and verify against it
+//                    NeoStoreUtil store = new NeoStoreUtil( storeDir );
+//                    committedTx = store.getLastCommittedTx();
+//                    if ( !storeId.equals( store.asStoreId() ) ) throw new ZooKeeperException( "StoreId in database doesn't match that of the ZK cluster" );
+//                }
+//                else
+//                {   // No local store
+//                    committedTx = 1;
+//                }
             }
             else
             {   // Cluster doesn't exist
@@ -399,7 +420,7 @@ public class ZooClient extends AbstractZooKeeperManager
                 storeId = createCluster( storeIdSuggestion );
                 makeSureRootPathIsFound();
             }
-            masterForCommittedTx = getFirstMasterForTx( committedTx );
+//            masterForCommittedTx = getFirstMasterForTx( committedTx );
         }
     }
 
@@ -450,12 +471,14 @@ public class ZooClient extends AbstractZooKeeperManager
             writeHaServerConfig();
             String root = getRoot();
             String path = root + "/" + machineId + "_";
-            String created = zooKeeper.create( path, dataRepresentingMe( committedTx, masterForCommittedTx ),
+            Pair<Long, Integer> lastTx = localDatabase.getLastTxData();
+            String created = zooKeeper.create( path, dataRepresentingMe( lastTx.first(), lastTx.other() ),
                 ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL );
 
             // Add watches to our master notification nodes
             subscribeToDataChangeWatcher( MASTER_NOTIFY_CHILD );
             subscribeToDataChangeWatcher( MASTER_REBOUND_CHILD );
+            subscribeToDataChangeWatcher( CALL_FOR_DATA );
             return created.substring( created.lastIndexOf( "_" ) + 1 );
         }
         catch ( KeeperException e )
@@ -511,8 +534,10 @@ public class ZooClient extends AbstractZooKeeperManager
             }
             catch ( KeeperException ee )
             {
-                ee.printStackTrace();
-                // ok
+                if ( ee.code() != KeeperException.Code.NONODE )
+                {
+                    msgLog.logMessage( "Unable to delete " + machinePath, ee );
+                }
             }
             finally
             {
@@ -621,12 +646,9 @@ public class ZooClient extends AbstractZooKeeperManager
         connection.setJMXConnectionData( new String( url ), new String( instanceId ) );
     }
 
-    public synchronized void setCommittedTx( long tx )
+    private synchronized void setCommittedTx( long tx, int master )
     {
         waitForSyncConnected();
-        this.committedTx = tx;
-        int master = receiver.getMasterForTx( tx );
-        this.masterForCommittedTx = master;
         String root = getRoot();
         String path = root + "/" + machineId + "_" + sequenceNr;
         byte[] data = dataRepresentingMe( tx, master );
@@ -676,6 +698,7 @@ public class ZooClient extends AbstractZooKeeperManager
     @Override
     public void shutdown()
     {
+        msgLog.close();
         this.shutdown = true;
         super.shutdown();
     }
@@ -734,9 +757,9 @@ public class ZooClient extends AbstractZooKeeperManager
         }
     }
 
-    public StoreId getClusterStoreId()
+    public StoreId getClusterStoreId( WaitMode mode )
     {
-        waitForSyncConnected();
+        waitForSyncConnected( mode );
         makeSureRootPathIsFound();
         return storeId;
     }
@@ -745,15 +768,60 @@ public class ZooClient extends AbstractZooKeeperManager
     public String toString()
     {
         return getClass().getSimpleName() + "[serverId:" + machineId + ", seq:" + sequenceNr +
-                ", lastCommittedTx:" + committedTx + " w/ master:" + masterForCommittedTx +
                 ", session:" + sessionId + "]";
     }
 
     private class WatcherImpl
             implements Watcher
     {
+        private final Queue<WatchedEvent> unprocessedEvents = new LinkedList<WatchedEvent>();
+        
+        /**
+         * Flush all events we go before initialization of ZooKeeper/WatcherImpl was completed.
+         * @param zooKeeper ZooKeeper instance to use when processing. We cannot rely on the
+         * zooKeeper instance inherited from ZooClient since the contract says that such fields
+         * are only guaranteed to be published when the constructor has returned, and at this
+         * point it hasn't.
+         */
+        protected void flushUnprocessedEvents( ZooKeeper zooKeeper )
+        {
+            synchronized ( unprocessedEvents )
+            {
+                WatchedEvent e = null;
+                while ( (e = unprocessedEvents.poll()) != null )
+                    processEvent( e, zooKeeper );
+            }
+        }
+        
         public void process( WatchedEvent event )
         {
+            /*
+             * MP: The setup we have here is messed up. Why do I say that? Well, we've got
+             * this watcher which uses the ZooKeeper object that it's set to watch. And
+             * it is passed in to the constructor of the ZooKeeper object. So, if this watcher
+             * gets an event before the ZooKeeper constructor returns we're screwed here.
+             * 
+             * Cue unprocessedEvents queue. It will act as a shield for this design blunder
+             * and absorb the events we get before everything is properly initialized,
+             * and emit them right thereafter (see #flushUnprocessedEvents()).
+             */
+            synchronized ( unprocessedEvents )
+            {
+                if ( zooKeeper == null || !unprocessedEvents.isEmpty() )
+                {
+                    unprocessedEvents.add( event );
+                    return;
+                }
+            }
+            
+            processEvent( event, zooKeeper );
+        }
+
+        private void processEvent( WatchedEvent event, ZooKeeper zooKeeper )
+        {
+            if ( shutdown )
+                return;
+            
             try
             {
                 String path = event.getPath();
@@ -761,13 +829,12 @@ public class ZooClient extends AbstractZooKeeperManager
                 if ( path == null && event.getState() == Watcher.Event.KeeperState.Expired )
                 {
                     keeperState = KeeperState.Expired;
-                    receiver.reconnect( new Exception() );
+                    clusterReceiver.reconnect( new InformativeStackTrace( "Reconnect due to session expired" ) );
                 }
                 else if ( path == null && event.getState() == Watcher.Event.KeeperState.SyncConnected )
                 {
                     long newSessionId = zooKeeper.getSessionId();
-                    Pair<Master, Machine> masterBeforeIWrite = getMasterFromZooKeeper(
-                            false, false );
+                    Pair<Master, Machine> masterBeforeIWrite = getMasterFromZooKeeper( false, false );
                     msgLog.logMessage( "Get master before write:" + masterBeforeIWrite );
                     boolean masterBeforeIWriteDiffers = masterBeforeIWrite.other().getMachineId() != getCachedMaster().other().getMachineId();
                     if ( newSessionId != sessionId || masterBeforeIWriteDiffers )
@@ -776,12 +843,11 @@ public class ZooClient extends AbstractZooKeeperManager
                         {
                             sequenceNr = setup();
                             msgLog.logMessage( "Did setup, seq=" + sequenceNr + " new sessionId=" + newSessionId );
-                            Pair<Master, Machine> masterAfterIWrote = getMasterFromZooKeeper(
-                                    false, false );
+                            Pair<Master, Machine> masterAfterIWrote = getMasterFromZooKeeper( false, false );
                             msgLog.logMessage( "Get master after write:" + masterAfterIWrote );
                             if ( sessionId != -1 )
                             {
-                                receiver.newMaster( new Exception( "Got SyncConnected event from ZK" ) );
+                                clusterReceiver.newMaster( new InformativeStackTrace( "Got SyncConnected event from ZK" ) );
                             }
                             sessionId = newSessionId;
                         }
@@ -810,13 +876,13 @@ public class ZooClient extends AbstractZooKeeperManager
                     if ( path.contains( currentMaster.getZooKeeperPath() ) )
                     {
                         msgLog.logMessage("Acting on it, calling newMaster()");
-                        receiver.newMaster( new Exception() );
+                        clusterReceiver.newMaster( new InformativeStackTrace( "NodeDeleted event received (a machine left the cluster)" ) );
                     }
                 }
                 else if ( event.getType() == Watcher.Event.EventType.NodeDataChanged )
                 {
                     int newMasterMachineId = toInt( getZooKeeper( true ).getData( path, true, null ) );
-                    msgLog.logMessage( "Got event data " + newMasterMachineId );
+                    msgLog.logMessage( "Got event data " + path + " = " + newMasterMachineId );
                     if ( path.contains( MASTER_NOTIFY_CHILD ) )
                     {
                         // This event is for the masters eyes only so it should only
@@ -824,7 +890,7 @@ public class ZooClient extends AbstractZooKeeperManager
                         // it really is master.
                         if ( newMasterMachineId == machineId )
                         {
-                            receiver.newMaster( new Exception() );
+                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (someone though I should be the master)" ) );
                         }
                     }
                     else if ( path.contains( MASTER_REBOUND_CHILD ) )
@@ -832,10 +898,15 @@ public class ZooClient extends AbstractZooKeeperManager
                         // This event is for all the others after the master got the
                         // MASTER_NOTIFY_CHILD which then shouts out to the others to
                         // become slaves if they don't already are.
-                        if ( newMasterMachineId != machineId )
-                        {
-                            receiver.newMaster( new Exception() );
-                        }
+//                        if ( newMasterMachineId != machineId )
+//                        {
+                            clusterReceiver.newMaster( new InformativeStackTrace( "NodeDataChanged event received (new master ensures I'm slave) " + newMasterMachineId ) );
+//                        }
+                    }
+                    else if ( path.contains( CALL_FOR_DATA ) )
+                    {
+                        updateLastCommittedTx();
+                        subscribeToDataChangeWatcher( CALL_FOR_DATA );
                     }
                     else
                     {
@@ -843,16 +914,25 @@ public class ZooClient extends AbstractZooKeeperManager
                     }
                 }
             }
+            catch ( BrokerShutDownException e )
+            {
+                // It's OK. We're in a state where we cannot accept incoming events.
+            }
             catch ( Exception e )
             {
                 msgLog.logMessage( "Error in ZooClient.process", e, true );
-                e.printStackTrace();
                 throw Exceptions.launderedException( e );
             }
-                finally
+            finally
             {
-                    msgLog.flush();
+                msgLog.flush();
             }
         }
+    }
+
+    public void updateLastCommittedTx()
+    {
+        Pair<Long, Integer> lastTx = localDatabase.getLastTxData();
+        setCommittedTx( lastTx.first(), lastTx.other() );
     }
 }

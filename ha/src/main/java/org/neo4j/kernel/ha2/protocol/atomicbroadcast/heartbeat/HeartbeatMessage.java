@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
 import java.io.Serializable;
+
 import org.neo4j.com_2.message.MessageType;
 
 /**
