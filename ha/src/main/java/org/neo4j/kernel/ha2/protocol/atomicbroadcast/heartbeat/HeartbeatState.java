@@ -29,14 +29,14 @@ import static org.neo4j.com_2.message.Message.*;
 /**
  * TODO
  */
-public enum HeartbeatStateX
-    implements State<HeartbeatContextX, HeartbeatMessageX>
+public enum HeartbeatState
+    implements State<HeartbeatContext, HeartbeatMessage>
 {
     start
     {
         @Override
-        public HeartbeatStateX handle( HeartbeatContextX context,
-                                             Message<HeartbeatMessageX> message,
+        public HeartbeatState handle( HeartbeatContext context,
+                                             Message<HeartbeatMessage> message,
                                              MessageProcessor outgoing
         )
             throws Throwable
@@ -51,13 +51,13 @@ public enum HeartbeatStateX
 
                 case addHeartbeatListener:
                 {
-                    context.addHeartbeatListener((HeartbeatListenerX) message.getPayload());
+                    context.addHeartbeatListener((HeartbeatListener) message.getPayload());
                     break;
                 }
 
                 case removeHeartbeatListener:
                 {
-                    context.removeHeartbeatListener( (HeartbeatListenerX) message.getPayload());
+                    context.removeHeartbeatListener( (HeartbeatListener) message.getPayload());
                     break;
                 }
 
@@ -67,11 +67,11 @@ public enum HeartbeatStateX
                     for( String server : context.servers )
                     {
                         if (!context.me.equals( server ))
-                            context.timeouts.setTimeout( server, internal( HeartbeatMessageX.timed_out, server ) );
+                            context.timeouts.setTimeout( server, internal( HeartbeatMessage.timed_out, server ) );
                     }
 
                     // Send first heartbeat
-                    outgoing.process( internal( HeartbeatMessageX.send_heartbeat ) );
+                    outgoing.process( internal( HeartbeatMessage.send_heartbeat ) );
 
                     return running;
                 }
@@ -84,8 +84,8 @@ public enum HeartbeatStateX
     running
     {
         @Override
-        public HeartbeatStateX handle( HeartbeatContextX context,
-                                             Message<HeartbeatMessageX> message,
+        public HeartbeatState handle( HeartbeatContext context,
+                                             Message<HeartbeatMessage> message,
                                              MessageProcessor outgoing
         )
             throws Throwable
@@ -94,14 +94,14 @@ public enum HeartbeatStateX
             {
                 case i_am_alive:
                 {
-                    HeartbeatMessageX.IAmAliveState state = (HeartbeatMessageX.IAmAliveState) message.getPayload();
+                    HeartbeatMessage.IAmAliveState state = (HeartbeatMessage.IAmAliveState) message.getPayload();
 
                     context.alive( state.getServer() );
 
                     if (!context.me.equals( state.getServer() ))
                     {
                         context.timeouts.cancelTimeout( state.getServer() );
-                        context.timeouts.setTimeout( state.getServer(), internal( HeartbeatMessageX.timed_out, state.getServer() ) );
+                        context.timeouts.setTimeout( state.getServer(), internal( HeartbeatMessage.timed_out, state.getServer() ) );
                     }
 
                     break;
@@ -113,7 +113,7 @@ public enum HeartbeatStateX
 
                     context.failed( server );
 
-                    context.timeouts.setTimeout( server, internal( HeartbeatMessageX.timed_out, server ) );
+                    context.timeouts.setTimeout( server, internal( HeartbeatMessage.timed_out, server ) );
                     break;
                 }
 
@@ -122,10 +122,10 @@ public enum HeartbeatStateX
                     // Send heartbeat message to all other servers
                     for( String server : context.servers )
                     {
-                        outgoing.process( to( HeartbeatMessageX.i_am_alive, server, new HeartbeatMessageX.IAmAliveState( context.me ) ) );
+                        outgoing.process( to( HeartbeatMessage.i_am_alive, server, new HeartbeatMessage.IAmAliveState( context.me ) ) );
                     }
 
-                    context.timeouts.setTimeout( context.me, internal( HeartbeatMessageX.send_heartbeat ) );
+                    context.timeouts.setTimeout( context.me, internal( HeartbeatMessage.send_heartbeat ) );
                     break;
                 }
 

@@ -20,12 +20,33 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
+import java.io.Serializable;
+import org.neo4j.com_2.message.MessageType;
+
 /**
  * TODO
  */
-public interface HeartbeatListenerX
+public enum HeartbeatMessage
+    implements MessageType
 {
-    void failed(String server);
+    possibleServers,
+    addHeartbeatListener,removeHeartbeatListener,
+    join,leave,
+    i_am_alive,timed_out,send_heartbeat;
 
-    void alive(String server);
+    public static class IAmAliveState
+        implements Serializable
+    {
+        private String server;
+
+        public IAmAliveState( String server )
+        {
+            this.server = server;
+        }
+
+        public String getServer()
+        {
+            return server;
+        }
+    }
 }

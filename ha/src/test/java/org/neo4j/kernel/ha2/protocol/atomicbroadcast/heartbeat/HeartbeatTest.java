@@ -23,7 +23,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
-import org.neo4j.kernel.ha2.HeartbeatServerFactoryX;
+import org.neo4j.kernel.ha2.HeartbeatServerFactory;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
@@ -31,9 +31,9 @@ import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 /**
  * TODO
  */
-public class HeartbeatTestX
+public class HeartbeatTest
 {
-    Logger logger = Logger.getLogger( HeartbeatTestX.class.getName() );
+    Logger logger = Logger.getLogger( HeartbeatTest.class.getName() );
 
     private static final String ID1 = "1";
     private static final String ID2 = "2";
@@ -42,20 +42,20 @@ public class HeartbeatTestX
 
     private NetworkMock network;
 
-    private HeartbeatX member1;
-    private HeartbeatX member2;
-    private HeartbeatX member3;
+    private Heartbeat member1;
+    private Heartbeat member2;
+    private Heartbeat member3;
 
     @Test
     public void testNoFailures()
     {
-        network = new NetworkMock(500, new HeartbeatServerFactoryX(), new FixedNetworkLatencyStrategy(), new FixedTimeoutStrategy( 1000 ));
+        network = new NetworkMock(500, new HeartbeatServerFactory(), new FixedNetworkLatencyStrategy(), new FixedTimeoutStrategy( 1000 ));
 
         member1 = newMember( ID1, POSSIBLE_SERVERS );
         member2 = newMember( ID2, POSSIBLE_SERVERS );
         member3 = newMember( ID3, POSSIBLE_SERVERS );
 
-        member1.addHeartbeatListener( new HeartbeatListenerX()
+        member1.addHeartbeatListener( new HeartbeatListener()
         {
             @Override
             public void failed( String server )
@@ -94,10 +94,10 @@ public class HeartbeatTestX
         logger.info( "1 & 2 SHOULD BE FAILED NOW" );
     }
 
-    private HeartbeatX newMember( String id, String... possibleServers )
+    private Heartbeat newMember( String id, String... possibleServers )
     {
         TestProtocolServer server = network.addServer( id );
-        HeartbeatX member = server.newClient( HeartbeatX.class );
+        Heartbeat member = server.newClient( Heartbeat.class );
         member.possibleServers( possibleServers );
         return member;
     }
