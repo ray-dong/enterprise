@@ -20,15 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import java.net.URI;
 import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
-import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
  * Context for the Learner Paxos state machine.

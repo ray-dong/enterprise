@@ -20,26 +20,25 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
+import static java.util.Arrays.asList;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.junit.Assert.assertThat;
+import static org.junit.matchers.JUnitMatchers.hasItems;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import org.hamcrest.CoreMatchers;
+
 import org.junit.Test;
-import org.junit.matchers.JUnitMatchers;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.util.Arrays.*;
-import static org.hamcrest.CoreMatchers.*;
-import static org.junit.Assert.*;
-import static org.junit.matchers.JUnitMatchers.*;
 
 /**
  * TODO
