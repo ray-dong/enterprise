@@ -20,12 +20,12 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
-import org.neo4j.com_2.message.MessageType;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
-
 import java.io.Serializable;
 import java.net.URI;
 import java.util.List;
+
+import org.neo4j.com_2.message.MessageType;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 
 /**
  * Messages to implement the Cluster API state machine

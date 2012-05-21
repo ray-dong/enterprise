@@ -20,20 +20,26 @@
 
 package org.neo4j.kernel.ha2;
 
+import java.net.URI;
+
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.*;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastState;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerState;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerState;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
 
 /**
  * TODO
