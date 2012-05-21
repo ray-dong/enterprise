@@ -20,10 +20,7 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.PaxosClusterConfiguration;
-
 import java.net.URI;
-import java.util.concurrent.Future;
 
 /**
  * Cluster membership management

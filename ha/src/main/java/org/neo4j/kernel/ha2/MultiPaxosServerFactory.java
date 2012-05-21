@@ -53,11 +53,12 @@ public class MultiPaxosServerFactory
     {
         ConnectedStateMachines connectedStateMachines = new ConnectedStateMachines( input, output );
 
-        final ClusterContext clusterContext = new ClusterContext(initialConfig,
-                timeouts);
+        LearnerContext learnerContext = new LearnerContext();
+        ProposerContext proposerContext = new ProposerContext();
 
-        final MultiPaxosContext context = new MultiPaxosContext(clusterContext, timeouts);
-        context.timeouts = timeouts;
+        final ClusterContext clusterContext = new ClusterContext(proposerContext, learnerContext, new ClusterConfiguration( initialConfig.getNodes() ),timeouts);
+
+        final MultiPaxosContext context = new MultiPaxosContext(clusterContext, proposerContext, learnerContext, timeouts);
 
         StateMachine paxosStateMachine= new StateMachine(new AtomicBroadcastContext(), AtomicBroadcastMessage.class, AtomicBroadcastState.start);
         StateMachine acceptor= new StateMachine(context, AcceptorMessage.class, AcceptorState.start);

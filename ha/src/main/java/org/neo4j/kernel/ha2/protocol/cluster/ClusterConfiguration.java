@@ -26,7 +26,9 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Created with IntelliJ IDEA.
@@ -60,7 +62,7 @@ public class ClusterConfiguration
         if (nodes.contains(nodeUrl))
             return;
 
-        nodes.add(nodeUrl);
+        nodes.add( nodeUrl );
     }
 
     public void left(URI nodeUrl)
@@ -103,5 +105,10 @@ public class ClusterConfiguration
     public String toString()
     {
         return "Nodes:"+nodes;
+    }
+
+    public void left()
+    {
+        nodes.clear();
     }
 }

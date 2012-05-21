@@ -46,13 +46,13 @@ public enum ClusterMessage
     {
         private List<URI> acceptors;
         private List<URI> nodes;
-        private InstanceId latestProposedId;
+        private InstanceId latestReceivedInstanceId;
 
-        public ConfigurationResponseState(List<URI> acceptors, List<URI> nodes, InstanceId latestProposedId)
+        public ConfigurationResponseState(List<URI> acceptors, List<URI> nodes, InstanceId latestReceivedInstanceId )
         {
             this.acceptors = acceptors;
             this.nodes = nodes;
-            this.latestProposedId = latestProposedId;
+            this.latestReceivedInstanceId = latestReceivedInstanceId;
         }
 
         public List<URI> getAcceptors()
@@ -65,9 +65,9 @@ public enum ClusterMessage
             return nodes;
         }
 
-        public InstanceId getLatestProposedId()
+        public InstanceId getLatestReceivedInstanceId()
         {
-            return latestProposedId;
+            return latestReceivedInstanceId;
         }
     }
 
@@ -85,6 +85,8 @@ public enum ClusterMessage
         {
             return nodes;
         }
+
+
     }
 
 }

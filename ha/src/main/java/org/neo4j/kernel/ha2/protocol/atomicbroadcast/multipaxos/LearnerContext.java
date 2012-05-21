@@ -18,30 +18,29 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.cluster;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import org.neo4j.com_2.message.Message;
-import org.neo4j.com_2.message.MessageProcessor;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
- *
+ * Context for the Learner Paxos state machine.
  */
-public class ClusterJoinHandler
-    implements AtomicBroadcastListener
+public class LearnerContext
 {
-    private final Message<ClusterMessage> joinResponse;
-    private final MessageProcessor outgoing;
+    // Learner state
+    List<LearnerInstance> learnerInstances = new ArrayList<LearnerInstance>(100);
+    public long lastReceivedInstanceId = -1;
 
-    public ClusterJoinHandler(Message<ClusterMessage> joinResponse, MessageProcessor outgoing)
+    public int getLearnerInstanceIndex( long instanceId )
     {
-        this.joinResponse = joinResponse;
-        this.outgoing = outgoing;
-    }
-
-    @Override
-    public void receive(Object value)
-    {
-        outgoing.process(joinResponse);
+        return (int)(instanceId%learnerInstances.size());
     }
 }

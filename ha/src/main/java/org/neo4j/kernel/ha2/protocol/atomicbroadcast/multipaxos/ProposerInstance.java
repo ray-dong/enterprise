@@ -117,6 +117,11 @@ public class ProposerInstance
         clientValue = false;
     }
 
+    public List<URI> getAcceptors()
+    {
+        return acceptors;
+    }
+
     @Override
     public String toString()
     {

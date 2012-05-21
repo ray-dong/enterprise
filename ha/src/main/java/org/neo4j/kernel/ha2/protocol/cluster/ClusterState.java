@@ -27,6 +27,7 @@ import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
@@ -46,43 +47,48 @@ public enum ClusterState
         {
             switch( message.getMessageType() )
             {
-            case addClusterListener:
-            {
-                context.addClusterListener( message.<ClusterListener>getPayload() );
+                case addClusterListener:
+                {
+                    context.addClusterListener( message.<ClusterListener>getPayload() );
 
-                break;
-            }
+                    break;
+                }
 
-            case removeClusterListener:
-            {
-                context.removeClusterListener( message.<ClusterListener>getPayload() );
+                case removeClusterListener:
+                {
+                    context.removeClusterListener( message.<ClusterListener>getPayload() );
 
-                break;
-            }
+                    break;
+                }
 
-            case create:
-            {
-                context.create();
-                outgoing.process( internal( AcceptorMessage.join ) );
-                outgoing.process( internal( LearnerMessage.join ) );
-                return joined;
-            }
+                case create:
+                {
+                    context.created();
+                    outgoing.process( internal( AtomicBroadcastMessage.join ) );
+                    outgoing.process( internal( AcceptorMessage.join ) );
+                    outgoing.process( internal( LearnerMessage.join ) );
+                    return joined;
+                }
 
-            case join:
-            {
-                URI clusterNodeUri = message.getPayload();
-                outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
-                context.timeouts.setTimeout( clusterNodeUri, internal( ClusterMessage.configurationTimeout ) );
-                return acquiringConfiguration;
-            }
-            case leave:
-                break;
-            case configuration:
-                break;
-            case configurationResponse:
-                break;
-            case configurationTimeout:
-                break;
+                case join:
+                {
+                    URI clusterNodeUri = message.getPayload();
+                    outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
+                    context.timeouts.setTimeout( clusterNodeUri, internal( ClusterMessage.configurationTimeout ) );
+                    return acquiringConfiguration;
+                }
+
+                case leave:
+                {
+                    break;
+                }
+
+                case configuration:
+                    break;
+                case configurationResponse:
+                    break;
+                case configurationTimeout:
+                    break;
             }
             return this;
         }
@@ -104,6 +110,9 @@ public enum ClusterState
                     List<URI> nodeList = new ArrayList<URI>(state.getNodes());
                     if (!nodeList.contains(context.me))
                     {
+                        context.learnerContext.lastReceivedInstanceId = state.getLatestReceivedInstanceId().getId();
+                        context.proposerContext.lastInstanceId = state.getLatestReceivedInstanceId().getId()+1;
+
                         nodeList.add(context.me);
 
                         ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState(nodeList);
@@ -112,6 +121,8 @@ public enum ClusterState
                         outgoing.process( internal( LearnerMessage.join ) );
                         outgoing.process( internal( AtomicBroadcastMessage.join ) );
                         outgoing.process(internal( ProposerMessage.propose, newState ));
+
+                        // TODO timeout this
 
                         return joining;
                     } else
@@ -146,7 +157,10 @@ public enum ClusterState
                 case configurationChanged:
                 {
                     ClusterMessage.ConfigurationChangeState state = message.getPayload();
+                    // TODO Verify that this is the change we sent out in the first place
+
                     context.joined( state.getNodes() );
+                    outgoing.process( internal( ProposerMessage.join ) );
                     return joined;
                 }
             }
@@ -162,10 +176,24 @@ public enum ClusterState
         {
             switch (message.getMessageType())
             {
+                case addClusterListener:
+                {
+                    context.addClusterListener( message.<ClusterListener>getPayload() );
+
+                    break;
+                }
+
+                case removeClusterListener:
+                {
+                    context.removeClusterListener( message.<ClusterListener>getPayload() );
+
+                    break;
+                }
+
                 case configuration:
                 {
                     outgoing.process( respond( ClusterMessage.configurationResponse, message, new ClusterMessage.ConfigurationResponseState( context.getConfiguration().getNodes(),
-                                                                                                                                             context.getConfiguration().getNodes(), null ) ));
+                                                                                                                                             context.getConfiguration().getNodes(), new InstanceId(context.learnerContext.lastReceivedInstanceId ) )));
                     break;
                 }
 
@@ -173,7 +201,65 @@ public enum ClusterState
                 {
                     ClusterMessage.ConfigurationChangeState state = message.getPayload();
                     context.joined( state.getNodes() );
-                    return joined;
+                    break;
+                }
+
+                case leave:
+                {
+                    List<URI> nodeList = new ArrayList<URI>(context.getConfiguration().getNodes());
+                    if (nodeList.size() == 1)
+                    {
+                        context.left();
+
+                        outgoing.process( internal( ProposerMessage.leave ) );
+                        outgoing.process( internal( AcceptorMessage.leave ) );
+                        outgoing.process( internal( LearnerMessage.leave ) );
+                        outgoing.process( internal( AtomicBroadcastMessage.leave ) );
+
+                        return start;
+
+                    } else
+                    {
+                        nodeList.remove(context.me);
+
+                        ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState(nodeList);
+
+                        outgoing.process(internal( ProposerMessage.propose, newState ));
+
+                        return leaving;
+                    }
+                }
+            }
+
+            return this;
+        }
+    },
+
+    leaving
+    {
+        @Override
+        public State<?, ?> handle( ClusterContext context,
+                                   Message<ClusterMessage> message,
+                                   MessageProcessor outgoing
+        )
+            throws Throwable
+        {
+            switch( message.getMessageType() )
+            {
+                case configurationChanged:
+                {
+                    ClusterMessage.ConfigurationChangeState state = message.getPayload();
+                    if (!state.getNodes().contains( context.getMe() ))
+                    {
+                        context.left();
+
+                        outgoing.process( internal( ProposerMessage.leave ) );
+                        outgoing.process( internal( AcceptorMessage.leave ) );
+                        outgoing.process( internal( LearnerMessage.leave ) );
+                        outgoing.process( internal( AtomicBroadcastMessage.leave ) );
+
+                        return start;
+                    }
                 }
             }
 

@@ -32,6 +32,7 @@ import java.util.logging.Logger;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
+import org.slf4j.LoggerFactory;
 
 /**
  * This mocks message delivery, message loss, and time for timeouts and message latency
@@ -48,6 +49,7 @@ public class NetworkMock
     private ProtocolServerFactory factory;
     private final NetworkLatencyStrategy strategy;
     private TimeoutStrategy timeoutStrategy;
+    protected final org.slf4j.Logger logger;
 
     public NetworkMock( long tickDuration, ProtocolServerFactory factory, NetworkLatencyStrategy strategy, TimeoutStrategy timeoutStrategy )
     {
@@ -55,6 +57,7 @@ public class NetworkMock
         this.factory = factory;
         this.strategy = strategy;
         this.timeoutStrategy = timeoutStrategy;
+        logger = LoggerFactory.getLogger( NetworkMock.class );
     }
 
     public TestProtocolServer addServer( String serverId )
@@ -75,7 +78,7 @@ public class NetworkMock
 
     private void debug( String participant, String string )
     {
-        Logger.getLogger("").info( "=== " + participant + " " + string );
+        logger.info( "=== " + participant + " " + string );
     }
 
     public void removeServer( String serverId )
@@ -129,11 +132,11 @@ public class NetworkMock
                         long delay = strategy.messageDelay(message, testServer.getKey());
                         if (delay == NetworkLatencyStrategy.LOST)
                         {
-                            Logger.getLogger("").info( "Broadcasted message to "+testServer.getKey()+" was lost");
+                            logger.info( "Broadcasted message to "+testServer.getKey()+" was lost");
 
                         } else
                         {
-                            Logger.getLogger("").info("Broadcast to " + testServer.getKey() + ": " + message);
+                            logger.info("Broadcast to " + testServer.getKey() + ": " + message);
                             messageDeliveries.add(new MessageDelivery(now+delay, message, testServer.getValue()));
                         }
                     }
@@ -143,11 +146,11 @@ public class NetworkMock
                 long delay = strategy.messageDelay(message, to);
                 if (delay == NetworkLatencyStrategy.LOST)
                 {
-                    Logger.getLogger("").info( "Send message to "+to+" was lost");
+                    logger.info( "Send message to "+to+" was lost");
                 } else
                 {
                     TestProtocolServer server = participants.get( to );
-                    Logger.getLogger("").info("Send to " + to + ": " + message);
+                    logger.info("Send to " + to + ": " + message);
                     messageDeliveries.add(new MessageDelivery(now+delay, message, server));
                 }
             }
@@ -158,8 +161,10 @@ public class NetworkMock
     
     public void tick(int iterations)
     {
-        for (int i = 0; i < iterations; i++)
+        for( int i = 0; i < iterations; i++ )
+        {
             tick();
+        }
     }
 
     public void tickUntilDone()

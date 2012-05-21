@@ -45,26 +45,19 @@ import org.neo4j.kernel.ha2.timeout.Timeouts;
  */
 public class MultiPaxosContext
 {
-    public ClusterContext clusterContext;
-
-    public Timeouts timeouts;
-
-    // Proposer/coordinator state
-    Deque<Object> pendingValues = new LinkedList<Object>();
-    Map<InstanceId,Object> bookedInstances = new HashMap<InstanceId,Object>(  );
-    public long lastInstanceId = 0;
-    ProposerInstanceStore proposerInstances = new ProposerInstanceStore();
-
-    // Learner state
-    List<LearnerInstance> learnerInstances = new ArrayList<LearnerInstance>(100);
-    long lastReceivedInstanceId = -1;
+    ClusterContext clusterContext;
+    ProposerContext proposerContext;
+    LearnerContext learnerContext;
+    Timeouts timeouts;
 
     // Acceptor state
     AcceptorInstanceStore acceptorInstances = new InMemoryAcceptorInstanceStore();
 
-    public MultiPaxosContext(ClusterContext clusterContext, Timeouts timeouts)
+    public MultiPaxosContext(ClusterContext clusterContext, ProposerContext proposerContext, LearnerContext learnerContext, Timeouts timeouts)
     {
         this.clusterContext = clusterContext;
+        this.proposerContext = proposerContext;
+        this.learnerContext = learnerContext;
         this.timeouts = timeouts;
     }
 
@@ -73,7 +66,7 @@ public class MultiPaxosContext
         return clusterContext.getConfiguration().getNodes().indexOf(clusterContext.getMe());
     }
 
-    public Iterable<URI> getAcceptors()
+    public List<URI> getAcceptors()
     {
         return clusterContext.getConfiguration().getNodes();
     }
@@ -88,18 +81,12 @@ public class MultiPaxosContext
         return clusterContext.getConfiguration().getCoordinator();
     }
 
-    public int getMinimumQuorumSize()
+    public int getMinimumQuorumSize( List<URI> acceptors )
     {
-        return clusterContext.getConfiguration().getNodes().size()-clusterContext.getConfiguration().getAllowedFailures();
-    }
-    
-    public int getLearnerInstanceIndex( long instanceId )
-    {
-        return (int)(instanceId%learnerInstances.size());
-    }
-
-    public InstanceId newInstanceId()
-    {
-        return new InstanceId( lastInstanceId++);
+        // n >= 2f+1
+        if (acceptors.size() >= 2*clusterContext.getConfiguration().getAllowedFailures() + 1)
+            return acceptors.size()-clusterContext.getConfiguration().getAllowedFailures();
+        else
+            return acceptors.size();
     }
 }

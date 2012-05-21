@@ -44,9 +44,9 @@ public enum LearnerState
                     case join:
                     {
                         // Initialize all learner instances
-                        context.learnerInstances.clear();
+                        context.learnerContext.learnerInstances.clear();
                         for (int i = 0; i < 10; i++)
-                            context.learnerInstances.add( new LearnerInstance() );
+                            context.learnerContext.learnerInstances.add( new LearnerInstance() );
 
                         // TODO Do formal join process
                         return learner;
@@ -71,19 +71,19 @@ public enum LearnerState
                     case learn:
                     {
                         LearnerMessage.LearnState learnState = message.getPayload();
-                        if (learnState.getInstanceId().equals( new InstanceId( context.lastReceivedInstanceId +1) ))
+                        if (learnState.getInstanceId().equals( new InstanceId( context.learnerContext.lastReceivedInstanceId +1) ))
                         {
                             outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnState.getValue()));
 
-                            context.lastReceivedInstanceId = learnState.getInstanceId().getId();
-                            for (int i=1; i < context.learnerInstances.size(); i++)
+                            context.learnerContext.lastReceivedInstanceId = learnState.getInstanceId().getId();
+                            for (int i=1; i < context.learnerContext.learnerInstances.size(); i++)
                             {
-                                int index = context.getLearnerInstanceIndex(learnState.getInstanceId().getId()+i);
-                                LearnerInstance learnerInstance = context.learnerInstances.get( index );
+                                int index = context.learnerContext.getLearnerInstanceIndex(learnState.getInstanceId().getId()+i);
+                                LearnerInstance learnerInstance = context.learnerContext.learnerInstances.get( index );
                                 if ( learnerInstance.instanceId != null)
                                 {
                                     outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnerInstance.value));
-                                    context.lastReceivedInstanceId = learnerInstance.instanceId.getId();
+                                    context.learnerContext.lastReceivedInstanceId = learnerInstance.instanceId.getId();
                                     learnerInstance.instanceId = null;
                                     learnerInstance.value = null;
                                 } else
@@ -93,17 +93,17 @@ public enum LearnerState
                                 }
                             }
                         }
-                        else if (learnState.getInstanceId().getId()<= context.lastReceivedInstanceId)
+                        else if (learnState.getInstanceId().getId()<= context.learnerContext.lastReceivedInstanceId)
                         {
                             // We have already learned this - ignore
                         } else
                         {
                             // Store it and wait for hole to be filled
-                            int distance = (int)(learnState.getInstanceId().getId() - context.lastReceivedInstanceId);
-                            if (distance < context.learnerInstances.size()-1)
+                            int distance = (int)(learnState.getInstanceId().getId() - context.learnerContext.lastReceivedInstanceId);
+                            if (distance < context.learnerContext.learnerInstances.size()-1)
                             {
-                                int index = context.getLearnerInstanceIndex(learnState.getInstanceId().getId());
-                                context.learnerInstances.get( index ).set(learnState);
+                                int index = context.learnerContext.getLearnerInstanceIndex(learnState.getInstanceId().getId());
+                                context.learnerContext.learnerInstances.get( index ).set(learnState);
                             } else
                             {
                                 // TODO Value has been discarded because there is no space in the index. Have to refetch it later from someone else

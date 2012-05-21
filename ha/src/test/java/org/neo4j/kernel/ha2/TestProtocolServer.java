@@ -36,6 +36,7 @@ import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TestTimeouts;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.slf4j.LoggerFactory;
 
 /**
  * TODO
@@ -60,7 +61,7 @@ public class TestProtocolServer
 
         server = factory.newProtocolServer( timeouts, receiver, sender );
 
-        server.addStateTransitionListener( new StateTransitionLogger( serverId, Logger.getAnonymousLogger(  ) ) );
+        server.addStateTransitionListener( new StateTransitionLogger( serverId, LoggerFactory.getLogger(StateTransitionLogger.class) ) );
 
         try
         {

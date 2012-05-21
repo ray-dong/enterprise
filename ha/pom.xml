@@ -151,6 +151,11 @@ terms of the relevant Commercial Agreement.
       <artifactId>log4j</artifactId>
     </dependency>
     <dependency>
+    	<groupId>ch.qos.logback</groupId>
+    	<artifactId>logback-classic</artifactId>
+    	<version>1.0.0</version>
+    </dependency>
+    <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
       <scope>test</scope>

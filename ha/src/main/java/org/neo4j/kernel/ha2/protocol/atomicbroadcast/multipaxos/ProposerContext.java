@@ -20,63 +20,25 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import java.io.Serializable;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Map;
 
 /**
  * TODO
  */
-public class InstanceId
-    implements Serializable, Comparable<InstanceId>
+public class ProposerContext
 {
-    long id;
+    // Proposer/coordinator state
+    Deque<Object> pendingValues = new LinkedList<Object>();
+    Map<InstanceId,Object> bookedInstances = new HashMap<InstanceId,Object>(  );
+    ProposerInstanceStore proposerInstances = new ProposerInstanceStore();
 
-    public InstanceId( long id )
+    public long lastInstanceId = 0;
+
+    public InstanceId newInstanceId()
     {
-        this.id = id;
-    }
-
-    public long getId()
-    {
-        return id;
-    }
-
-    @Override
-    public int compareTo( InstanceId o )
-    {
-        return (int) (id - o.getId());
-    }
-
-    @Override
-    public boolean equals( Object o )
-    {
-        if( this == o )
-        {
-            return true;
-        }
-        if( o == null || getClass() != o.getClass() )
-        {
-            return false;
-        }
-
-        InstanceId that = (InstanceId) o;
-
-        if( id != that.id )
-        {
-            return false;
-        }
-
-        return true;
-    }
-
-    @Override
-    public int hashCode()
-    {
-        return (int) ( id ^ ( id >>> 32 ) );
-    }
-
-    @Override
-    public String toString()
-    {
-        return id+"";
+        return new InstanceId( lastInstanceId++);
     }
 }

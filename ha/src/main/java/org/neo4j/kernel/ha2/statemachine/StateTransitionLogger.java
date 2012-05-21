@@ -20,7 +20,7 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
-import java.util.logging.Logger;
+import org.slf4j.Logger;
 
 /**
  * TODO
