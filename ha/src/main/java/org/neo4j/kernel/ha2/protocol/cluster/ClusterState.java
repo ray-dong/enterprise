@@ -20,9 +20,14 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
+import static org.neo4j.com_2.message.Message.internal;
+import static org.neo4j.com_2.message.Message.respond;
+import static org.neo4j.com_2.message.Message.to;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
@@ -30,8 +35,6 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastM
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
-
-import static org.neo4j.com_2.message.Message.*;
 
 /**
  * State machine for the Cluster API

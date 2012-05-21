@@ -21,16 +21,8 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import org.neo4j.helpers.Listeners;
-import org.neo4j.helpers.Specifications;
-import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
-import org.neo4j.kernel.ha2.timeout.Timeouts;
-
-import java.util.*;
-
-import static org.neo4j.helpers.collection.Iterables.iterable;
-import static org.neo4j.helpers.collection.Iterables.toList;
 
 /**
  * Context shared by all Paxos state machines.
