@@ -71,7 +71,7 @@ public class TestTimeouts
     public void tick(long time)
     {
         // Time has passed
-        now += time;
+        now = time;
 
         // Check if any timeouts needs to be triggered
         triggeredTimeouts.clear();

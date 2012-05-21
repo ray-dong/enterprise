@@ -93,7 +93,10 @@ public enum LearnerState
                                 }
                             }
                         }
-                        else
+                        else if (learnState.getInstanceId().getId()<= context.lastReceivedInstanceId)
+                        {
+                            // We have already learned this - ignore
+                        } else
                         {
                             // Store it and wait for hole to be filled
                             int distance = (int)(learnState.getInstanceId().getId() - context.lastReceivedInstanceId);

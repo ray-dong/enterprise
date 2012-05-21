@@ -123,12 +123,18 @@ public enum ProposerState
                                     // R1
                                     if (instance.value_2 == null)
                                     {
+                                        // Another value was already associated with this instance. Push value back onto pending list
+                                        context.pendingValues.offerFirst( context.bookedInstances.remove( instance.id ) );
+
                                         instance.ready( instance.value_1, false );
                                     } else if (instance.value_1.equals( instance.value_2 == null ? context.bookedInstances.get( instance.id ) : instance.value_2 ))
                                     {
                                         instance.ready( instance.value_2, instance.clientValue );
                                     } else if (instance.clientValue)
                                     {
+                                        // Another value was already associated with this instance. Push value back onto pending list
+                                        context.pendingValues.offerFirst( context.bookedInstances.remove( instance.id ) );
+
                                         instance.ready( instance.value_1, false );
                                     } else
                                     {

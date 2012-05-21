@@ -112,8 +112,6 @@ public class ClusterTest
         cluster3.join(new URI(server1));
         network.tickUntilDone();
         logger.severe( "3 JOINED!!!" );
-        network.tickUntilDone();
-        logger.severe( "3 JOINED 2!!!" );
 
         logger.info(config.get().toString());
     }

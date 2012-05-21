@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URI;
 import java.util.logging.Logger;
 
@@ -27,6 +29,7 @@ import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.helpers.Listeners;
+import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
@@ -134,6 +137,20 @@ public class ProtocolServer
     public <T> T newClient( Class<T> clientProxyInterface )
     {
         return proxyFactory.newProxy( clientProxyInterface );
+    }
+
+    @Override
+    public String toString()
+    {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter out = new PrintWriter( stringWriter, true);
+        out.printf( "Me:%s \n", me.toString() );
+
+        for( StateMachine stateMachine : connectedStateMachines.getStateMachines() )
+        {
+            out.println( "  "+stateMachine);
+        }
+        return stringWriter.toString();
     }
 
     private class FromHeaderMessageProcessor

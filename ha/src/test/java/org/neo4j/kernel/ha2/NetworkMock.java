@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -104,7 +106,7 @@ public class NetworkMock
         // Check and trigger timeouts
         for( TestProtocolServer testServer : participants.values() )
         {
-            testServer.tick(tickDuration);
+            testServer.tick(now);
         }
 
         // Get all sent messages from all test servers
@@ -173,6 +175,22 @@ public class NetworkMock
             count += testProtocolServer.getTimeouts().getTimeouts().size();
         }
         return count;
+    }
+
+    @Override
+    public String toString()
+    {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter out = new PrintWriter( stringWriter, true);
+        out.printf( "Now:%s \n", now );
+        out.printf( "Pending messages:%s \n", messageDeliveries.size() );
+        out.printf( "Pending timeouts:%s \n", totalCurrentTimeouts() );
+
+        for( TestProtocolServer testProtocolServer : participants.values() )
+        {
+            out.println( "  "+testProtocolServer);
+        }
+        return stringWriter.toString();
     }
 
     private static class MessageDelivery

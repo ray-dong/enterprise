@@ -122,6 +122,12 @@ public class TestProtocolServer
         timeouts.tick( time );
     }
 
+    @Override
+    public String toString()
+    {
+        return server.getServerId()+": "+sender.getMessages().size()+server.toString();
+    }
+
     public class TestMessageSender
         implements MessageProcessor
     {
@@ -131,6 +137,11 @@ public class TestProtocolServer
         public void process( Message<? extends MessageType> message )
         {
             messages.add( message );
+        }
+
+        public List<Message> getMessages()
+        {
+            return messages;
         }
 
         public void sendMessages( List<Message> output )

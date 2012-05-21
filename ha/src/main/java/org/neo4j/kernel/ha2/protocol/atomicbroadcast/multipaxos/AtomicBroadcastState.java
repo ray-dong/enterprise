@@ -87,6 +87,8 @@ public enum AtomicBroadcastState
                             outgoing.process( internal( ClusterMessage.configurationChanged, message.getPayload() ) );
                         else
                             context.receive(message.getPayload());
+
+                        break;
                     }
 
                     case leave:
