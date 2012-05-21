@@ -24,7 +24,7 @@ import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
 
 /**
- * TODO
+ * Timeout management for state machines
  */
 public interface Timeouts
 {

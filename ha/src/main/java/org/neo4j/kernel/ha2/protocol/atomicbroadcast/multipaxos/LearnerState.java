@@ -70,19 +70,20 @@ public enum LearnerState
                 {
                     case learn:
                     {
-                        LearnerMessage.LearnState learnState = ( LearnerMessage.LearnState) message.getPayload();
-                        if (learnState.getInstanceId().equals( new InstanceId( context.lastLearnedInstanceId+1) ))
+                        LearnerMessage.LearnState learnState = message.getPayload();
+                        if (learnState.getInstanceId().equals( new InstanceId( context.lastReceivedInstanceId +1) ))
                         {
-                            context.learnValue( learnState.getValue() );
-                            context.lastLearnedInstanceId = learnState.getInstanceId().getId();
+                            outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnState.getValue()));
+
+                            context.lastReceivedInstanceId = learnState.getInstanceId().getId();
                             for (int i=1; i < context.learnerInstances.size(); i++)
                             {
                                 int index = context.getLearnerInstanceIndex(learnState.getInstanceId().getId()+i);
                                 LearnerInstance learnerInstance = context.learnerInstances.get( index );
                                 if ( learnerInstance.instanceId != null)
                                 {
-                                    context.learnValue( learnerInstance.value );
-                                    context.lastLearnedInstanceId = learnerInstance.instanceId.getId();
+                                    outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnerInstance.value));
+                                    context.lastReceivedInstanceId = learnerInstance.instanceId.getId();
                                     learnerInstance.instanceId = null;
                                     learnerInstance.value = null;
                                 } else
@@ -95,7 +96,7 @@ public enum LearnerState
                         else
                         {
                             // Store it and wait for hole to be filled
-                            int distance = (int)(learnState.getInstanceId().getId() - context.lastLearnedInstanceId);
+                            int distance = (int)(learnState.getInstanceId().getId() - context.lastReceivedInstanceId);
                             if (distance < context.learnerInstances.size()-1)
                             {
                                 int index = context.getLearnerInstanceIndex(learnState.getInstanceId().getId());
@@ -106,6 +107,12 @@ public enum LearnerState
                             }
                         }
                         break;
+                    }
+
+                    case learnRequest:
+                    {
+                        LearnerMessage.LearnRequestState state = message.getPayload();
+
                     }
 
                     case leave:

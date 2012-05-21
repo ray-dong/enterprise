@@ -70,7 +70,7 @@ public class NetworkedServerFactory
         final NetworkNode node = new NetworkNode( config, logger );
         life.add( node );
 
-        Timeouts timeouts = new TimeoutsService( timeoutStrategy, node );
+        Timeouts timeouts = life.add(new TimeoutsService( timeoutStrategy, node ));
 
         final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeouts, node, node);
         node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
@@ -78,7 +78,7 @@ public class NetworkedServerFactory
             @Override
             public void listeningAt( URI me )
             {
-                protocolServer.listeningAt( me.toString() );
+                protocolServer.listeningAt( me );
             }
 
             @Override

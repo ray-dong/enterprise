@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -60,7 +62,13 @@ public class TestProtocolServer
 
         server.addStateTransitionListener( new StateTransitionLogger( serverId, Logger.getAnonymousLogger(  ) ) );
 
-        server.listeningAt( serverId );
+        try
+        {
+            server.listeningAt( new URI(serverId) );
+        } catch (URISyntaxException e)
+        {
+            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
+        }
 
         life.add( server );
     }

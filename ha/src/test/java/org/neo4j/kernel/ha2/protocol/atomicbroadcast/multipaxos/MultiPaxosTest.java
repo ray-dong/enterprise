@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 
+import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
@@ -34,6 +35,7 @@ import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 
 /**
@@ -54,13 +56,13 @@ public class MultiPaxosTest
 
     @Test
     public void testDecision()
-        throws ExecutionException, InterruptedException
+            throws ExecutionException, InterruptedException, URISyntaxException
     {
-        network = new NetworkMock(50, new MultiPaxosServerFactory(), new FixedNetworkLatencyStrategy(0), new FixedTimeoutStrategy( 1000 ));
+        network = new NetworkMock(50, new MultiPaxosServerFactory(new ClusterConfiguration(POSSIBLE_SERVERS)), new FixedNetworkLatencyStrategy(0), new FixedTimeoutStrategy( 1000 ));
 
-        member1 = newMember( ID1, POSSIBLE_SERVERS );
-        member2 = newMember( ID2, POSSIBLE_SERVERS );
-        member3 = newMember( ID3, POSSIBLE_SERVERS );
+        member1 = newMember( ID1 );
+        member2 = newMember( ID2 );
+        member3 = newMember( ID3 );
 
         Map<String, String> map1 = new AtomicBroadcastMap<String,String>(member1);
         Map<String, String> map2 = new AtomicBroadcastMap<String,String>(member2);
@@ -86,12 +88,10 @@ public class MultiPaxosTest
         Assert.assertThat( foo , CoreMatchers.nullValue() );
     }
 
-    private AtomicBroadcast newMember( String id, String... possibleServers )
+    private AtomicBroadcast newMember( String id)
     {
         TestProtocolServer server = network.addServer( id );
         AtomicBroadcast member = server.newClient( AtomicBroadcast.class );
-        member.possibleServers( possibleServers );
-        member.join();
         return member;
     }
 }

@@ -22,17 +22,18 @@ package org.neo4j.kernel.ha2;
 
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastState;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerState;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerState;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.*;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
+
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 
 /**
  * TODO
@@ -40,15 +41,25 @@ import org.neo4j.kernel.ha2.timeout.Timeouts;
 public class MultiPaxosServerFactory
     implements ProtocolServerFactory
 {
+    private ClusterConfiguration initialConfig;
+
+    public MultiPaxosServerFactory(ClusterConfiguration initialConfig)
+    {
+        this.initialConfig = initialConfig;
+    }
+
     @Override
     public ProtocolServer newProtocolServer(Timeouts timeouts, MessageSource input, MessageProcessor output )
     {
-        final MultiPaxosContext context = new MultiPaxosContext();
-        context.timeouts = timeouts;
-
         ConnectedStateMachines connectedStateMachines = new ConnectedStateMachines( input, output );
 
-        StateMachine paxosStateMachine= new StateMachine(context, AtomicBroadcastMessage.class, AtomicBroadcastState.start);
+        final ClusterContext clusterContext = new ClusterContext(initialConfig,
+                timeouts);
+
+        final MultiPaxosContext context = new MultiPaxosContext(clusterContext, timeouts);
+        context.timeouts = timeouts;
+
+        StateMachine paxosStateMachine= new StateMachine(new AtomicBroadcastContext(), AtomicBroadcastMessage.class, AtomicBroadcastState.start);
         StateMachine acceptor= new StateMachine(context, AcceptorMessage.class, AcceptorState.start);
         StateMachine coordinator= new StateMachine(context, ProposerMessage.class, ProposerState.start);
         StateMachine learner= new StateMachine(context, LearnerMessage.class, LearnerState.start);
@@ -58,16 +69,21 @@ public class MultiPaxosServerFactory
         connectedStateMachines.addStateMachine( coordinator );
         connectedStateMachines.addStateMachine( learner );
 
-
         final ProtocolServer server = new ProtocolServer( connectedStateMachines );
+
+        StateMachine cluster = new StateMachine(clusterContext, ClusterMessage.class, ClusterState.start);
+
+        connectedStateMachines.addStateMachine(cluster);
+
         server.addBindingListener( new BindingListener()
         {
             @Override
-            public void listeningAt( String me )
+            public void listeningAt( URI me )
             {
-                context.setMe( me );
+                clusterContext.setMe(me);
             }
         } );
+
 
         return server;
     }

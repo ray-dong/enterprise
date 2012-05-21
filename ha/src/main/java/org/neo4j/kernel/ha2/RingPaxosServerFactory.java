@@ -28,6 +28,8 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos.RingPaxosContext;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 
+import java.net.URI;
+
 /**
  * TODO
  */
@@ -56,9 +58,9 @@ public class RingPaxosServerFactory
         server.addBindingListener( new BindingListener()
         {
             @Override
-            public void listeningAt( String me )
+            public void listeningAt( URI me )
             {
-                context.setMe( me );
+                context.setMe( me.toString() );
             }
         } );
 

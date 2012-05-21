@@ -30,26 +30,31 @@ import java.util.Map;
 public class Message<MESSAGETYPE extends MessageType>
     implements Serializable
 {
-    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE messageType)
     {
-        return broadcast(message, null);
+        return broadcast(messageType, null);
     }
 
-    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE message, Object payload)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> broadcast(MESSAGETYPE messageType, Object payload)
     {
-        return new Message<MESSAGETYPE>(message, payload).setHeader( TO, BROADCAST );
+        return new Message<MESSAGETYPE>(messageType, payload).setHeader( TO, BROADCAST );
     }
 
-    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> to(MESSAGETYPE messageType, Object to)
     {
-        return to( message, to, null );
+        return to( messageType, to, null );
     }
     
-    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> to(MESSAGETYPE message, Object to, Object payload)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> to(MESSAGETYPE messageType, Object to, Object payload)
     {
-        return new Message<MESSAGETYPE>(message, payload).setHeader( TO, to.toString() );
+        return new Message<MESSAGETYPE>(messageType, payload).setHeader( TO, to.toString() );
     }
     
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> respond(MESSAGETYPE messageType, Message message, Object payload)
+    {
+        return new Message<MESSAGETYPE>(messageType, payload).setHeader( TO, message.getHeader( Message.FROM ));
+    }
+
     public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> internal(MESSAGETYPE message)
     {
         return internal( message, null );
@@ -83,9 +88,9 @@ public class Message<MESSAGETYPE extends MessageType>
         return messageType;
     }
 
-    public Object getPayload()
+    public <T> T getPayload()
     {
-        return payload;
+        return (T) payload;
     }
     
     public Message<MESSAGETYPE> setHeader(String name, String value)

@@ -28,6 +28,8 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 
+import java.net.URI;
+
 /**
  * TODO
  */
@@ -49,9 +51,9 @@ public class HeartbeatServerFactory
         server.addBindingListener( new BindingListener()
         {
             @Override
-            public void listeningAt( String me )
+            public void listeningAt( URI me )
             {
-                context.setMe( me );
+                context.setMe( me.toString() );
             }
         } );
 

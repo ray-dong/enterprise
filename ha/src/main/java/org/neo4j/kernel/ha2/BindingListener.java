@@ -20,10 +20,12 @@
 
 package org.neo4j.kernel.ha2;
 
+import java.net.URI;
+
 /**
 * Listener for binding to a server address.
 */
 public interface BindingListener
 {
-    void listeningAt( String me );
+    void listeningAt( URI me );
 }

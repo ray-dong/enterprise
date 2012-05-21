@@ -64,12 +64,12 @@ public enum AcceptorState
                 {
                     case prepare:
                     {
-                        AcceptorMessage.PrepareState prepareState = (AcceptorMessage.PrepareState) message.getPayload();
+                        AcceptorMessage.PrepareState prepareState = message.getPayload();
                         AcceptorInstance instance = context.acceptorInstances.getAcceptorInstance( prepareState.getInstanceId() );
 
                         if ( prepareState.getBallot() > instance.ballot )
                         {
-                            instance.ballot = prepareState.getBallot();
+                            instance.prepare(prepareState);
 
                             outgoing.process(Message.to( ProposerMessage.promise, message.getHeader( Message.FROM ), new ProposerMessage.PromiseState( instance.instanceId, instance.ballot, instance.value ) ));
                         } else
@@ -83,12 +83,13 @@ public enum AcceptorState
                     case accept:
                     {
                         // Task 4
-                        AcceptorMessage.AcceptState acceptState = ( AcceptorMessage.AcceptState) message.getPayload();
+                        AcceptorMessage.AcceptState acceptState = message.getPayload();
                         AcceptorInstance instance = context.acceptorInstances.getAcceptorInstance( acceptState.getInstance() );
 
                         if (acceptState.getBallot() == instance.ballot)
                         {
-                            instance.value = acceptState.getValue();
+                            instance.accept(acceptState);
+
                             outgoing.process( Message.to( ProposerMessage.accepted, message.getHeader( Message.FROM ), new ProposerMessage.AcceptedState(instance.instanceId) ) );
                         } else
                         {

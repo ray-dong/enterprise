@@ -28,4 +28,7 @@ import org.neo4j.com_2.message.Message;
 public interface TimeoutStrategy
 {
     long timeoutFor(Message message);
+
+    void timeoutTriggered(Message timeoutMessage);
+    void timeoutCancelled(Message timeoutMessage);
 }

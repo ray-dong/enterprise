@@ -26,7 +26,7 @@ import java.util.List;
 /**
  * TODO
  */
-public class ClusterConfiguration
+public class PaxosClusterConfiguration
 {
     List<String> proposers = new ArrayList<String>();
     List<String> acceptors = new ArrayList<String>();
@@ -34,7 +34,7 @@ public class ClusterConfiguration
     String coordinator;
     int allowedFailures = 1; // Number of allowed failures
 
-    public ClusterConfiguration( List<String> proposers, List<String> acceptors, List<String> learners, String coordinator, int allowedFailures)
+    public PaxosClusterConfiguration(List<String> proposers, List<String> acceptors, List<String> learners, String coordinator, int allowedFailures)
     {
         this.proposers = proposers;
         this.acceptors = acceptors;

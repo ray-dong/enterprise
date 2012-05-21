@@ -20,16 +20,22 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
+import org.junit.Test;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkedServerFactory;
 import org.neo4j.kernel.ha2.ProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
+import org.neo4j.kernel.ha2.protocol.cluster.Cluster;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
@@ -39,32 +45,27 @@ import org.neo4j.kernel.lifecycle.LifeSupport;
  */
 public class MultiPaxosNetworkTest
 {
-//    @Test
+    @Test
     public void testBroadcast()
-        throws ExecutionException, InterruptedException
+            throws ExecutionException, InterruptedException, URISyntaxException
     {
         LifeSupport life = new LifeSupport();
-        NetworkedServerFactory serverFactory = new NetworkedServerFactory( life, new MultiPaxosServerFactory(), new FixedTimeoutStrategy( 1000 ), StringLogger.SYSTEM );
+        NetworkedServerFactory serverFactory = new NetworkedServerFactory( life,
+                new MultiPaxosServerFactory(new ClusterConfiguration("neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
+                new FixedTimeoutStrategy( 10000 ), StringLogger.SYSTEM );
 
-        ProtocolServer server1 = serverFactory.newNetworkedServer( MapUtil.stringMap() );
-        ProtocolServer server2 = serverFactory.newNetworkedServer( MapUtil.stringMap() );
-        ProtocolServer server3 = serverFactory.newNetworkedServer( MapUtil.stringMap() );
+        ProtocolServer server1 = serverFactory.newNetworkedServer( MapUtil.stringMap("port","5001") );
+        ProtocolServer server2 = serverFactory.newNetworkedServer( MapUtil.stringMap("port","5002") );
+        ProtocolServer server3 = serverFactory.newNetworkedServer( MapUtil.stringMap("port","5003") );
 
         life.start();
 
         AtomicBroadcast atomicBroadcast1 = server1.newClient( AtomicBroadcast.class );
-        atomicBroadcast1.possibleServers( server1.getServerId(), server2.getServerId(), server3.getServerId() );
-        atomicBroadcast1.join();
-
         AtomicBroadcast atomicBroadcast2 = server2.newClient( AtomicBroadcast.class );
-        atomicBroadcast2.possibleServers( server1.getServerId(), server2.getServerId(), server3.getServerId() );
-        atomicBroadcast2.join();
-
         AtomicBroadcast atomicBroadcast3 = server3.newClient( AtomicBroadcast.class );
-        atomicBroadcast3.possibleServers( server1.getServerId(), server2.getServerId(), server3.getServerId() );
-        atomicBroadcast3.join();
 
         AtomicBroadcastMap<String,String> map = new AtomicBroadcastMap<String,String>( atomicBroadcast1 );
+        AtomicBroadcastMap<String,String> map2 = new AtomicBroadcastMap<String,String>( atomicBroadcast2 );
 
         for (int i = 0; i < 10; i++ )
         {
@@ -76,6 +77,8 @@ public class MultiPaxosNetworkTest
         String value = map.get( "foo1");
         System.out.println( "Read value" );
         Assert.assertThat(value, CoreMatchers.equalTo( "bar1" ));
+
+        System.out.println( "Read value:"+map2.get("foo1") );
 
         map.close();
 

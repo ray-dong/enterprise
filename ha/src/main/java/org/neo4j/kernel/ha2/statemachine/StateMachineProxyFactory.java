@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.statemachine;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.URI;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -42,9 +43,8 @@ public class StateMachineProxyFactory
     implements MessageProcessor, BindingListener
 {
     private ConnectedStateMachines stateMachines;
-    private StateMachine stateMachine;
     private StateMachineConversations conversations;
-    private String serverId;
+    private URI serverId;
 
     private Map<String, ResponseFuture> responseFutureMap = new ConcurrentHashMap<String, ResponseFuture>(  );
     
@@ -53,17 +53,17 @@ public class StateMachineProxyFactory
     {
         this.stateMachines = stateMachines;
         this.conversations = conversations;
-        this.stateMachine = stateMachines.getStateMachines().iterator().next();
     }
     
     public <CLIENT> CLIENT newProxy(Class<CLIENT> proxyInterface)
+            throws IllegalArgumentException
     {
-        stateMachines.checkValidProxyInterface( proxyInterface );
+        StateMachine stateMachine = getStateMachine(proxyInterface);
 
-        return proxyInterface.cast( Proxy.newProxyInstance( proxyInterface.getClassLoader(), new Class<?>[]{ proxyInterface }, new StateMachineProxyHandler( this ) ) );
+        return proxyInterface.cast( Proxy.newProxyInstance( proxyInterface.getClassLoader(), new Class<?>[]{ proxyInterface }, new StateMachineProxyHandler( this, stateMachine ) ) );
     }
 
-    Object invoke( Method method, Object arg )
+    Object invoke( StateMachine stateMachine, Method method, Object arg )
         throws Throwable
     {
         String conversationId = conversations.getNextConversationId();
@@ -71,7 +71,7 @@ public class StateMachineProxyFactory
         try
         {
             MessageType typeAsEnum = (MessageType) Enum.valueOf(  (Class<? extends Enum>) stateMachine.getMessageType(), method.getName() );
-            Message<?> message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId );
+            Message<?> message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId.toString() );
 
             if (method.getReturnType().equals( Void.TYPE ))
             {
@@ -94,7 +94,7 @@ public class StateMachineProxyFactory
     }
 
     @Override
-    public void listeningAt( String me )
+    public void listeningAt( URI me )
     {
         serverId = me;
     }
@@ -124,6 +124,48 @@ public class StateMachineProxyFactory
                 }
             }
         }
+    }
+
+    private StateMachine getStateMachine(Class<?> proxyInterface)
+            throws IllegalArgumentException
+    {
+        IllegalArgumentException exception = new IllegalArgumentException( "No state machine can handle the interface:"+proxyInterface.getName() );
+
+        statemachine: for( StateMachine stateMachine : stateMachines.getStateMachines() )
+        {
+            boolean foundMatch = false;
+
+            for( Method method : proxyInterface.getMethods() )
+            {
+                if (!(method.getReturnType().equals( Void.TYPE ) || method.getReturnType().equals( Future.class )))
+                {
+                    throw new IllegalArgumentException( "Methods must return either void or Future" );
+                }
+
+                try
+                {
+                    Enum.valueOf( (Class<? extends Enum>) stateMachine.getMessageType(), method.getName() );
+
+                    // Ok!
+                    foundMatch = true;
+                }
+                catch( Exception e )
+                {
+                    if (foundMatch)
+                        // State machine could only partially handle this interface
+                        exception = new IllegalArgumentException( "State machine for "+stateMachine.getMessageType().getName()+" cannot handle method:"+method.getName() );
+
+                    // Continue searching
+                    continue statemachine;
+                }
+            }
+
+            // All methods are implemented by this state machine - return it!
+            return stateMachine;
+        }
+
+        // Could not find any state machine that can handle this interface
+        throw exception;
     }
 
     class ResponseFuture
@@ -198,12 +240,12 @@ public class StateMachineProxyFactory
             return getResult();
         }
 
-        private Object getResult()
+        private synchronized Object getResult()
             throws InterruptedException, ExecutionException
         {
             if (response.getMessageType().name().equals( initiatedByMessageType.name() + "Failure" ))
             {
-                // Call timed out
+                // Call failed
                 if (response.getPayload() != null)
                 {
                     if (response.getPayload() instanceof Throwable)
@@ -226,7 +268,7 @@ public class StateMachineProxyFactory
         }
 
         @Override
-        public Object get( long timeout, TimeUnit unit )
+        public synchronized Object get( long timeout, TimeUnit unit )
             throws InterruptedException, ExecutionException, TimeoutException
         {
             if (response != null)
@@ -235,7 +277,9 @@ public class StateMachineProxyFactory
             }
 
             this.wait(unit.toMillis( timeout ));
-            
+
+            if (response == null)
+                throw new TimeoutException();
             return getResult();
         }
     }

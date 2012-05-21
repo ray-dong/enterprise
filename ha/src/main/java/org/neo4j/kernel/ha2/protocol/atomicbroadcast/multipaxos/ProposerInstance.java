@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,6 +42,7 @@ public class ProposerInstance
     InstanceId id = null;
     State state = State.empty;
     long ballot = 0;
+    List<URI> acceptors;
     List<ProposerMessage.PromiseState> promises = new ArrayList<ProposerMessage.PromiseState>();
     List<ProposerMessage.AcceptedState> accepts = new ArrayList<ProposerMessage.AcceptedState>();
     Object value_1;
@@ -48,9 +50,10 @@ public class ProposerInstance
     Object value_2;
     boolean clientValue = false;
 
-    public void propose( InstanceId instanceId, long ballot )
+    public void propose( InstanceId instanceId, long ballot, List<URI> acceptors)
     {
         this.id = instanceId;
+        this.acceptors = acceptors;
         this.state = State.p1_pending;
         this.ballot = ballot;
     }

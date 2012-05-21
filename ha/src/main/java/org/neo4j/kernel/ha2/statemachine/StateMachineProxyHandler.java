@@ -30,16 +30,18 @@ public class StateMachineProxyHandler
     implements InvocationHandler
 {
     private StateMachineProxyFactory stateMachineProxyFactory;
+    private StateMachine stateMachine;
 
-    public StateMachineProxyHandler( StateMachineProxyFactory stateMachineProxyFactory )
+    public StateMachineProxyHandler(StateMachineProxyFactory stateMachineProxyFactory, StateMachine stateMachine)
     {
         this.stateMachineProxyFactory = stateMachineProxyFactory;
+        this.stateMachine = stateMachine;
     }
 
     @Override
     public Object invoke( Object proxy, Method method, Object[] args )
         throws Throwable
     {
-        return stateMachineProxyFactory.invoke(method, args == null ? null : args[0]);
+        return stateMachineProxyFactory.invoke(stateMachine, method, args == null ? null : args[0]);
     }
 }

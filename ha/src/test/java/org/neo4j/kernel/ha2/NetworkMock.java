@@ -87,7 +87,27 @@ public class NetworkMock
 
     public int tick()
     {
-        // Get all messages from all test servers
+        // Deliver messages whose delivery time has passed
+        now += tickDuration;
+
+        Iterator<MessageDelivery> iter = messageDeliveries.iterator();
+        while (iter.hasNext())
+        {
+            MessageDelivery messageDelivery = iter.next();
+            if (messageDelivery.getMessageDeliveryTime() <= now)
+            {
+                messageDelivery.getServer().process(messageDelivery.getMessage());
+                iter.remove();
+            }
+        }
+
+        // Check and trigger timeouts
+        for( TestProtocolServer testServer : participants.values() )
+        {
+            testServer.tick(tickDuration);
+        }
+
+        // Get all sent messages from all test servers
         List<Message> messages = new ArrayList<Message>(  );
         for( TestProtocolServer testServer : participants.values() )
         {
@@ -131,34 +151,18 @@ public class NetworkMock
             }
         }
 
-        // Deliver messages whose delivery time has passed
-        now += tickDuration;
-
-        Iterator<MessageDelivery> iter = messageDeliveries.iterator();
-        while (iter.hasNext())
-        {
-            MessageDelivery messageDelivery = iter.next();
-            if (messageDelivery.getMessageDeliveryTime() <= now)
-            {
-                messageDelivery.getServer().process(messageDelivery.getMessage());
-                iter.remove();
-            }
-        }
-
         return messageDeliveries.size();
     }
     
+    public void tick(int iterations)
+    {
+        for (int i = 0; i < iterations; i++)
+            tick();
+    }
+
     public void tickUntilDone()
     {
-        do
-        {
-            while (tick()+totalCurrentTimeouts()>0){}
-            
-            for( TestProtocolServer testServer : participants.values() )
-            {
-                testServer.tick(tickDuration);
-            }
-        } while (tick() > 0);
+        while (tick()+totalCurrentTimeouts()>0){}
     }
 
     private int totalCurrentTimeouts()

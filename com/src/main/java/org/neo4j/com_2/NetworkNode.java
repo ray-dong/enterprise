@@ -202,17 +202,24 @@ public class NetworkNode
     @Override
     public void process( Message<? extends MessageType> message )
     {
-        String to = message.getHeader( Message.TO );
-        
-        if (to.equals( Message.BROADCAST ))
+        if (message.hasHeader(Message.TO))
         {
-            broadcast( message );
-        } else if (to.equals( me.toString() ))
+            String to = message.getHeader( Message.TO );
+
+            if (to.equals( Message.BROADCAST ))
+            {
+                broadcast( message );
+            } else if (to.equals( me.toString() ))
+            {
+                receive( message );
+            }else
+            {
+                send( message );
+            }
+        } else
         {
-            receive( message );
-        }else
-        {
-            send( message );
+            // Internal message
+            receive(message);
         }
     }
     

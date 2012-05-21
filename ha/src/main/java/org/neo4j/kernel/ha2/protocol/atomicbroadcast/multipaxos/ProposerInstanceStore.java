@@ -40,4 +40,9 @@ public class ProposerInstanceStore
         }
         return instance;
     }
+
+    public void delivered(InstanceId instanceId)
+    {
+        instances.remove(instanceId);
+    }
 }

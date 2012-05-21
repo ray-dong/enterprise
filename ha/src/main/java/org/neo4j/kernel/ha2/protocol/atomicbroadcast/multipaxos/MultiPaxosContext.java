@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 import static org.neo4j.helpers.collection.Iterables.iterable;
 import static org.neo4j.helpers.collection.Iterables.toList;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
@@ -36,6 +37,7 @@ import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.Specifications;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
@@ -43,16 +45,9 @@ import org.neo4j.kernel.ha2.timeout.Timeouts;
  */
 public class MultiPaxosContext
 {
+    public ClusterContext clusterContext;
+
     public Timeouts timeouts;
-
-    private String me;
-
-    private List<String> possibleServers = new ArrayList<String>(  );
-    private Set<String> failedServers = new HashSet<String>(  );
-
-    Iterable<AtomicBroadcastListener> listeners = Listeners.newListeners();
-
-    ClusterConfiguration clusterConfiguration;
 
     // Proposer/coordinator state
     Deque<Object> pendingValues = new LinkedList<Object>();
@@ -62,99 +57,46 @@ public class MultiPaxosContext
 
     // Learner state
     List<LearnerInstance> learnerInstances = new ArrayList<LearnerInstance>(100);
-    long lastLearnedInstanceId = -1;
+    long lastReceivedInstanceId = -1;
 
     // Acceptor state
     AcceptorInstanceStore acceptorInstances = new InMemoryAcceptorInstanceStore();
 
-    public void addAtomicBroadcastListener( AtomicBroadcastListener listener )
+    public MultiPaxosContext(ClusterContext clusterContext, Timeouts timeouts)
     {
-        listeners = Listeners.addListener( listener, listeners );
-    }
-
-    public void removeAtomicBroadcastListener( AtomicBroadcastListener listener )
-    {
-        listeners = Listeners.removeListener( listener, listeners );
-    }
-
-    public void setMe( String me )
-    {
-        this.me = me;
-    }
-
-    public String getMe()
-    {
-        return me;
+        this.clusterContext = clusterContext;
+        this.timeouts = timeouts;
     }
 
     public int getServerId()
     {
-        return clusterConfiguration.getProposers().indexOf( me );
+        return clusterContext.getConfiguration().getNodes().indexOf(clusterContext.getMe());
     }
 
-    public void setPossibleServers( String... serverIds )
+    public Iterable<URI> getAcceptors()
     {
-        possibleServers.clear();
-        possibleServers.addAll( toList( iterable( serverIds ) ) );
+        return clusterContext.getConfiguration().getNodes();
     }
 
-    public Iterable<String> getPossibleServers()
+    public Iterable<URI> getLearners()
     {
-        return possibleServers;
+        return clusterContext.getConfiguration().getNodes();
     }
 
-    public Iterable<String> getLiveServers()
+    public URI getCoordinator()
     {
-        return Iterables.filter( Specifications.in( failedServers ), possibleServers );
-    }
-
-    public void fail(String serverId)
-    {
-        failedServers.add( serverId );
-    }
-
-    public void recover(String serverId)
-    {
-        failedServers.remove( serverId );
-    }
-
-    public Iterable<String> getAcceptors()
-    {
-        return clusterConfiguration.getAcceptors();
-    }
-
-    public Iterable<String> getLearners()
-    {
-        return clusterConfiguration.getLearners();
-    }
-
-    public String getCoordinator()
-    {
-        return clusterConfiguration.getCoordinator();
+        return clusterContext.getConfiguration().getCoordinator();
     }
 
     public int getMinimumQuorumSize()
     {
-        return clusterConfiguration.getAcceptors().size()/2+1;
+        return clusterContext.getConfiguration().getNodes().size()-clusterContext.getConfiguration().getAllowedFailures();
     }
     
-    public void learnValue( final Object value )
-    {
-        Listeners.notifyListeners( listeners, new Listeners.Notification<AtomicBroadcastListener>()
-                {
-                    @Override
-                    public void notify( AtomicBroadcastListener listener )
-                    {
-                        listener.receive( value );
-                    }
-                } );
-    }
-
     public int getLearnerInstanceIndex( long instanceId )
     {
         return (int)(instanceId%learnerInstances.size());
     }
-
 
     public InstanceId newInstanceId()
     {

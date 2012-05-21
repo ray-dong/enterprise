@@ -22,6 +22,8 @@ package org.neo4j.kernel.ha2.statemachine;
 
 import org.neo4j.kernel.ha2.BindingListener;
 
+import java.net.URI;
+
 /**
  * Generate id's for state machine conversations. This should be shared between all state machines in a server.
  */
@@ -37,8 +39,8 @@ public class StateMachineConversations
     }
 
     @Override
-    public void listeningAt( String me )
+    public void listeningAt( URI me )
     {
-        serverId = me;
+        serverId = me.toString();
     }
 }

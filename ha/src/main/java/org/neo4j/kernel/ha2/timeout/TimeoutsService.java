@@ -107,6 +107,8 @@ public class TimeoutsService
         {
             cancelled = true;
             timeouts.remove( key );
+
+            timeoutStrategy.timeoutCancelled(message);
         }
 
         @Override
@@ -115,7 +117,7 @@ public class TimeoutsService
             if (!cancelled)
             {
                 timeouts.remove( key );
-                System.out.println( "TIMEOUT TRIGGERED:"+message );
+                timeoutStrategy.timeoutTriggered(message);
                 output.process( message );
             }
         }

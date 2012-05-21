@@ -18,29 +18,30 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
+package org.neo4j.kernel.ha2.protocol.cluster;
+
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 
 /**
- * Record of Paxos instance in acceptors
+ *
  */
-public class AcceptorInstance
+public class ClusterJoinHandler
+    implements AtomicBroadcastListener
 {
-    InstanceId instanceId = null;
-    long ballot = -1;
-    Object value;
+    private final Message<ClusterMessage> joinResponse;
+    private final MessageProcessor outgoing;
 
-    public AcceptorInstance( InstanceId instanceId )
+    public ClusterJoinHandler(Message<ClusterMessage> joinResponse, MessageProcessor outgoing)
     {
-        this.instanceId = instanceId;
+        this.joinResponse = joinResponse;
+        this.outgoing = outgoing;
     }
 
-    public void prepare(AcceptorMessage.PrepareState prepareState)
+    @Override
+    public void receive(Object value)
     {
-        ballot = prepareState.getBallot();
-    }
-
-    public void accept(AcceptorMessage.AcceptState acceptState)
-    {
-        value = acceptState.getValue();
+        outgoing.process(joinResponse);
     }
 }

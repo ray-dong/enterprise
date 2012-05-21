@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2;
 
+import java.net.URI;
 import java.util.logging.Logger;
 
 import org.neo4j.com_2.message.Message;
@@ -38,7 +39,7 @@ import org.neo4j.kernel.lifecycle.Lifecycle;
 public class ProtocolServer
     implements Lifecycle
 {
-    private String me;
+    private URI me;
     protected StateMachineProxyFactory proxyFactory;
     protected final ConnectedStateMachines connectedStateMachines;
     private Iterable<BindingListener> bindingListeners = Listeners.newListeners();
@@ -97,7 +98,7 @@ public class ProtocolServer
         bindingListeners = Listeners.removeListener( listener, bindingListeners );
     }
 
-    public void listeningAt( final String me )
+    public void listeningAt( final URI me )
     {
         this.me = me;
 
@@ -115,7 +116,7 @@ public class ProtocolServer
      * Ok to have this accessible like this?
      * @return server id
      */
-    public String getServerId()
+    public URI getServerId()
     {
         return me;
     }
@@ -141,9 +142,9 @@ public class ProtocolServer
         private String me;
 
         @Override
-        public void listeningAt( String me )
+        public void listeningAt( URI me )
         {
-            this.me = me;
+            this.me = me.toString();
         }
 
         @Override

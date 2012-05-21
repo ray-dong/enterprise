@@ -54,8 +54,7 @@ public class HeartbeatContext
 
     public void alive( final String server )
     {
-        Object failedServer = failed.remove( server );
-        if (failedServer != null)
+        if (failed.remove( server ))
             Listeners.notifyListeners( listeners, new Listeners.Notification<HeartbeatListener>()
             {
                 @Override
@@ -70,7 +69,7 @@ public class HeartbeatContext
     {
         if (!failed.contains( server ))
         {
-            failed.remove( server );
+            failed.add( server );
             Listeners.notifyListeners( listeners, new Listeners.Notification<HeartbeatListener>()
             {
                 @Override

@@ -18,29 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
+package org.neo4j.kernel.ha2.protocol.cluster;
 
 /**
- * Record of Paxos instance in acceptors
+ * Listener interface for cluster configuration changes
  */
-public class AcceptorInstance
+public interface ClusterListener
 {
-    InstanceId instanceId = null;
-    long ballot = -1;
-    Object value;
-
-    public AcceptorInstance( InstanceId instanceId )
-    {
-        this.instanceId = instanceId;
-    }
-
-    public void prepare(AcceptorMessage.PrepareState prepareState)
-    {
-        ballot = prepareState.getBallot();
-    }
-
-    public void accept(AcceptorMessage.AcceptState acceptState)
-    {
-        value = acceptState.getValue();
-    }
+    void notifyClusterChange(ClusterConfiguration configuration);
 }

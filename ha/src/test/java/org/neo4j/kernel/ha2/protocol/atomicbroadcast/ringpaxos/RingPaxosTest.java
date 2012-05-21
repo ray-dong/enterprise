@@ -74,8 +74,6 @@ public class RingPaxosTest
     {
         TestProtocolServer server = network.addServer( id );
         AtomicBroadcast member = server.newClient( AtomicBroadcast.class );
-        member.possibleServers( possibleServers );
-        member.join();
         return member;
     }
 }

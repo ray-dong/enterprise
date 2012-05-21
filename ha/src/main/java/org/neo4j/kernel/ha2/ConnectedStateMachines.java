@@ -154,36 +154,6 @@ public class ConnectedStateMachines
         }
     }
 
-    public void checkValidProxyInterface(Class<?> proxyInterface)
-        throws IllegalArgumentException
-    {
-        method: for( Method method : proxyInterface.getMethods() )
-        {
-            if (!(method.getReturnType().equals( Void.TYPE ) || method.getReturnType().equals( Future.class )))
-            {
-                throw new IllegalArgumentException( "Methods must return either void or Future" );
-            }
-
-            for( StateMachine stateMachine : stateMachines.values() )
-            {
-                try
-                {
-                    Enum.valueOf( (Class<? extends Enum>) stateMachine.getMessageType(), method.getName() );
-
-                    // Ok!
-                    continue method;
-                }
-                catch( Exception e )
-                {
-                    // Continue searching
-                }
-            }
-
-            // Could not find any state in any state machine that can handle this method
-            throw new IllegalArgumentException( "No state machine can handle the method:"+method.getName() );
-        }
-    }
-
     @Override
     public String toString()
     {

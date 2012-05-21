@@ -28,7 +28,7 @@ import org.neo4j.com_2.message.MessageType;
 public enum AtomicBroadcastMessage
     implements MessageType
 {
-    joined, join,left, leave, // Group management
-    possibleServers,fail,recover, // Node management
-    broadcast, addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast
+    join, leave, // Group management
+    receive, // Internal message created by implementation
+    broadcast, addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast API
 }

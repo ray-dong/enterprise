@@ -25,13 +25,6 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
  */
 public interface AtomicBroadcast
 {
-    void possibleServers(String... serverId);
-    void fail(String serverId);
-    void recover(String serverId);
-
-    void join();
-    void leave();
-
     void broadcast( Object value );
     void addAtomicBroadcastListener( AtomicBroadcastListener listener );
     void removeAtomicBroadcastListener( AtomicBroadcastListener listener );

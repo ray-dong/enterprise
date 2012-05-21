@@ -24,20 +24,22 @@ import static org.neo4j.com_2.message.Message.internal;
 
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 
 /**
  * State Machine for implementation of Atomic Broadcast client interface
  */
 public enum AtomicBroadcastState
-    implements State<MultiPaxosContext, AtomicBroadcastMessage>
+    implements State<AtomicBroadcastContext, AtomicBroadcastMessage>
 {
     start
         {
             @Override
-            public AtomicBroadcastState handle( MultiPaxosContext context,
+            public AtomicBroadcastState handle( AtomicBroadcastContext context,
                                       Message<AtomicBroadcastMessage> message,
                                       MessageProcessor outgoing
             )
@@ -46,23 +48,14 @@ public enum AtomicBroadcastState
 
                 switch( message.getMessageType() )
                 {
-                    case possibleServers:
-                    {
-                        context.setPossibleServers( (String[]) message.getPayload() );
-
-                        ClusterConfiguration config = new ClusterConfiguration( Iterables.toList(context.getPossibleServers()), Iterables.toList(context.getPossibleServers()), Iterables.toList(context.getPossibleServers()), context.getPossibleServers().iterator().next(), 1 );
-                        context.clusterConfiguration = config;
-                        break;
-                    }
-
                     case join:
                     {
-                        outgoing.process( internal( AcceptorMessage.join ) );
-                        outgoing.process( internal( ProposerMessage.join ) );
-                        outgoing.process( internal( LearnerMessage.join ) );
-
-                        outgoing.process( internal( AtomicBroadcastMessage.joined ) );
                         return joined;
+                    }
+
+                    default:
+                    {
+                        defaultHandling(context, message, outgoing);
                     }
                 }
 
@@ -73,7 +66,7 @@ public enum AtomicBroadcastState
     joined
         {
             @Override
-            public AtomicBroadcastState handle( MultiPaxosContext context,
+            public AtomicBroadcastState handle( AtomicBroadcastContext context,
                                       Message<AtomicBroadcastMessage> message,
                                       MessageProcessor outgoing
             )
@@ -81,18 +74,6 @@ public enum AtomicBroadcastState
             {
                 switch (message.getMessageType())
                 {
-                    case addAtomicBroadcastListener:
-                    {
-                        context.addAtomicBroadcastListener( (AtomicBroadcastListener) message.getPayload() );
-                        break;
-                    }
-
-                    case removeAtomicBroadcastListener:
-                    {
-                        context.removeAtomicBroadcastListener( (AtomicBroadcastListener) message.getPayload() );
-                        break;
-                    }
-
                     case broadcast:
                     {
                         // TODO This assumes that this process is coordinator. Should handle other cases as well
@@ -100,27 +81,44 @@ public enum AtomicBroadcastState
                         break;
                     }
 
-                    case fail:
+                    case receive:
                     {
-                        // TODO Handle notification of failure. Should recreate cluster without given node
-                        String serverId = message.getPayload().toString();
-                        break;
-                    }
-
-                    case recover:
-                    {
-                        // TODO Handle notification of recovery. Should recreate cluster with given node
-                        String serverId = message.getPayload().toString();
-                        break;
+                        if (message.getPayload() instanceof ClusterMessage.ConfigurationChangeState)
+                            outgoing.process( internal( ClusterMessage.configurationChanged, message.getPayload() ) );
+                        else
+                            context.receive(message.getPayload());
                     }
 
                     case leave:
                     {
                         return start;
                     }
+
+                    default:
+                    {
+                        defaultHandling(context, message, outgoing);
+                    }
                 }
 
                 return this;
             }
+        };
+
+    private static void defaultHandling(AtomicBroadcastContext context, Message<AtomicBroadcastMessage> message, MessageProcessor outgoing)
+    {
+        switch (message.getMessageType())
+        {
+            case addAtomicBroadcastListener:
+            {
+                context.addAtomicBroadcastListener( (AtomicBroadcastListener) message.getPayload() );
+                break;
+            }
+
+            case removeAtomicBroadcastListener:
+            {
+                context.removeAtomicBroadcastListener( (AtomicBroadcastListener) message.getPayload() );
+                break;
+            }
         }
+    }
 }

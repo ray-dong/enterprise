@@ -28,6 +28,7 @@ import org.neo4j.kernel.ha2.HeartbeatServerFactory;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
+import org.neo4j.kernel.ha2.timeout.MessageTimeoutStrategy;
 
 /**
  * TODO
@@ -50,7 +51,11 @@ public class HeartbeatTest
     @Test
     public void testNoFailures()
     {
-        network = new NetworkMock(500, new HeartbeatServerFactory(), new FixedNetworkLatencyStrategy(), new FixedTimeoutStrategy( 1000 ));
+        network = new NetworkMock(500,
+                new HeartbeatServerFactory(),
+                new FixedNetworkLatencyStrategy(),
+                new MessageTimeoutStrategy(new FixedTimeoutStrategy( 1000 )).
+                        timeout(HeartbeatMessage.timed_out, 1500));
 
         member1 = newMember( ID1, POSSIBLE_SERVERS );
         member2 = newMember( ID2, POSSIBLE_SERVERS );
@@ -75,24 +80,20 @@ public class HeartbeatTest
         member2.join();
         member3.join();
 
-        network.tickUntilDone();
+        network.tick();
 
         logger.info( "SHOULD BE OK HERE" );
 
-        network.tickUntilDone();
-        network.tickUntilDone();
-        network.tickUntilDone();
-
         member3.leave();
 
-        network.tickUntilDone();
+        network.tick(5);
         logger.info( "3 SHOULD BE FAILED NOW" );
 
         member2.leave();
         member1.leave();
 
-        network.tickUntilDone();
-        logger.info( "1 & 2 SHOULD BE FAILED NOW" );
+        network.tick(5);
+        logger.info( "1 & 2 SHOULD HAVE LEFT NOW" );
     }
 
     private Heartbeat newMember( String id, String... possibleServers )

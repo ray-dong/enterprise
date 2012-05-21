@@ -30,10 +30,8 @@ import org.neo4j.com_2.message.MessageType;
 public enum LearnerMessage
     implements MessageType
 {
-    failure,
     join,leave,
-
-    learn;
+    learn,learnRequest;
 
     public static class LearnState
         implements Serializable
@@ -61,6 +59,28 @@ public enum LearnerMessage
         public String toString()
         {
             return instanceId+": "+value;
+        }
+    }
+
+    public static class LearnRequestState
+        implements Serializable
+    {
+        private InstanceId instanceId;
+
+        public LearnRequestState( InstanceId instanceId)
+        {
+            this.instanceId = instanceId;
+        }
+
+        public InstanceId getInstanceId()
+        {
+            return instanceId;
+        }
+
+        @Override
+        public String toString()
+        {
+            return instanceId.toString();
         }
     }
 }

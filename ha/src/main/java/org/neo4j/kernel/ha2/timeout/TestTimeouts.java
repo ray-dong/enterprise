@@ -58,7 +58,9 @@ public class TestTimeouts
     @Override
     public void cancelTimeout( Object key )
     {
-        timeouts.remove( key );
+        Timeout timeout = timeouts.remove( key );
+        if (timeout != null)
+            timeoutStrategy.timeoutCancelled(timeout.timeoutMessage);
     }
 
     public Map<Object, Timeout> getTimeouts()
@@ -92,7 +94,7 @@ public class TestTimeouts
         }
     }
 
-    public static class Timeout
+    public class Timeout
     {
         private long timeout;
         private Message<? extends MessageType> timeoutMessage;
@@ -107,6 +109,8 @@ public class TestTimeouts
         {
             if (now>=timeout)
             {
+                timeoutStrategy.timeoutTriggered(timeoutMessage);
+
                 return true;
             } else
             {
