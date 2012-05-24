@@ -52,22 +52,7 @@ public class NetworkedServerFactory
 
     public ProtocolServer newNetworkedServer(final Map<String, String> configuration)
     {
-        NetworkNode.Configuration config = new NetworkNode.Configuration()
-        {
-            @Override
-            public int[] port( int[] defaultPortRange, int min, int max )
-            {
-                 String port = configuration.get( "port" );
-                 return port != null ? new int[] { parseInt( port ), parseInt( port ) } : defaultPortRange;
-            }
-            
-            @Override
-            public String address( String def )
-            {
-                return configuration.containsKey( "address" ) ? configuration.get( "address" ) : def;
-            }
-        };
-        final NetworkNode node = new NetworkNode( config, logger );
+        final NetworkNode node = new NetworkNode( configuration, logger );
         life.add( node );
 
         Timeouts timeouts = life.add(new TimeoutsService( timeoutStrategy, node ));

@@ -20,10 +20,15 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
+import java.net.URI;
+
 /**
  * Listener interface for cluster configuration changes
  */
 public interface ClusterListener
 {
-    void notifyClusterChange(ClusterConfiguration configuration);
+    void enteredCluster(Iterable<URI> nodes);
+    void joinedCluster(URI node);
+    void leftCluster(URI node);
+    void leftCluster();
 }

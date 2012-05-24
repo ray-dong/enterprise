@@ -58,7 +58,7 @@ public class ClusterConfigurationTest
     @Test
     public void givenEmptyClusterWhenNodeAddedThenNodeWasAdded()
     {
-        configuration.joined(NEO4J_SERVER1);
+        configuration.joined( NEO4J_SERVER1 );
 
         assertThat(configuration.getNodes(), equalTo(Arrays.asList(NEO4J_SERVER1)));
     }
@@ -66,8 +66,8 @@ public class ClusterConfigurationTest
     @Test
     public void givenEmptyClusterWhenNodeIsAddedTwiceThenNodeWasAddedOnce()
     {
-        configuration.joined(NEO4J_SERVER1);
-        configuration.joined(NEO4J_SERVER1);
+        configuration.joined( NEO4J_SERVER1 );
+        configuration.joined( NEO4J_SERVER1 );
 
         assertThat(configuration.getNodes(), equalTo(Arrays.asList(NEO4J_SERVER1)));
     }
@@ -75,7 +75,7 @@ public class ClusterConfigurationTest
     @Test
     public void givenClusterWithOneNodeWhenNodeIsRemovedThenClusterIsEmpty()
     {
-        configuration.joined(NEO4J_SERVER1);
+        configuration.joined( NEO4J_SERVER1 );
         configuration.left(NEO4J_SERVER1);
 
         assertThat(configuration.getNodes(), equalTo(Collections.<URI>emptyList()));
@@ -85,7 +85,7 @@ public class ClusterConfigurationTest
     @Test
     public void givenClusterWithOneNodeWhenNodeIsRemovedTwiceThenClusterIsEmpty()
     {
-        configuration.joined(NEO4J_SERVER1);
+        configuration.joined( NEO4J_SERVER1 );
         configuration.left(NEO4J_SERVER1);
         configuration.left(NEO4J_SERVER1);
 

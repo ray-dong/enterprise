@@ -20,52 +20,39 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-
 import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkMock;
-import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
-import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterRule;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
+
+import static org.hamcrest.CoreMatchers.*;
 
 /**
  * TODO
  */
 public class MultiPaxosTest
 {
-    private static final String ID1 = "1";
-    private static final String ID2 = "2";
-    private static final String ID3 = "3";
-    private static final String[] POSSIBLE_SERVERS = new String[]{ID1,ID2,ID3};
+    private NetworkMock network = new NetworkMock( 50, new MultiPaxosServerFactory(), new FixedNetworkLatencyStrategy(0), new FixedTimeoutStrategy( 1000 ) );
 
-    private NetworkMock network;
-
-    private AtomicBroadcast member1;
-    private AtomicBroadcast member2;
-    private AtomicBroadcast member3;
+    @Rule
+    public ClusterRule cluster = new ClusterRule( network, 3 );
 
     @Test
     public void testDecision()
             throws ExecutionException, InterruptedException, URISyntaxException
     {
-        network = new NetworkMock(50, new MultiPaxosServerFactory(new ClusterConfiguration(POSSIBLE_SERVERS)), new FixedNetworkLatencyStrategy(0), new FixedTimeoutStrategy( 1000 ));
-
-        member1 = newMember( ID1 );
-        member2 = newMember( ID2 );
-        member3 = newMember( ID3 );
-
-        Map<String, String> map1 = new AtomicBroadcastMap<String,String>(member1);
-        Map<String, String> map2 = new AtomicBroadcastMap<String,String>(member2);
+        Map<String, String> map1 = new AtomicBroadcastMap<String,String>(cluster.getNodes().get( 0 ).newClient( AtomicBroadcast.class ));
+        Map<String, String> map2 = new AtomicBroadcastMap<String,String>(cluster.getNodes().get( 1 ).newClient( AtomicBroadcast.class ));
 
         map1.put("foo", "bar");
         network.tickUntilDone();
@@ -86,12 +73,5 @@ public class MultiPaxosTest
         network.tickUntilDone();
         foo = map2.get( "foo" );
         Assert.assertThat( foo , CoreMatchers.nullValue() );
-    }
-
-    private AtomicBroadcast newMember( String id)
-    {
-        TestProtocolServer server = network.addServer( id );
-        AtomicBroadcast member = server.newClient( AtomicBroadcast.class );
-        return member;
     }
 }

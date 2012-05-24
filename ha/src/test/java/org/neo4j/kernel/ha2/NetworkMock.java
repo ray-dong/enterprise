@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -64,7 +65,7 @@ public class NetworkMock
     {
         TestProtocolServer server = newTestProtocolServer(serverId);
 
-        debug( serverId, "joins cluster" );
+        debug( serverId, "joins network" );
 
         participants.put( serverId, server );
 
@@ -83,7 +84,7 @@ public class NetworkMock
 
     public void removeServer( String serverId )
     {
-        debug( serverId, "leaves cluster" );
+        debug( serverId, "leaves network" );
         TestProtocolServer server = participants.get(serverId);
         server.stop();
 
@@ -94,6 +95,8 @@ public class NetworkMock
     {
         // Deliver messages whose delivery time has passed
         now += tickDuration;
+
+ //       logger.debug( "tick:"+now );
 
         Iterator<MessageDelivery> iter = messageDeliveries.iterator();
         while (iter.hasNext())
@@ -132,18 +135,26 @@ public class NetworkMock
                         long delay = strategy.messageDelay(message, testServer.getKey());
                         if (delay == NetworkLatencyStrategy.LOST)
                         {
-                            logger.info( "Broadcasted message to "+testServer.getKey()+" was lost");
+                            logger.info( "Broadcasted message to " + testServer.getKey() + " was lost" );
 
                         } else
                         {
-                            logger.info("Broadcast to " + testServer.getKey() + ": " + message);
+                            logger.info( "Broadcast to " + testServer.getKey() + ": " + message );
                             messageDeliveries.add(new MessageDelivery(now+delay, message, testServer.getValue()));
                         }
                     }
                 }
             } else
             {
-                long delay = strategy.messageDelay(message, to);
+                long delay = 0;
+                if (message.getHeader( Message.TO ).equals( message.getHeader( Message.FROM ) ))
+                {
+                    logger.info( "Sending message to itself; zero latency" );
+                } else
+                {
+                    delay = strategy.messageDelay(message, to);
+                }
+
                 if (delay == NetworkLatencyStrategy.LOST)
                 {
                     logger.info( "Send message to "+to+" was lost");
@@ -198,6 +209,16 @@ public class NetworkMock
         return stringWriter.toString();
     }
 
+    public Long getTime()
+    {
+        return now;
+    }
+
+    public Collection<TestProtocolServer> getServers()
+    {
+        return participants.values();
+    }
+
     private static class MessageDelivery
     {
         long messageDeliveryTime;
@@ -229,7 +250,7 @@ public class NetworkMock
         @Override
         public String toString()
         {
-            return "Deliver "+message.getMessageType().name()+" to "+server+" at "+messageDeliveryTime;
+            return "Deliver "+message.getMessageType().name()+" to "+server.getServer().getServerId()+" at "+messageDeliveryTime;
         }
     }
 }

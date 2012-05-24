@@ -46,9 +46,14 @@ public enum AtomicBroadcastState
 
                 switch( message.getMessageType() )
                 {
+                    case entered:
+                    {
+                        return broadcasting;
+                    }
+
                     case join:
                     {
-                        return joined;
+                        return joining;
                     }
 
                     default:
@@ -61,7 +66,49 @@ public enum AtomicBroadcastState
             }
         },
 
-    joined
+    joining
+        {
+            @Override
+            public State<?, ?> handle( AtomicBroadcastContext context,
+                                       Message<AtomicBroadcastMessage> message,
+                                       MessageProcessor outgoing
+            )
+                throws Throwable
+            {
+                switch( message.getMessageType() )
+                {
+                    case failed:
+                    {
+                        // Joining failed
+                        outgoing.process( internal( ClusterMessage.joinFailed, message.getPayload() ) );
+
+                        return start;
+                    }
+
+                    case receive:
+                    {
+                        if (message.getPayload() instanceof ClusterMessage.ConfigurationChangeState)
+                            outgoing.process( internal( ClusterMessage.configurationChanged, message.getPayload() ) );
+
+                        break;
+                    }
+
+                    case entered:
+                    {
+                        return broadcasting;
+                    }
+
+                    default:
+                    {
+                        defaultHandling(context, message, outgoing);
+                    }
+                }
+
+                return this;
+            }
+        },
+
+    broadcasting
         {
             @Override
             public AtomicBroadcastState handle( AtomicBroadcastContext context,
@@ -74,7 +121,6 @@ public enum AtomicBroadcastState
                 {
                     case broadcast:
                     {
-                        // TODO This assumes that this process is coordinator. Should handle other cases as well
                         outgoing.process( internal( ProposerMessage.propose, message.getPayload() ) );
                         break;
                     }

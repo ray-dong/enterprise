@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
+import org.neo4j.com_2.NetworkNode;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkedServerFactory;
@@ -51,9 +52,9 @@ public class MultiPaxosNetworkTest
                 new MultiPaxosServerFactory(new ClusterConfiguration("neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
                 new FixedTimeoutStrategy( 10000 ), StringLogger.SYSTEM );
 
-        ProtocolServer server1 = serverFactory.newNetworkedServer( MapUtil.stringMap("port","5001") );
-        ProtocolServer server2 = serverFactory.newNetworkedServer( MapUtil.stringMap("port","5002") );
-        ProtocolServer server3 = serverFactory.newNetworkedServer( MapUtil.stringMap("port","5003") );
+        ProtocolServer server1 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5001") );
+        ProtocolServer server2 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5002") );
+        ProtocolServer server3 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5003") );
 
         life.start();
 

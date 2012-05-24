@@ -158,7 +158,7 @@ public class ConnectedStateMachines
         List<String> states = new ArrayList<String>();
         for( StateMachine stateMachine : stateMachines.values() )
         {
-            states.add( stateMachine.getState().toString() );
+            states.add( stateMachine.getState().getClass().getSuperclass().getSimpleName()+":"+stateMachine.getState().toString() );
         }
         return states.toString();
     }

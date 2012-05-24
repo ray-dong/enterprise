@@ -21,25 +21,46 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Queue;
 
 /**
  * TODO
  */
-public class InMemoryAcceptorInstanceStore
-    implements AcceptorInstanceStore
+public class PaxosInstanceStore
 {
-    Map<InstanceId, AcceptorInstance> instances = new HashMap<InstanceId, AcceptorInstance>(  );
+    private static final int MAX_STORED = 100;
 
-    @Override
-    public AcceptorInstance getAcceptorInstance( InstanceId instanceId )
+    int queued = 0;
+    Queue<InstanceId> delivered = new LinkedList<InstanceId>(  );
+
+    Map<InstanceId, PaxosInstance> instances = new HashMap<InstanceId, PaxosInstance>(  );
+
+    public PaxosInstance getPaxosInstance( InstanceId instanceId )
     {
-        AcceptorInstance instance = instances.get( instanceId );
+        if (instanceId == null)
+            throw new NullPointerException( "InstanceId may not be null" );
+
+        PaxosInstance instance = instances.get( instanceId );
         if (instance == null)
         {
-            instance = new AcceptorInstance(instanceId);
+            instance = new PaxosInstance(this);
             instances.put( instanceId, instance );
         }
         return instance;
+    }
+
+    public void delivered(InstanceId instanceId)
+    {
+        queued++;
+        delivered.offer( instanceId );
+
+        if (queued > MAX_STORED)
+        {
+            InstanceId removeInstanceId = delivered.poll();
+            instances.remove( removeInstanceId );
+            queued--;
+        }
     }
 }

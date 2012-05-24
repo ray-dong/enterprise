@@ -29,8 +29,6 @@ import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
  */
 public class AtomicBroadcastContext
 {
-    ClusterContext context;
-
     Iterable<AtomicBroadcastListener> listeners = Listeners.newListeners();
 
     public void addAtomicBroadcastListener( AtomicBroadcastListener listener )

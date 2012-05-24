@@ -36,6 +36,7 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
+import org.slf4j.LoggerFactory;
 
 /**
  * State machine for the Cluster API
@@ -67,7 +68,8 @@ public enum ClusterState
                 case create:
                 {
                     context.created();
-                    outgoing.process( internal( AtomicBroadcastMessage.join ) );
+                    outgoing.process( internal( AtomicBroadcastMessage.entered ) );
+                    outgoing.process( internal( ProposerMessage.join ) );
                     outgoing.process( internal( AcceptorMessage.join ) );
                     outgoing.process( internal( LearnerMessage.join ) );
                     return joined;
@@ -76,6 +78,7 @@ public enum ClusterState
                 case join:
                 {
                     URI clusterNodeUri = message.getPayload();
+                    context.joining( clusterNodeUri );
                     outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
                     context.timeouts.setTimeout( clusterNodeUri, internal( ClusterMessage.configurationTimeout ) );
                     return acquiringConfiguration;
@@ -114,11 +117,15 @@ public enum ClusterState
                     if (!nodeList.contains(context.me))
                     {
                         context.learnerContext.lastReceivedInstanceId = state.getLatestReceivedInstanceId().getId();
+                        context.learnerContext.lastLearnedInstanceId = state.getLatestReceivedInstanceId().getId();
                         context.proposerContext.lastInstanceId = state.getLatestReceivedInstanceId().getId()+1;
 
-                        nodeList.add(context.me);
+                        context.acquiredConfiguration( nodeList );
 
-                        ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState(nodeList);
+                        LoggerFactory.getLogger(ClusterState.class).info( "Joining:"+nodeList );
+
+                        ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState();
+                        newState.join( context.me );
 
                         outgoing.process( internal( AcceptorMessage.join ) );
                         outgoing.process( internal( LearnerMessage.join ) );
@@ -131,6 +138,9 @@ public enum ClusterState
                     } else
                     {
                         // TODO Already in, go to joined state
+                        outgoing.process( internal( AcceptorMessage.join ) );
+                        outgoing.process( internal( LearnerMessage.join ) );
+                        outgoing.process( internal( AtomicBroadcastMessage.entered ) );
                         return joined;
                     }
                 }
@@ -162,9 +172,25 @@ public enum ClusterState
                     ClusterMessage.ConfigurationChangeState state = message.getPayload();
                     // TODO Verify that this is the change we sent out in the first place
 
-                    context.joined( state.getNodes() );
-                    outgoing.process( internal( ProposerMessage.join ) );
-                    return joined;
+                    if (context.getMe().equals( state.getJoin() ))
+                    {
+                        context.joined();
+                        outgoing.process( internal( ProposerMessage.join ) );
+                        return joined;
+                    } else
+                    {
+                        context.updated( state );
+                        return this;
+                    }
+                }
+
+                case joinFailed:
+                {
+                    // Try getting config again
+                    URI clusterNodeUri = context.joining;
+                    outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
+                    context.timeouts.setTimeout( clusterNodeUri, internal( ClusterMessage.configurationTimeout ) );
+                    return acquiringConfiguration;
                 }
             }
 
@@ -203,7 +229,7 @@ public enum ClusterState
                 case configurationChanged:
                 {
                     ClusterMessage.ConfigurationChangeState state = message.getPayload();
-                    context.joined( state.getNodes() );
+                    context.updated( state );
                     break;
                 }
 
@@ -223,9 +249,10 @@ public enum ClusterState
 
                     } else
                     {
-                        nodeList.remove(context.me);
+                        LoggerFactory.getLogger(ClusterState.class).info( "Leaving:" + nodeList );
 
-                        ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState(nodeList);
+                        ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState();
+                        newState.leave( context.me );
 
                         outgoing.process(internal( ProposerMessage.propose, newState ));
 
@@ -252,7 +279,7 @@ public enum ClusterState
                 case configurationChanged:
                 {
                     ClusterMessage.ConfigurationChangeState state = message.getPayload();
-                    if (!state.getNodes().contains( context.getMe() ))
+                    if (state.isLeaving(context.getMe()))
                     {
                         context.left();
 
@@ -262,6 +289,9 @@ public enum ClusterState
                         outgoing.process( internal( AtomicBroadcastMessage.leave ) );
 
                         return start;
+                    } else
+                    {
+                        state.apply(context.getConfiguration());
                     }
                 }
             }

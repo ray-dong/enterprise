@@ -29,9 +29,11 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastState;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerState;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
@@ -48,6 +50,11 @@ public class MultiPaxosServerFactory
     implements ProtocolServerFactory
 {
     private ClusterConfiguration initialConfig;
+
+    public MultiPaxosServerFactory()
+    {
+        this(new ClusterConfiguration(  ));
+    }
 
     public MultiPaxosServerFactory(ClusterConfiguration initialConfig)
     {

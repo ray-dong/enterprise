@@ -20,10 +20,12 @@
 
 package org.neo4j.com_2;
 
+import java.util.Map;
 import org.junit.Test;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageType;
+import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
@@ -47,41 +49,10 @@ public class NetworkSendReceiveTest
 
         Server server1;
         {
-            Server.Configuration config = new Server.Configuration()
-            {
-                
-                @Override
-                public int[] port( int[] defaultPortRange, int min, int max )
-                {
-                    return new int[] { 1234, 1234 };
-                }
-                
-                @Override
-                public String address( String def )
-                {
-                    return def;
-                }
-            };
-            
-            life.add(server1 = new Server( config ));
+            life.add(server1 = new Server( MapUtil.stringMap( NetworkNode.cluster_port.name(), "1234" ) ));
         }
         {
-            Server.Configuration config = new Server.Configuration()
-            {
-                
-                @Override
-                public int[] port( int[] defaultPortRange, int min, int max )
-                {
-                    return new int[] { 1235, 1235 };
-                }
-                
-                @Override
-                public String address( String def )
-                {
-                    return def;
-                }
-            };
-            life.add(new Server( config ));
+            life.add(new Server( MapUtil.stringMap( NetworkNode.cluster_port.name(), "1234" ) ));
         }
         
         life.start();
@@ -105,13 +76,9 @@ public class NetworkSendReceiveTest
 
         protected NetworkNode node;
 
-        public interface Configuration
-            extends NetworkNode.Configuration
-        {}
-        
         private final LifeSupport life = new LifeSupport();
         
-        private Server( Configuration config )
+        private Server( Map<String,String> config )
         {
             node = new NetworkNode(config, StringLogger.SYSTEM);
 

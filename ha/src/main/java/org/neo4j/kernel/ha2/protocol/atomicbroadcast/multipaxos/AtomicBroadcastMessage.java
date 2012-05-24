@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
 
 /**
@@ -28,7 +29,7 @@ import org.neo4j.com_2.message.MessageType;
 public enum AtomicBroadcastMessage
     implements MessageType
 {
-    join, leave, // Group management
-    receive, // Internal message created by implementation
+    entered, join, leave, // Group management
+    receive, failed, // Internal message created by implementation
     broadcast, addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast API
 }

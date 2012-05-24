@@ -54,6 +54,9 @@ public class HaSettings
     @Default( "neo4j.ha" )
     public static final GraphDatabaseSetting.StringSetting cluster_name = new GraphDatabaseSetting.StringSetting( "ha.cluster_name", ANY, "Must be a valid cluster name" );
 
+    @Default( "8000" )
+    public static final GraphDatabaseSetting.PortSetting cluster_port = new GraphDatabaseSetting.PortSetting( "ha.cluster_port" );
+
     @Default( TRUE )
     public static final BooleanSetting allow_init_cluster = new BooleanSetting( "ha.allow_init_cluster" );
 

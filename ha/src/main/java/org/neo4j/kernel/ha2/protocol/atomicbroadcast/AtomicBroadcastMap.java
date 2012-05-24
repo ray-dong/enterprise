@@ -94,7 +94,7 @@ public class AtomicBroadcastMap<K,V>
     @Override
     public V get( Object key )
     {
-        System.out.println("GET "+lastCommand);
+        System.out.println("GET "+(lastCommand != null ? lastCommand.toString() : ""));
         checkUpToDate();
         return map.get( key );
     }

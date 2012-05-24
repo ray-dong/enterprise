@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
+import org.slf4j.LoggerFactory;
 
 /**
  * State machine for Paxos Learner
@@ -43,12 +44,6 @@ public enum LearnerState
                 {
                     case join:
                     {
-                        // Initialize all learner instances
-                        context.learnerContext.learnerInstances.clear();
-                        for (int i = 0; i < 10; i++)
-                            context.learnerContext.learnerInstances.add( new LearnerInstance() );
-
-                        // TODO Do formal join process
                         return learner;
                     }
                 }
@@ -71,56 +66,92 @@ public enum LearnerState
                     case learn:
                     {
                         LearnerMessage.LearnState learnState = message.getPayload();
+                        PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( learnState.getInstanceId() );
+
+                        // Skip if we already know about this
+                        if( learnState.getInstanceId().getId() <= context.learnerContext.lastReceivedInstanceId )
+                        {
+                            break;
+                        }
+
+                        context.learnerContext.lastLearnedInstanceId = Math.max( context.learnerContext.lastLearnedInstanceId, learnState.getInstanceId().getId());
+
+                        instance.closed(learnState.getValue());
+
+                        // If this is the next instance to be learned, then do so and check if we have anything pending to be learnt
                         if (learnState.getInstanceId().equals( new InstanceId( context.learnerContext.lastReceivedInstanceId +1) ))
                         {
+                            instance.delivered();
                             outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnState.getValue()));
-
                             context.learnerContext.lastReceivedInstanceId = learnState.getInstanceId().getId();
-                            for (int i=1; i < context.learnerContext.learnerInstances.size(); i++)
+
+                            long instanceId = learnState.getInstanceId().getId()+1;
+                            while ((instance = context.getPaxosInstances().getPaxosInstance( new InstanceId( instanceId ) )).isState( PaxosInstance.State.closed ))
                             {
-                                int index = context.learnerContext.getLearnerInstanceIndex(learnState.getInstanceId().getId()+i);
-                                LearnerInstance learnerInstance = context.learnerContext.learnerInstances.get( index );
-                                if ( learnerInstance.instanceId != null)
-                                {
-                                    outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnerInstance.value));
-                                    context.learnerContext.lastReceivedInstanceId = learnerInstance.instanceId.getId();
-                                    learnerInstance.instanceId = null;
-                                    learnerInstance.value = null;
-                                } else
-                                {
-                                    // Found hole - wait for it to be filled!
-                                    return this;
-                                }
+                                instance.delivered();
+                                outgoing.process(Message.internal(AtomicBroadcastMessage.receive, instance.value_2));
+                                context.learnerContext.lastReceivedInstanceId = instance.id.getId();
+
+                                instanceId++;
                             }
-                        }
-                        else if (learnState.getInstanceId().getId()<= context.learnerContext.lastReceivedInstanceId)
-                        {
-                            // We have already learned this - ignore
-                        } else
-                        {
-                            // Store it and wait for hole to be filled
-                            int distance = (int)(learnState.getInstanceId().getId() - context.learnerContext.lastReceivedInstanceId);
-                            if (distance < context.learnerContext.learnerInstances.size()-1)
+
+                            if (instanceId == context.learnerContext.lastLearnedInstanceId+1)
                             {
-                                int index = context.learnerContext.getLearnerInstanceIndex(learnState.getInstanceId().getId());
-                                context.learnerContext.learnerInstances.get( index ).set(learnState);
+                                // No hole - all is ok
+                                // Cancel potential timeout, if one is active
+                                context.timeouts.cancelTimeout( "learn" );
                             } else
                             {
-                                // TODO Value has been discarded because there is no space in the index. Have to refetch it later from someone else
+                                // Found hole - we're waiting for this to be filled, i.e. timeout already set
                             }
+                        } else
+                        {
+                            // Set timeout waiting for values to come in
+                            context.timeouts.cancelTimeout( "learn" );
+                            context.timeouts.setTimeout( "learn", Message.internal( LearnerMessage.learnTimedout ) );
+                        }
+                        break;
+                    }
+
+                    case learnTimedout:
+                    {
+                        // Timed out waiting for learned values - send explicit request to someone
+                        if (context.learnerContext.lastReceivedInstanceId != context.learnerContext.lastLearnedInstanceId)
+                        {
+
+                            for (long instanceId = context.learnerContext.lastReceivedInstanceId+1; instanceId < context.learnerContext.lastLearnedInstanceId; instanceId++)
+                            {
+                                InstanceId id = new InstanceId( instanceId );
+                                PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( id );
+                                if (!instance.isState( PaxosInstance.State.closed ) && !instance.isState( PaxosInstance.State.delivered ))
+                                {
+                                    outgoing.process( Message.to( LearnerMessage.learnRequest, context.clusterContext.getConfiguration().getNodes().get( 0 ).toString(), new LearnerMessage.LearnRequestState(id) ) );
+                                }
+                            }
+
+                            // Set another timeout
+                            context.timeouts.setTimeout( "learn", Message.internal( LearnerMessage.learnTimedout ) );
                         }
                         break;
                     }
 
                     case learnRequest:
                     {
+                        // Someone wants to learn a value that we might have
                         LearnerMessage.LearnRequestState state = message.getPayload();
-
+                        PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( state.getInstanceId() );
+                        if (instance.isState( PaxosInstance.State.closed ) || instance.isState( PaxosInstance.State.delivered ))
+                        {
+                            outgoing.process( Message.respond( LearnerMessage.learn, message, new LearnerMessage.LearnState( instance.id, instance.value_2 ) ));
+                        } else
+                        {
+                            LoggerFactory.getLogger(getClass()).debug( "Did not have learned value for instance "+state.getInstanceId() );
+                        }
+                        break;
                     }
 
                     case leave:
                     {
-                        // TODO Do formal leave process
                         return start;
                     }
                 }

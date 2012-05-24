@@ -44,4 +44,9 @@ public class StateMachineProxyHandler
     {
         return stateMachineProxyFactory.invoke(stateMachine, method, args == null ? null : args[0]);
     }
+
+    public StateMachineProxyFactory getStateMachineProxyFactory()
+    {
+        return stateMachineProxyFactory;
+    }
 }

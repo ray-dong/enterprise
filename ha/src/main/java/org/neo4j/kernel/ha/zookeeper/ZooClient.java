@@ -115,7 +115,7 @@ public class ZooClient extends AbstractZooKeeperManager
         this.localDatabase = localDatabase;
         this.clusterReceiver = clusterReceiver;
         machineId = conf.getInteger( server_id );
-        backupPort = conf.getInteger( OnlineBackupSettings.online_backup_port );
+        backupPort = OnlineBackupSettings.online_backup_port.getPort( conf.getParams() );
         haServer = conf.isSet(server) ? conf.get( server ) : defaultServer();
         writeLastCommittedTx = conf.getEnum(SlaveUpdateMode.class, slave_coordinator_update_mode).syncWithZooKeeper;
         clusterName = conf.get( cluster_name );

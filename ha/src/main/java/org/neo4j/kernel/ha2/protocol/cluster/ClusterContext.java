@@ -20,20 +20,13 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
-import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.helpers.Listeners;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerContext;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 
-import java.io.Serializable;
 import java.net.URI;
 import java.util.List;
-
-import org.neo4j.helpers.Listeners;
-import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
  *
@@ -41,6 +34,8 @@ import org.neo4j.kernel.ha2.timeout.Timeouts;
  */
 public class ClusterContext
 {
+    URI joining;
+
     URI me;
     Iterable<ClusterListener> listeners = Listeners.newListeners();
     ProposerContext proposerContext;
@@ -56,28 +51,54 @@ public class ClusterContext
         this.timeouts = timeouts;
     }
 
+    public void joining(URI node)
+    {
+        joining = node;
+    }
+
     public void created()
     {
-        configuration.joined(me);
+        configuration.joined( me );
         Listeners.notifyListeners(listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
         {
             @Override
             public void notify(ClusterListener listener)
             {
-                listener.notifyClusterChange(configuration);
+                listener.enteredCluster( configuration.getNodes() );
             }
         });
     }
 
-    public void joined(List<URI> nodes)
+    public void acquiredConfiguration( final List<URI> nodeList )
     {
-        configuration.setNodes( nodes );
+        configuration.setNodes( nodeList );
+    }
+
+    public void joined()
+    {
+        configuration.joined( me );
         Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
         {
             @Override
             public void notify( ClusterListener listener )
             {
-                listener.notifyClusterChange( configuration );
+                listener.enteredCluster( configuration.getNodes() );
+            }
+        } );
+    }
+
+    public void updated( final ClusterMessage.ConfigurationChangeState stateChange)
+    {
+        stateChange.apply( configuration );
+        Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
+        {
+            @Override
+            public void notify( ClusterListener listener )
+            {
+                if (stateChange.getJoin() != null)
+                    listener.joinedCluster( stateChange.getJoin() );
+                if (stateChange.getLeave() != null)
+                    listener.leftCluster( stateChange.getLeave() );
             }
         } );
     }
@@ -90,7 +111,7 @@ public class ClusterContext
             @Override
             public void notify( ClusterListener listener )
             {
-                listener.notifyClusterChange( configuration );
+                listener.leftCluster();
             }
         } );
     }
@@ -112,7 +133,7 @@ public class ClusterContext
 
     public void addClusterListener(ClusterListener listener)
     {
-        listeners = Listeners.addListener(listener, listeners);
+        listeners = Listeners.addListener( listener, listeners );
     }
 
     public void removeClusterListener(ClusterListener listener)
@@ -124,5 +145,4 @@ public class ClusterContext
     {
         return configuration.getCoordinator().equals(me);
     }
-
 }

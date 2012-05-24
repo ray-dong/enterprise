@@ -39,7 +39,7 @@ public enum ClusterMessage
     addClusterListener, removeClusterListener,
 
     // Protocol messages
-    configuration,configurationResponse,configurationTimeout, configurationChanged;
+    configuration,configurationResponse,configurationTimeout, configurationChanged, joinFailed;
 
     public static class ConfigurationResponseState
         implements Serializable
@@ -74,19 +74,48 @@ public enum ClusterMessage
     public static class ConfigurationChangeState
         implements Serializable
     {
-        private List<URI> nodes;
+        private URI join;
+        private URI leave;
 
-        public ConfigurationChangeState(List<URI> nodes)
+        public void join(URI uri)
         {
-            this.nodes = nodes;
+            this.join = uri;
         }
 
-        public List<URI> getNodes()
+        public void leave(URI uri)
         {
-            return nodes;
+            this.leave = uri;
         }
 
+        public URI getJoin()
+        {
+            return join;
+        }
 
+        public URI getLeave()
+        {
+            return leave;
+        }
+
+        public void apply(ClusterConfiguration config)
+        {
+            if (join != null)
+                config.joined( join );
+
+            if (leave != null)
+                config.left( leave );
+        }
+
+        public boolean isLeaving( URI me )
+        {
+            return me.equals(leave);
+        }
+
+        @Override
+        public String toString()
+        {
+            return "Change cluster config: "+(join == null ? "leave:"+leave : "join:"+join.toString());
+        }
     }
 
 }

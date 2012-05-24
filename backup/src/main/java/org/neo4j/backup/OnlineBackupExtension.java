@@ -51,7 +51,7 @@ public class OnlineBackupExtension extends KernelExtension<BackupServer>
         if (kernel.getConfig().getBoolean( OnlineBackupSettings.online_backup_enabled ))
         {
             TheBackupInterface backup = new BackupImpl( kernel.graphDatabase() );
-            return new BackupServer( backup, kernel.getConfig().getInteger( OnlineBackupSettings.online_backup_port ),
+            return new BackupServer( backup, OnlineBackupSettings.online_backup_port.getPort( kernel.getConfigParams() ),
                                                     kernel.graphDatabase().getMessageLog());
         } else
             return null;

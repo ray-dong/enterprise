@@ -42,12 +42,19 @@ public class ClusterConfiguration
     private URI coordinator;
     private int allowedFailures = 1;
 
-    public ClusterConfiguration(String... nodes) throws URISyntaxException
+    public ClusterConfiguration(String... nodes)
     {
         this.nodes = new ArrayList<URI>();
         for (String node : nodes)
         {
-            this.nodes.add(new URI(node));
+            try
+            {
+                this.nodes.add(new URI(node));
+            }
+            catch( URISyntaxException e )
+            {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -56,7 +63,7 @@ public class ClusterConfiguration
         this.nodes = new ArrayList<URI>(nodes);
     }
 
-    public void joined(URI nodeUrl)
+    public void joined( URI nodeUrl )
     {
         if (nodes.contains(nodeUrl))
             return;
@@ -79,10 +86,13 @@ public class ClusterConfiguration
         return coordinator != null;
     }
 
-    public void setNodes( List<URI> nodes )
+    public void setNodes( Iterable<URI> nodes )
     {
         this.nodes.clear();
-        this.nodes.addAll(nodes);
+        for( URI node : nodes )
+        {
+            this.nodes.add( node );
+        }
     }
 
     public List<URI> getNodes()

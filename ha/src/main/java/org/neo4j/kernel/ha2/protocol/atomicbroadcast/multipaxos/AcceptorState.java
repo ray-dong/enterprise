@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
+import org.slf4j.LoggerFactory;
 
 /**
  * State machine for Paxos Acceptor
@@ -65,17 +66,18 @@ public enum AcceptorState
                     case prepare:
                     {
                         AcceptorMessage.PrepareState prepareState = message.getPayload();
-                        AcceptorInstance instance = context.acceptorInstances.getAcceptorInstance( prepareState.getInstanceId() );
+                        PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( prepareState.getInstanceId() );
 
-                        if ( prepareState.getBallot() > instance.ballot )
+                        if ( prepareState.getBallot() >= instance.ballot)
                         {
-                            instance.prepare(prepareState);
+                            instance.prepare(prepareState.getInstanceId(), prepareState.getBallot());
 
-                            outgoing.process(Message.to( ProposerMessage.promise, message.getHeader( Message.FROM ), new ProposerMessage.PromiseState( instance.instanceId, instance.ballot, instance.value ) ));
+                            outgoing.process(Message.respond( ProposerMessage.promise, message, new ProposerMessage.PromiseState( instance.id, instance.ballot, instance.value_2 ) ));
                         } else
                         {
                             // Optimization - explicit reject
-                            outgoing.process(Message.to( ProposerMessage.reject, message.getHeader( Message.FROM ), new ProposerMessage.DenialState( instance.instanceId )));
+                            LoggerFactory.getLogger(AcceptorState.class).info( "Reject "+prepareState.getInstanceId()+" ballot:"+instance.ballot );
+                            outgoing.process(Message.respond( ProposerMessage.rejectPropose, message, new ProposerMessage.RejectProposeState( instance.id, instance.ballot ) ));
                         }
                         break;
                     }
@@ -84,23 +86,22 @@ public enum AcceptorState
                     {
                         // Task 4
                         AcceptorMessage.AcceptState acceptState = message.getPayload();
-                        AcceptorInstance instance = context.acceptorInstances.getAcceptorInstance( acceptState.getInstance() );
+                        PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( acceptState.getInstance() );
 
                         if (acceptState.getBallot() == instance.ballot)
                         {
-                            instance.accept(acceptState);
+                            instance.accept(acceptState.getValue());
 
-                            outgoing.process( Message.to( ProposerMessage.accepted, message.getHeader( Message.FROM ), new ProposerMessage.AcceptedState(instance.instanceId) ) );
+                            outgoing.process( Message.respond( ProposerMessage.accepted, message, new ProposerMessage.AcceptedState( instance.id ) ) );
                         } else
                         {
-                            // TODO How to deal with this? What does this case mean?
+                            outgoing.process(Message.respond( ProposerMessage.rejectAccept, message, new ProposerMessage.RejectAcceptState( instance.id ) ));
                         }
                         break;
                     }
 
                     case leave:
                     {
-                        // TODO Do formal leave process
                         return start;
                     }
                 }

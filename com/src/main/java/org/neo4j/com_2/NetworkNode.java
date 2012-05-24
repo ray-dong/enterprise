@@ -56,6 +56,7 @@ import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
+import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
@@ -66,6 +67,9 @@ import org.neo4j.kernel.lifecycle.Lifecycle;
 public class NetworkNode
     implements MessageProcessor, MessageSource, Lifecycle
 {
+    public static final GraphDatabaseSetting.PortSetting cluster_port = new GraphDatabaseSetting.PortSetting( "ha.cluster_port" );
+    public static final GraphDatabaseSetting.StringSetting cluster_address = new GraphDatabaseSetting.StringSetting( "ha.cluster_address", GraphDatabaseSetting.ANY, "Must be a valid hostname" );
+
     public interface Configuration
     {
         String address(String def);
@@ -94,14 +98,14 @@ public class NetworkNode
     private ClientBootstrap clientBootstrap;
     private DefaultChannelFactory channelFactory;
     
-    private Configuration config;
+    private Map<String,String> config;
     private StringLogger msgLog;
     private URI me;
 
     private Map<URI, Channel> connections = new ConcurrentHashMap<URI, Channel>();
     private Iterable<NetworkChannelsListener> listeners = Listeners.newListeners();
 
-    public NetworkNode( Configuration config, StringLogger msgLog )
+    public NetworkNode( Map<String,String> config, StringLogger msgLog )
     {
         this.config = config;
         this.msgLog = msgLog;
@@ -120,7 +124,7 @@ public class NetworkNode
         serverBootstrap = new ServerBootstrap( channelFactory );
         serverBootstrap.setPipelineFactory(new NetworkNodePipelineFactory());
 
-        int[] ports = config.port(new int[]{1234,1244}, 1, 65535);
+        int[] ports = cluster_port.getPorts( config );
         
         int minPort = ports[0];
         int maxPort = ports.length == 2 ? ports[1] : minPort;
@@ -141,7 +145,7 @@ public class NetworkNode
         {
             try
             {
-                channel = serverBootstrap.bind(new InetSocketAddress(config.address( "127.0.0.1" ), checkPort));
+                channel = serverBootstrap.bind(new InetSocketAddress(cluster_address.getString( config ), checkPort));
                 listeningAt( ( getURI( (InetSocketAddress) channel.getLocalAddress() ) ) );
 
 
@@ -175,6 +179,11 @@ public class NetworkNode
     public void shutdown()
         throws Throwable
     {
+        channel.close();
+        for( Channel channel1 : connections.values() )
+        {
+            channel1.close();
+        }
     }
 
     // MessageSource implementation

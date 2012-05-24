@@ -40,10 +40,10 @@ public class StateTransitionLogger
     public void stateTransition(StateTransition transition)
     {
         if (transition.getMessage().getPayload() instanceof String)
-            logger.info(participant+": "+
-                               transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
+            logger.info(participant+"/"+
+                        transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
                                                                                                                                transition.getNewState().toString());
         else
-            logger.info(participant+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
+            logger.info(participant+"/"+transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
     }
 }

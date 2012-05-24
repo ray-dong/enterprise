@@ -30,14 +30,12 @@ import org.neo4j.com_2.message.MessageType;
 public enum ProposerMessage
     implements MessageType
 {
-    failure,
     join,leave,
     phase1Timeout,
     propose, // If no accept message is sent out, it means not enough promises have come in
-    promise, // phase 1b
-    reject, // phase 1b reject
+    promise, rejectPropose,rejectPropose2, // phase 1b
     phase2Timeout,
-    accepted; // phase 2b
+    accepted, rejectAccept; // phase 2b
 
     public static class PromiseState
         implements Serializable
@@ -69,12 +67,51 @@ public enum ProposerMessage
         }
     }
 
-    public static class DenialState
+    public static class RejectProposeState
+        implements Serializable
+    {
+        private InstanceId instance;
+        private long ballot;
+
+        public RejectProposeState( InstanceId instance, long ballot )
+        {
+            this.instance = instance;
+            this.ballot = ballot;
+        }
+
+        public InstanceId getInstance()
+        {
+            return instance;
+        }
+
+        public long getBallot()
+        {
+            return ballot;
+        }
+    }
+
+    public static class RejectPropose2State
         implements Serializable
     {
         private InstanceId instance;
 
-        public DenialState( InstanceId instance )
+        public RejectPropose2State( InstanceId instance )
+        {
+            this.instance = instance;
+        }
+
+        public InstanceId getInstance()
+        {
+            return instance;
+        }
+    }
+
+    public static class RejectAcceptState
+        implements Serializable
+    {
+        private InstanceId instance;
+
+        public RejectAcceptState( InstanceId instance )
         {
             this.instance = instance;
         }

@@ -41,8 +41,7 @@ public class MultiPaxosContext
     LearnerContext learnerContext;
     Timeouts timeouts;
 
-    // Acceptor state
-    AcceptorInstanceStore acceptorInstances = new InMemoryAcceptorInstanceStore();
+    PaxosInstanceStore paxosInstances = new PaxosInstanceStore();
 
     public MultiPaxosContext(ClusterContext clusterContext, ProposerContext proposerContext, LearnerContext learnerContext, Timeouts timeouts)
     {
@@ -54,7 +53,11 @@ public class MultiPaxosContext
 
     public int getServerId()
     {
-        return clusterContext.getConfiguration().getNodes().indexOf(clusterContext.getMe());
+        int i = clusterContext.getConfiguration().getNodes().indexOf( clusterContext.getMe() );
+        if (i == -1)
+            i = 99;
+
+        return i;
     }
 
     public List<URI> getAcceptors()
@@ -70,6 +73,11 @@ public class MultiPaxosContext
     public URI getCoordinator()
     {
         return clusterContext.getConfiguration().getCoordinator();
+    }
+
+    public PaxosInstanceStore getPaxosInstances()
+    {
+        return paxosInstances;
     }
 
     public int getMinimumQuorumSize( List<URI> acceptors )

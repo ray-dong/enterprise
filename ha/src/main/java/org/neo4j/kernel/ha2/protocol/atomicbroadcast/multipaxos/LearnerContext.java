@@ -36,11 +36,6 @@ import org.neo4j.kernel.ha2.timeout.Timeouts;
 public class LearnerContext
 {
     // Learner state
-    List<LearnerInstance> learnerInstances = new ArrayList<LearnerInstance>(100);
     public long lastReceivedInstanceId = -1;
-
-    public int getLearnerInstanceIndex( long instanceId )
-    {
-        return (int)(instanceId%learnerInstances.size());
-    }
+    public long lastLearnedInstanceId = -1;
 }

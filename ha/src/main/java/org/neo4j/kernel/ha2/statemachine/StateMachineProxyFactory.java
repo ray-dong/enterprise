@@ -66,12 +66,26 @@ public class StateMachineProxyFactory
     Object invoke( StateMachine stateMachine, Method method, Object arg )
         throws Throwable
     {
+        if (method.getName().equals( "toString" ))
+        {
+            return serverId == null ? "" : serverId.toString();
+        }
+
+        if (method.getName().equals( "equals" ))
+        {
+            return ((StateMachineProxyHandler)Proxy.getInvocationHandler( arg )).getStateMachineProxyFactory().serverId.equals( serverId );
+        }
+
         String conversationId = conversations.getNextConversationId();
 
         try
         {
             MessageType typeAsEnum = (MessageType) Enum.valueOf(  (Class<? extends Enum>) stateMachine.getMessageType(), method.getName() );
-            Message<?> message = Message.internal( typeAsEnum, arg ).setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId.toString() );
+            Message<?> message = Message.internal( typeAsEnum, arg );
+            if (serverId != null)
+            {
+                message.setHeader( Message.CONVERSATION_ID, conversationId ).setHeader( Message.CREATED_BY, serverId.toString() );
+            }
 
             if (method.getReturnType().equals( Void.TYPE ))
             {

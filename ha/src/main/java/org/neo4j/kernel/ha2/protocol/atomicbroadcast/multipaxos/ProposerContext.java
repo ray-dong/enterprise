@@ -33,12 +33,15 @@ public class ProposerContext
     // Proposer/coordinator state
     Deque<Object> pendingValues = new LinkedList<Object>();
     Map<InstanceId,Object> bookedInstances = new HashMap<InstanceId,Object>(  );
-    ProposerInstanceStore proposerInstances = new ProposerInstanceStore();
 
     public long lastInstanceId = 0;
 
-    public InstanceId newInstanceId()
+    public InstanceId newInstanceId( long lastReceivedInstanceId )
     {
+        // Never propose something lower than last received instance id
+        if (lastReceivedInstanceId >= lastInstanceId)
+            lastInstanceId = lastReceivedInstanceId+1;
+
         return new InstanceId( lastInstanceId++);
     }
 }

@@ -40,7 +40,6 @@ import org.neo4j.kernel.lifecycle.Lifecycle;
  * own server address (me), and provides a proxy factory for creating clients to invoke the CSM.
  */
 public class ProtocolServer
-    implements Lifecycle
 {
     private URI me;
     protected StateMachineProxyFactory proxyFactory;
@@ -66,31 +65,6 @@ public class ProtocolServer
         addBindingListener( proxyFactory );
     }
     
-    @Override
-    public void init()
-        throws Throwable
-    {
-    }
-
-    @Override
-    public void start()
-        throws Throwable
-    {
-    }
-
-    @Override
-    public void stop()
-        throws Throwable
-    {
-        logger.info( "Stop server" );
-    }
-
-    @Override
-    public void shutdown()
-        throws Throwable
-    {
-    }
-
     public void addBindingListener(BindingListener listener)
     {
         bindingListeners = Listeners.addListener( listener, bindingListeners );
