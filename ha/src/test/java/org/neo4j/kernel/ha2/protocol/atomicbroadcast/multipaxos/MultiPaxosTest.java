@@ -29,11 +29,13 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
+import org.neo4j.kernel.ha2.MultipleFailureLatencyStrategy;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterRule;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
+import org.neo4j.kernel.ha2.timeout.MessageTimeoutStrategy;
 
 import static org.hamcrest.CoreMatchers.*;
 
@@ -42,7 +44,7 @@ import static org.hamcrest.CoreMatchers.*;
  */
 public class MultiPaxosTest
 {
-    private NetworkMock network = new NetworkMock( 50, new MultiPaxosServerFactory(), new FixedNetworkLatencyStrategy(0), new FixedTimeoutStrategy( 1000 ) );
+    private NetworkMock network = new NetworkMock( 50, new MultiPaxosServerFactory(), new MultipleFailureLatencyStrategy(new FixedNetworkLatencyStrategy(0)), new MessageTimeoutStrategy(new FixedTimeoutStrategy( 1000 )) );
 
     @Rule
     public ClusterRule cluster = new ClusterRule( network, 3 );

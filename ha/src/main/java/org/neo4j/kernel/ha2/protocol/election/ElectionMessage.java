@@ -18,13 +18,41 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
+package org.neo4j.kernel.ha2.protocol.election;
+
+import java.net.URI;
+import org.neo4j.com_2.message.MessageType;
 
 /**
  * TODO
  */
-public interface Heartbeat
+public enum ElectionMessage
+    implements MessageType
 {
-    void addHeartbeatListener( HeartbeatListener listener );
-    void removeHeartbeatListener( HeartbeatListener listener );
+    join,leave,
+    addElectionListener,removeElectionListener,
+    demote, suggest, suggestTimeout, suggestion;
+
+    public static class SuggestionData
+    {
+        private URI demoteNode;
+        private int index;
+
+        public SuggestionData( URI demoteNode, int index )
+        {
+            this.demoteNode = demoteNode;
+            this.index = index;
+        }
+
+        public URI getDemoteNode()
+        {
+            return demoteNode;
+        }
+
+        public int getIndex()
+        {
+            return index;
+        }
+    }
+
 }

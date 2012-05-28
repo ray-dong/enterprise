@@ -78,4 +78,10 @@ public class MessageTimeoutStrategy
     {
         delegate.timeoutCancelled(timeoutMessage);
     }
+
+    @Override
+    public void tick( long now )
+    {
+        delegate.tick( now );
+    }
 }

@@ -53,4 +53,9 @@ public class FixedTimeoutStrategy
     {
         //To change body of implemented methods use File | Settings | File Templates.
     }
+
+    @Override
+    public void tick( long now )
+    {
+    }
 }

@@ -24,19 +24,14 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Logger;
-
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
-import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
-import org.neo4j.kernel.ha2.timeout.TestTimeouts;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
-import org.neo4j.kernel.lifecycle.LifeSupport;
-import org.slf4j.LoggerFactory;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
  * TODO
@@ -46,22 +41,16 @@ public class TestProtocolServer
 {
     protected final TestMessageSource receiver;
     protected final TestMessageSender sender;
-    protected TestTimeouts timeouts;
+    protected Timeouts timeoxuts;
 
-    private Logger logger = Logger.getLogger( getClass().getName() );
-
-    private final LifeSupport life = new LifeSupport();
     protected ProtocolServer server;
 
     public TestProtocolServer( TimeoutStrategy timeoutStrategy, ProtocolServerFactory factory, String serverId )
     {
         this.receiver = new TestMessageSource();
         this.sender = new TestMessageSender();
-        this.timeouts = new TestTimeouts( receiver, timeoutStrategy );
 
-        server = factory.newProtocolServer( timeouts, receiver, sender );
-
-        server.addStateTransitionListener( new StateTransitionLogger( serverId, LoggerFactory.getLogger(StateTransitionLogger.class) ) );
+        server = factory.newProtocolServer( timeoutStrategy, receiver, sender );
 
         try
         {
@@ -70,8 +59,6 @@ public class TestProtocolServer
         {
             e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
         }
-
-        life.add( server );
     }
 
     public ProtocolServer getServer()
@@ -79,9 +66,9 @@ public class TestProtocolServer
         return server;
     }
 
-    public TestTimeouts getTimeouts()
+    public Timeouts getTimeouts()
     {
-        return timeouts;
+        return server.getTimeouts();
     }
 
     @Override
@@ -95,17 +82,6 @@ public class TestProtocolServer
         sender.sendMessages( output );
     }
     
-    public void start()
-    {
-        life.start();
-    }
-
-    public void stop()
-    {
-        logger.info( "Stop server" );
-        life.stop();
-    }
-
     public <T> T newClient( Class<T> clientProxyInterface )
     {
         return server.newClient( clientProxyInterface );
@@ -117,10 +93,10 @@ public class TestProtocolServer
         return this;
     }
 
-    public void tick(long time)
+    public void tick(long now)
     {
         // Time passes - check timeouts
-        timeouts.tick( time );
+        server.getTimeouts().tick( now );
     }
 
     @Override

@@ -20,12 +20,12 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
-import static org.neo4j.com_2.message.Message.internal;
-import static org.neo4j.com_2.message.Message.to;
-
+import java.net.URI;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
+
+import static org.neo4j.com_2.message.Message.*;
 
 /**
  * TODO
@@ -44,12 +44,6 @@ public enum HeartbeatState
         {
             switch( message.getMessageType() )
             {
-                case possibleServers:
-                {
-                    context.setPossibleServers( (String[]) message.getPayload() );
-                    break;
-                }
-
                 case addHeartbeatListener:
                 {
                     context.addHeartbeatListener((HeartbeatListener) message.getPayload());
@@ -65,16 +59,8 @@ public enum HeartbeatState
                 case join:
                 {
                     // Setup heartbeat timeouts
-                    for( String server : context.servers )
-                    {
-                        if (!context.me.equals( server ))
-                            context.timeouts.setTimeout( server, internal( HeartbeatMessage.timed_out, server ) );
-                    }
-
-                    // Send first heartbeat
-                    outgoing.process( internal( HeartbeatMessage.send_heartbeat ) );
-
-                    return running;
+                    context.startHeartbeatTimers(message);
+                    return heartbeat;
                 }
             }
 
@@ -82,7 +68,7 @@ public enum HeartbeatState
         }
     },
 
-    running
+    heartbeat
     {
         @Override
         public HeartbeatState handle( HeartbeatContext context,
@@ -99,44 +85,58 @@ public enum HeartbeatState
 
                     context.alive( state.getServer() );
 
-                    if (!context.me.equals( state.getServer() ))
-                    {
-                        context.timeouts.cancelTimeout( state.getServer() );
-                        context.timeouts.setTimeout( state.getServer(), internal( HeartbeatMessage.timed_out, state.getServer() ) );
-                    }
+                    context.getClusterContext().timeouts.cancelTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer() );
+                    context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer(), timeout( HeartbeatMessage.timed_out, message, state.getServer() ) );
 
                     break;
                 }
 
                 case timed_out:
                 {
-                    String server = (String) message.getPayload();
+                    URI server = message.getPayload();
 
-                    context.failed( server );
+                    // Check if this node is no longer a part of the cluster
+                    if (context.getClusterContext().getConfiguration().getNodes().contains( server ))
+                    {
+                        context.failed( server );
 
-                    context.timeouts.setTimeout( server, internal( HeartbeatMessage.timed_out, server ) );
+                        context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+server, timeout( HeartbeatMessage.timed_out, message, server ) );
+                    } else
+                    {
+                        // If no longer part of cluster, then don't bother
+                        context.serverLeftCluster( server );
+                    }
                     break;
                 }
 
                 case send_heartbeat:
                 {
-                    // Send heartbeat message to all other servers
-                    for( String server : context.servers )
-                    {
-                        outgoing.process( to( HeartbeatMessage.i_am_alive, server, new HeartbeatMessage.IAmAliveState( context.me ) ) );
-                    }
+                    URI to = message.getPayload();
 
-                    context.timeouts.setTimeout( context.me, internal( HeartbeatMessage.send_heartbeat ) );
+                    // Check if this node is no longer a part of the cluster
+                    if (context.getClusterContext().getConfiguration().getNodes().contains( to ))
+                    {
+                        // Send heartbeat message to given server
+                        outgoing.process( to( HeartbeatMessage.i_am_alive, to, new HeartbeatMessage.IAmAliveState( context.getClusterContext().getMe())));
+
+                        // Set new timeout to send heartbeat to this host
+                        context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.send_heartbeat + "-" + to, timeout( HeartbeatMessage.send_heartbeat, message, to ) );
+                    }
+                    break;
+                }
+
+                case reset_send_heartbeat:
+                {
+                    URI to = message.getPayload();
+                    String timeoutName = HeartbeatMessage.send_heartbeat + "-" + to;
+                    context.getClusterContext().timeouts.cancelTimeout( timeoutName );
+                    context.getClusterContext().timeouts.setTimeout( timeoutName, Message.timeout( HeartbeatMessage.send_heartbeat, message, to ) );
                     break;
                 }
 
                 case leave:
                 {
-                    // Cancel all existing timeouts
-                    for( String server : context.servers )
-                    {
-                        context.timeouts.cancelTimeout( server );
-                    }
+                    context.stopHeartbeatTimers();
 
                     return start;
                 }

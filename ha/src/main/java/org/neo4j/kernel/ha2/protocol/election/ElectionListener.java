@@ -18,33 +18,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2.protocol.election;
 
-import org.neo4j.com_2.message.MessageType;
+import java.net.URI;
 
 /**
- * Learner state machine messages
+ * TODO
  */
-public enum LearnerMessage
-    implements MessageType
+public interface ElectionListener
 {
-    failure,
-    join,leave,
-
-    learn;
-
-    public static class LearnState
-    {
-        private int v_vid;
-
-        public LearnState( int v_vid )
-        {
-            this.v_vid = v_vid;
-        }
-
-        public int getV_vid()
-        {
-            return v_vid;
-        }
-    }
+    void elected(String name, URI node);
 }

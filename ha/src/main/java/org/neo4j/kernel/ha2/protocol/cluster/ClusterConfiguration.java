@@ -39,7 +39,7 @@ import java.util.Map;
 public class ClusterConfiguration
 {
     private final List<URI> nodes;
-    private URI coordinator;
+    private Map<String, URI> roles = new HashMap<String, URI>();
     private int allowedFailures = 1;
 
     public ClusterConfiguration(String... nodes)
@@ -73,17 +73,7 @@ public class ClusterConfiguration
 
     public void left(URI nodeUrl)
     {
-        nodes.remove(nodeUrl);
-    }
-
-    public void newCoordinator(URI nodeUri)
-    {
-        coordinator = nodeUri;
-    }
-
-    public boolean hasCoordinator()
-    {
-        return coordinator != null;
+        nodes.remove( nodeUrl );
     }
 
     public void setNodes( Iterable<URI> nodes )
@@ -95,14 +85,20 @@ public class ClusterConfiguration
         }
     }
 
+    public void setRoles( Map<String, URI> roles )
+    {
+        this.roles.clear();
+        this.roles.putAll( roles );
+    }
+
     public List<URI> getNodes()
     {
         return Collections.unmodifiableList(nodes);
     }
 
-    public URI getCoordinator()
+    public Map<String, URI> getRoles()
     {
-        return coordinator;
+        return roles;
     }
 
     public int getAllowedFailures()
@@ -119,5 +115,15 @@ public class ClusterConfiguration
     public void left()
     {
         nodes.clear();
+    }
+
+    public void setElected( String name, URI node )
+    {
+        roles.put( name, node );
+    }
+
+    public void removeElected( String roleName )
+    {
+        roles.remove( roleName );
     }
 }

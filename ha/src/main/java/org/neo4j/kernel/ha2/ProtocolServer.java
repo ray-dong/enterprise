@@ -33,6 +33,7 @@ import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 
 /**
@@ -48,8 +49,7 @@ public class ProtocolServer
 
     private Logger logger = Logger.getLogger( getClass().getName() );
 
-    public ProtocolServer( ConnectedStateMachines connectedStateMachines
-    )
+    public ProtocolServer( ConnectedStateMachines connectedStateMachines)
     {
         this.connectedStateMachines = connectedStateMachines;
 
@@ -125,6 +125,11 @@ public class ProtocolServer
             out.println( "  "+stateMachine);
         }
         return stringWriter.toString();
+    }
+
+    public Timeouts getTimeouts()
+    {
+        return connectedStateMachines.getTimeouts();
     }
 
     private class FromHeaderMessageProcessor

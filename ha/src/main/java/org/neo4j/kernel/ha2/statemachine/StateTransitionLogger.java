@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
+import org.neo4j.com_2.message.Message;
 import org.slf4j.Logger;
 
 /**
@@ -44,6 +45,11 @@ public class StateTransitionLogger
                         transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
                                                                                                                                transition.getNewState().toString());
         else
-            logger.info(participant+"/"+transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
+        {
+            if (transition.getMessage().hasHeader( Message.FROM ))
+                logger.info(participant+"/"+transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"("+transition.getMessage().getHeader( Message.FROM )+")]->"+transition.getNewState().toString());
+            else
+                logger.info(participant+"/"+transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
+        }
     }
 }

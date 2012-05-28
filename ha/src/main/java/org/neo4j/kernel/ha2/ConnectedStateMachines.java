@@ -37,6 +37,9 @@ import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
+import org.neo4j.kernel.ha2.timeout.LatencyCalculator;
+import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
+import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
  * TODO
@@ -47,21 +50,29 @@ public class ConnectedStateMachines
     private final Logger logger = Logger.getLogger( ConnectedStateMachines.class.getName() );
     
     private final MessageProcessor sender;
+    private Timeouts timeouts;
     private final Map<Class<? extends MessageType>,StateMachine> stateMachines = new LinkedHashMap<Class<? extends MessageType>, StateMachine>(  );
 
     private final List<MessageProcessor> outgoingProcessors = new ArrayList<MessageProcessor>(  );
     private final OutgoingMessageProcessor outgoing;
 
     public ConnectedStateMachines( MessageSource source,
-                                   final MessageProcessor sender
+                                   final MessageProcessor sender,
+                                   TimeoutStrategy timeoutStrategy
     )
     {
         this.sender = sender;
+        this.timeouts = new Timeouts( this, timeoutStrategy );
 
         outgoing = new OutgoingMessageProcessor();
         source.addMessageProcessor( this );
     }
     
+    public Timeouts getTimeouts()
+    {
+        return timeouts;
+    }
+
     public synchronized void addStateMachine(StateMachine stateMachine)
     {
         stateMachines.put(stateMachine.getMessageType(), stateMachine);
@@ -83,54 +94,63 @@ public class ConnectedStateMachines
         outgoingProcessors.add( messageProcessor );
     }
 
+    public OutgoingMessageProcessor getOutgoing()
+    {
+        return outgoing;
+    }
+
     @Override
     public synchronized void process( Message<? extends MessageType> message )
     {
-        StateMachine stateMachine = stateMachines.get( message.getMessageType().getClass() );
-        if (stateMachine == null)
-            return; // No StateMachine registered for this MessageType type - Ignore this
-
-        stateMachine.handle( message, outgoing );
-
-        // Process and send messages
-        // Allow state machines to send messages to each other as well in this loop
-        Message<? extends MessageType> outgoingMessage;
-        while ((outgoingMessage = outgoing.nextOutgoingMessage()) != null)
+        // Lock timeouts while we are processing the message
+        synchronized( timeouts )
         {
-            message.copyHeadersTo( outgoingMessage, CONVERSATION_ID, CREATED_BY );
+            StateMachine stateMachine = stateMachines.get( message.getMessageType().getClass() );
+            if (stateMachine == null)
+                return; // No StateMachine registered for this MessageType type - Ignore this
 
-            for( MessageProcessor outgoingProcessor : outgoingProcessors )
-            {
-                try
-                {
-                    outgoingProcessor.process( outgoingMessage );
-                }
-                catch( Throwable e )
-                {
-                    logger.warning( "Outgoing message processor threw exception" );
-                    logger.throwing( ConnectedStateMachines.class.getName(), "process", e );
-                }
-            }
+            stateMachine.handle( message, outgoing );
 
-            if( outgoingMessage.hasHeader( Message.TO ))
+            // Process and send messages
+            // Allow state machines to send messages to each other as well in this loop
+            Message<? extends MessageType> outgoingMessage;
+            while ((outgoingMessage = outgoing.nextOutgoingMessage()) != null)
             {
-                try
+                message.copyHeadersTo( outgoingMessage, CONVERSATION_ID, CREATED_BY );
+
+                for( MessageProcessor outgoingProcessor : outgoingProcessors )
                 {
-                    sender.process( outgoingMessage );
+                    try
+                    {
+                        outgoingProcessor.process( outgoingMessage );
+                    }
+                    catch( Throwable e )
+                    {
+                        logger.warning( "Outgoing message processor threw exception" );
+                        logger.throwing( ConnectedStateMachines.class.getName(), "process", e );
+                    }
                 }
-                catch( Throwable e )
+
+                if( outgoingMessage.hasHeader( Message.TO ))
                 {
-                    logger.warning( "Message sending threw exception" );
-                    logger.throwing( ConnectedStateMachines.class.getName(), "process", e );
-                }
-            } else
-            {
-                // Deliver internally if possible
-                StateMachine internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
-//                if (internalStatemachine != null && stateMachine != internalStatemachine )
-                if (internalStatemachine != null)
+                    try
+                    {
+                        sender.process( outgoingMessage );
+                    }
+                    catch( Throwable e )
+                    {
+                        logger.warning( "Message sending threw exception" );
+                        logger.throwing( ConnectedStateMachines.class.getName(), "process", e );
+                    }
+                } else
                 {
-                    internalStatemachine.handle( (Message)outgoingMessage, outgoing );
+                    // Deliver internally if possible
+                    StateMachine internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
+    //                if (internalStatemachine != null && stateMachine != internalStatemachine )
+                    if (internalStatemachine != null)
+                    {
+                        internalStatemachine.handle( (Message)outgoingMessage, outgoing );
+                    }
                 }
             }
         }
@@ -166,13 +186,13 @@ public class ConnectedStateMachines
     private class OutgoingMessageProcessor
         implements MessageProcessor
     {
+        private Queue<Message<? extends MessageType>> outgoingMessages = new LinkedList<Message<? extends MessageType>>();
+
         @Override
         public void process( Message<? extends MessageType> message )
         {
             outgoingMessages.offer( message );
         }
-
-        private Queue<Message<? extends MessageType>> outgoingMessages = new LinkedList<Message<? extends MessageType>>();
 
         public Message<? extends MessageType> nextOutgoingMessage()
         {

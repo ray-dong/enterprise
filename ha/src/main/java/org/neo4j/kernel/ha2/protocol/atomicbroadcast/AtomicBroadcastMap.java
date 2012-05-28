@@ -40,7 +40,7 @@ public class AtomicBroadcastMap<K,V>
     public AtomicBroadcastMap( AtomicBroadcast atomicBroadcast )
     {
         this.atomicBroadcast = atomicBroadcast;
-        atomicBroadcastListener = new AtomicBroadcastListener()
+        atomicBroadcastListener = new AtomicBroadcastListenerFilter( MapCommand.class, new AtomicBroadcastListener()
         {
             @Override
             public void receive( Object value )
@@ -59,7 +59,7 @@ public class AtomicBroadcastMap<K,V>
                     }
                 }
             }
-        };
+        });
         atomicBroadcast.addAtomicBroadcastListener( atomicBroadcastListener );
     }
 

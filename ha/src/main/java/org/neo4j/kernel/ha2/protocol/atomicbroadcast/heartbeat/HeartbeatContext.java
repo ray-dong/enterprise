@@ -20,39 +20,39 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
+
+import static org.neo4j.com_2.message.Message.*;
 
 /**
  * TODO
  */
 public class HeartbeatContext
 {
-    Timeouts timeouts;
-
-    public String me;
-    List<String> servers = new ArrayList<String>(  );
-    List<String> failed = new ArrayList<String>(  );
+    private ClusterContext context;
+    List<URI> failed = new ArrayList<URI>(  );
     Iterable<HeartbeatListener> listeners = Listeners.newListeners();
 
-    public HeartbeatContext(Timeouts timeouts)
+    public HeartbeatContext(ClusterContext context)
     {
-        this.timeouts = timeouts;
+        this.context = context;
     }
 
-    public void setPossibleServers(String[] serverIds)
+    public void started()
     {
-        servers.clear();
-        servers.addAll( Iterables.toList( Iterables.iterable( serverIds ) ));
         failed.clear();
-        failed.addAll( Iterables.toList( Iterables.iterable( serverIds ) ));
     }
 
-    public void alive( final String server )
+    public void alive( final URI server )
     {
         if (failed.remove( server ))
             Listeners.notifyListeners( listeners, new Listeners.Notification<HeartbeatListener>()
@@ -65,7 +65,7 @@ public class HeartbeatContext
             } );
     }
 
-    public void failed( final String server )
+    public void failed( final URI server )
     {
         if (!failed.contains( server ))
         {
@@ -81,9 +81,19 @@ public class HeartbeatContext
         }
     }
 
-    public void setMe( String me )
+    public List<URI> getFailed()
     {
-        this.me = me;
+        return failed;
+    }
+
+    public boolean isFailed(URI node)
+    {
+        return failed.contains( node );
+    }
+
+    public ClusterContext getClusterContext()
+    {
+        return context;
     }
 
     public void addHeartbeatListener( HeartbeatListener listener )
@@ -94,5 +104,33 @@ public class HeartbeatContext
     public void removeHeartbeatListener(HeartbeatListener listener)
     {
         listeners = Listeners.removeListener( listener, listeners );
+    }
+
+    public void stopHeartbeatTimers()
+    {
+        // Cancel all existing timeouts
+        for( URI server : context.getConfiguration().getNodes() )
+        {
+            context.timeouts.cancelTimeout( HeartbeatMessage.i_am_alive+"-"+server );
+            context.timeouts.cancelTimeout( HeartbeatMessage.send_heartbeat+"-"+server );
+        }
+    }
+
+    public void startHeartbeatTimers(Message<?> message)
+    {
+        // Start timers for sending and receiving heartbeats
+        for( URI server : context.getConfiguration().getNodes() )
+        {
+            if (!context.isMe( server ))
+            {
+                context.timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+server, timeout( HeartbeatMessage.timed_out, message, server ) );
+                context.timeouts.setTimeout( HeartbeatMessage.send_heartbeat+"-"+server, timeout( HeartbeatMessage.send_heartbeat, message, server ) );
+            }
+        }
+    }
+
+    public void serverLeftCluster( URI server )
+    {
+        failed.remove( server );
     }
 }

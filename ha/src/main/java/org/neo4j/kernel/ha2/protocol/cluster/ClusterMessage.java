@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.net.URI;
 import java.util.List;
 
+import java.util.Map;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 
@@ -44,25 +45,25 @@ public enum ClusterMessage
     public static class ConfigurationResponseState
         implements Serializable
     {
-        private List<URI> acceptors;
         private List<URI> nodes;
         private InstanceId latestReceivedInstanceId;
+        private Map<String, URI> roles;
 
-        public ConfigurationResponseState(List<URI> acceptors, List<URI> nodes, InstanceId latestReceivedInstanceId )
+        public ConfigurationResponseState(Map<String,URI> roles, List<URI> nodes, InstanceId latestReceivedInstanceId )
         {
-            this.acceptors = acceptors;
+            this.roles = roles;
             this.nodes = nodes;
             this.latestReceivedInstanceId = latestReceivedInstanceId;
-        }
-
-        public List<URI> getAcceptors()
-        {
-            return acceptors;
         }
 
         public List<URI> getNodes()
         {
             return nodes;
+        }
+
+        public Map<String, URI> getRoles()
+        {
+            return roles;
         }
 
         public InstanceId getLatestReceivedInstanceId()

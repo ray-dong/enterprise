@@ -20,17 +20,18 @@
 
 package org.neo4j.kernel.ha2;
 
-import static java.lang.Integer.parseInt;
-
 import java.net.URI;
 import java.util.Map;
-
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.neo4j.com_2.NetworkNode;
+import org.neo4j.helpers.DaemonThreadFactory;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-import org.neo4j.kernel.ha2.timeout.TimeoutsService;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.neo4j.kernel.lifecycle.Lifecycle;
 
 /**
  * TODO
@@ -55,9 +56,7 @@ public class NetworkedServerFactory
         final NetworkNode node = new NetworkNode( configuration, logger );
         life.add( node );
 
-        Timeouts timeouts = life.add(new TimeoutsService( timeoutStrategy, node ));
-
-        final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeouts, node, node);
+        final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeoutStrategy, node, node);
         node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
         {
             @Override
@@ -77,6 +76,56 @@ public class NetworkedServerFactory
             }
         } );
         life.add( protocolServer );
+
+        // Timeout timer - triggers every 10 ms
+        life.add( new Lifecycle()
+        {
+            private ScheduledExecutorService scheduler;
+
+            @Override
+            public void init()
+                throws Throwable
+            {
+            }
+
+            @Override
+            public void start()
+                throws Throwable
+            {
+                scheduler = Executors.newSingleThreadScheduledExecutor( new DaemonThreadFactory( "timeout" ) );
+
+                scheduler.scheduleWithFixedDelay( new Runnable()
+                {
+                    long previousTime = System.currentTimeMillis();
+
+                    @Override
+                    public void run()
+                    {
+                        long now = System.currentTimeMillis();
+                        long time = now - previousTime;
+                        previousTime = now;
+
+                        synchronized( protocolServer.getTimeouts() )
+                        {
+                            protocolServer.getTimeouts().tick( time );
+                        }
+                    }
+                }, 0, 10, TimeUnit.MILLISECONDS );
+            }
+
+            @Override
+            public void stop()
+                throws Throwable
+            {
+                scheduler.shutdownNow();
+            }
+
+            @Override
+            public void shutdown()
+                throws Throwable
+            {
+            }
+        } );
         
         return protocolServer;
     }

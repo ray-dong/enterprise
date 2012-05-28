@@ -18,13 +18,31 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
+package org.neo4j.kernel.ha2.protocol.election;
+
+import java.net.URI;
 
 /**
- * TODO
- */
-public interface Heartbeat
+* TODO
+*/
+public class RoleElection
 {
-    void addHeartbeatListener( HeartbeatListener listener );
-    void removeHeartbeatListener( HeartbeatListener listener );
+    String name;
+    URI node;
+
+    public RoleElection( String name, URI node )
+    {
+        this.name = name;
+        this.node = node;
+    }
+
+    public String getName()
+    {
+        return name;
+    }
+
+    public URI getNode()
+    {
+        return node;
+    }
 }

@@ -50,7 +50,7 @@ public class Message<MESSAGETYPE extends MessageType>
         return new Message<MESSAGETYPE>(messageType, payload).setHeader( TO, to.toString() );
     }
     
-    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> respond(MESSAGETYPE messageType, Message message, Object payload)
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> respond(MESSAGETYPE messageType, Message<?> message, Object payload)
     {
         return new Message<MESSAGETYPE>(messageType, payload).setHeader( TO, message.getHeader( Message.FROM ));
     }
@@ -64,6 +64,17 @@ public class Message<MESSAGETYPE extends MessageType>
     {
         return new Message<MESSAGETYPE>( message, payload );
     }
+
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> timeout(MESSAGETYPE message, Message<?> causedBy)
+    {
+        return timeout( message, causedBy, null );
+    }
+
+    public static <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> timeout(MESSAGETYPE message, Message<?> causedBy, Object payload)
+    {
+        return causedBy.copyHeadersTo( new Message<MESSAGETYPE>( message, payload ), Message.CONVERSATION_ID, Message.CREATED_BY);
+    }
+
 
     // Standard headers
     public static final String CONVERSATION_ID = "conversation-id";
@@ -123,7 +134,7 @@ public class Message<MESSAGETYPE extends MessageType>
         return value;
     }
 
-    public Message<? extends MessageType> copyHeadersTo( Message<? extends MessageType> message, String... names )
+    public <MESSAGETYPE extends MessageType> Message<MESSAGETYPE> copyHeadersTo( Message<MESSAGETYPE> message, String... names )
     {
         if (names.length == 0)
         {

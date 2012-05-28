@@ -108,7 +108,7 @@ public enum LearnerState
                         {
                             // Set timeout waiting for values to come in
                             context.timeouts.cancelTimeout( "learn" );
-                            context.timeouts.setTimeout( "learn", Message.internal( LearnerMessage.learnTimedout ) );
+                            context.timeouts.setTimeout( "learn", Message.timeout( LearnerMessage.learnTimedout, message ) );
                         }
                         break;
                     }
@@ -130,7 +130,7 @@ public enum LearnerState
                             }
 
                             // Set another timeout
-                            context.timeouts.setTimeout( "learn", Message.internal( LearnerMessage.learnTimedout ) );
+                            context.timeouts.setTimeout( "learn", Message.timeout( LearnerMessage.learnTimedout, message ) );
                         }
                         break;
                     }

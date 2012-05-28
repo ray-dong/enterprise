@@ -20,23 +20,23 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
-import static org.neo4j.com_2.message.Message.internal;
-import static org.neo4j.com_2.message.Message.respond;
-import static org.neo4j.com_2.message.Message.to;
-
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
+import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
+
+import static org.neo4j.com_2.message.Message.*;
 
 /**
  * State machine for the Cluster API
@@ -72,7 +72,9 @@ public enum ClusterState
                     outgoing.process( internal( ProposerMessage.join ) );
                     outgoing.process( internal( AcceptorMessage.join ) );
                     outgoing.process( internal( LearnerMessage.join ) );
-                    return joined;
+                    outgoing.process( internal( HeartbeatMessage.join ) );
+                    outgoing.process( internal( ElectionMessage.join ) );
+                    return entered;
                 }
 
                 case join:
@@ -80,7 +82,7 @@ public enum ClusterState
                     URI clusterNodeUri = message.getPayload();
                     context.joining( clusterNodeUri );
                     outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
-                    context.timeouts.setTimeout( clusterNodeUri, internal( ClusterMessage.configurationTimeout ) );
+                    context.timeouts.setTimeout( clusterNodeUri, timeout( ClusterMessage.configurationTimeout, message ) );
                     return acquiringConfiguration;
                 }
 
@@ -120,7 +122,7 @@ public enum ClusterState
                         context.learnerContext.lastLearnedInstanceId = state.getLatestReceivedInstanceId().getId();
                         context.proposerContext.lastInstanceId = state.getLatestReceivedInstanceId().getId()+1;
 
-                        context.acquiredConfiguration( nodeList );
+                        context.acquiredConfiguration( nodeList, state.getRoles() );
 
                         LoggerFactory.getLogger(ClusterState.class).info( "Joining:"+nodeList );
 
@@ -141,7 +143,7 @@ public enum ClusterState
                         outgoing.process( internal( AcceptorMessage.join ) );
                         outgoing.process( internal( LearnerMessage.join ) );
                         outgoing.process( internal( AtomicBroadcastMessage.entered ) );
-                        return joined;
+                        return entered;
                     }
                 }
 
@@ -176,7 +178,8 @@ public enum ClusterState
                     {
                         context.joined();
                         outgoing.process( internal( ProposerMessage.join ) );
-                        return joined;
+                        outgoing.process( internal( HeartbeatMessage.join ) );
+                        return entered;
                     } else
                     {
                         context.updated( state );
@@ -189,7 +192,7 @@ public enum ClusterState
                     // Try getting config again
                     URI clusterNodeUri = context.joining;
                     outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
-                    context.timeouts.setTimeout( clusterNodeUri, internal( ClusterMessage.configurationTimeout ) );
+                    context.timeouts.setTimeout( clusterNodeUri, timeout( ClusterMessage.configurationTimeout, message ) );
                     return acquiringConfiguration;
                 }
             }
@@ -198,7 +201,7 @@ public enum ClusterState
         }
     },
 
-    joined
+    entered
     {
         @Override
         public State<?, ?> handle(ClusterContext context, Message<ClusterMessage> message, MessageProcessor outgoing) throws Throwable
@@ -221,8 +224,9 @@ public enum ClusterState
 
                 case configuration:
                 {
-                    outgoing.process( respond( ClusterMessage.configurationResponse, message, new ClusterMessage.ConfigurationResponseState( context.getConfiguration().getNodes(),
-                                                                                                                                             context.getConfiguration().getNodes(), new InstanceId(context.learnerContext.lastReceivedInstanceId ) )));
+                    outgoing.process( respond( ClusterMessage.configurationResponse, message, new ClusterMessage.ConfigurationResponseState( context.getConfiguration().getRoles(),
+                                                                                                                                             context.getConfiguration().getNodes(),
+                                                                                                                                             new InstanceId(context.learnerContext.lastReceivedInstanceId ) )));
                     break;
                 }
 

@@ -32,6 +32,8 @@ import java.util.logging.Logger;
 
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
+import org.neo4j.kernel.ha2.timeout.MessageTimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.slf4j.LoggerFactory;
 
@@ -48,11 +50,11 @@ public class NetworkMock
     private long now = 0;
     private long tickDuration;
     private ProtocolServerFactory factory;
-    private final NetworkLatencyStrategy strategy;
-    private TimeoutStrategy timeoutStrategy;
+    private final MultipleFailureLatencyStrategy strategy;
+    private MessageTimeoutStrategy timeoutStrategy;
     protected final org.slf4j.Logger logger;
 
-    public NetworkMock( long tickDuration, ProtocolServerFactory factory, NetworkLatencyStrategy strategy, TimeoutStrategy timeoutStrategy )
+    public NetworkMock( long tickDuration, ProtocolServerFactory factory, MultipleFailureLatencyStrategy strategy, MessageTimeoutStrategy timeoutStrategy )
     {
         this.tickDuration = tickDuration;
         this.factory = factory;
@@ -74,7 +76,9 @@ public class NetworkMock
 
     protected TestProtocolServer newTestProtocolServer(String serverId)
     {
-        return new TestProtocolServer( timeoutStrategy, factory, serverId );
+        TestProtocolServer protocolServer = new TestProtocolServer( timeoutStrategy, factory, serverId );
+        protocolServer.addStateTransitionListener( new StateTransitionLogger( serverId, LoggerFactory.getLogger(StateTransitionLogger.class) ) );
+        return protocolServer;
     }
 
     private void debug( String participant, String string )
@@ -85,9 +89,6 @@ public class NetworkMock
     public void removeServer( String serverId )
     {
         debug( serverId, "leaves network" );
-        TestProtocolServer server = participants.get(serverId);
-        server.stop();
-
         participants.remove( serverId );
     }
 
@@ -104,7 +105,11 @@ public class NetworkMock
             MessageDelivery messageDelivery = iter.next();
             if (messageDelivery.getMessageDeliveryTime() <= now)
             {
-                messageDelivery.getServer().process(messageDelivery.getMessage());
+                long delay = strategy.messageDelay(messageDelivery.getMessage(), messageDelivery.getServer().toString());
+                if (delay != NetworkLatencyStrategy.LOST)
+                {
+                    messageDelivery.getServer().process(messageDelivery.getMessage());
+                }
                 iter.remove();
             }
         }
@@ -217,6 +222,16 @@ public class NetworkMock
     public Collection<TestProtocolServer> getServers()
     {
         return participants.values();
+    }
+
+    public MultipleFailureLatencyStrategy getNetworkLatencyStrategy()
+    {
+        return strategy;
+    }
+
+    public MessageTimeoutStrategy getTimeoutStrategy()
+    {
+        return timeoutStrategy;
     }
 
     private static class MessageDelivery

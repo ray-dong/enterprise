@@ -64,7 +64,7 @@ public enum ProposerState
                         // Don't include myself in list of acceptors
                         List<URI> acceptors = new ArrayList<URI>( context.getAcceptors() );
 
-                        propose( context, outgoing, state, acceptors );
+                        propose( context, message, outgoing, state, acceptors );
                         return coordinator;
                     }
                 }
@@ -97,10 +97,10 @@ public enum ProposerState
                                 acceptors.remove( context.clusterContext.getMe() );
                             }
 
-                            propose( context, outgoing, payload, acceptors );
+                            propose( context, message, outgoing, payload, acceptors );
                         }
                         else
-                            propose( context, outgoing, payload, context.getAcceptors() );
+                            propose( context, message, outgoing, payload, context.getAcceptors() );
 
                         break;
                     }
@@ -128,7 +128,7 @@ public enum ProposerState
                                     outgoing.process( message.copyHeadersTo(Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState( instanceId, ballot ) ), "instance"));
                                 }
                             }
-                            context.timeouts.setTimeout( instanceId, Message.internal( ProposerMessage.phase1Timeout, instanceId ) );
+                            context.timeouts.setTimeout( instanceId, Message.timeout( ProposerMessage.phase1Timeout, message, instanceId ) );
                         }
                         break;
                     }
@@ -153,7 +153,7 @@ public enum ProposerState
                                 {
                                     outgoing.process( message.copyHeadersTo(Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState( instanceId, ballot ) ), "instance"));
                                 }
-                                context.timeouts.setTimeout( instanceId, Message.internal( ProposerMessage.phase1Timeout, instanceId ) );
+                                context.timeouts.setTimeout( instanceId, Message.timeout( ProposerMessage.phase1Timeout, message, instanceId ) );
                             }
                         }
                         break;
@@ -211,7 +211,7 @@ public enum ProposerState
                                     outgoing.process( Message.to( AcceptorMessage.accept, acceptor, new AcceptorMessage.AcceptState( instance.id, instance.ballot, instance.value_2) ) );
                                 }
 
-                                context.timeouts.setTimeout( instance.id, Message.internal( ProposerMessage.phase2Timeout, instance.id ) );
+                                context.timeouts.setTimeout( instance.id, Message.timeout( ProposerMessage.phase2Timeout, message, instance.id ) );
                             }
                         }
                         break;
@@ -226,7 +226,7 @@ public enum ProposerState
 
                         if (instance.clientValue)
                         {
-                            propose( context, outgoing, instance.value_2, instance.getAcceptors() );
+                            propose( context, message, outgoing, instance.value_2, instance.getAcceptors() );
                         }
 
                         instance.acceptRejected();
@@ -249,7 +249,7 @@ public enum ProposerState
                                 outgoing.process( message.copyHeadersTo(Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState(instanceId, ballot ) ), "instance"));
                             }
 
-                            context.timeouts.setTimeout( instanceId, Message.internal( ProposerMessage.phase1Timeout, instanceId ) );
+                            context.timeouts.setTimeout( instanceId, Message.timeout( ProposerMessage.phase1Timeout, message, instanceId ) );
                         }
                         break;
                     }
@@ -299,7 +299,7 @@ public enum ProposerState
                                 {
                                     Object value = context.proposerContext.pendingValues.remove();
                                     LoggerFactory.getLogger( ProposerState.class ).debug( "Restarting "+value +" booked:"+context.proposerContext.bookedInstances.size() );
-                                    propose( context, outgoing, value, context.getAcceptors() );
+                                    propose( context, message, outgoing, value, context.getAcceptors() );
                                 }
                             }
                         }
@@ -332,7 +332,7 @@ public enum ProposerState
             }
         };
 
-    private static void propose( MultiPaxosContext context, MessageProcessor outgoing, Object payload, List<URI> acceptors )
+    private static void propose( MultiPaxosContext context, Message message, MessageProcessor outgoing, Object payload, List<URI> acceptors )
     {
         InstanceId instanceId = context.proposerContext.newInstanceId(context.learnerContext.lastReceivedInstanceId);
 
@@ -351,7 +351,7 @@ public enum ProposerState
                 outgoing.process( Message.to( AcceptorMessage.prepare, acceptor, new AcceptorMessage.PrepareState( instanceId, ballot ) ).setHeader( "instance", ""+instanceId ));
             }
 
-            context.timeouts.setTimeout( instanceId, Message.internal( ProposerMessage.phase1Timeout, instanceId ) );
+            context.timeouts.setTimeout( instanceId, Message.timeout( ProposerMessage.phase1Timeout, message, instanceId ) );
         } else
         {
             // Wait with this value - we have our hands full right now

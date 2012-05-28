@@ -20,13 +20,17 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
+import java.util.ArrayList;
+import java.util.Map;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerContext;
+import org.neo4j.kernel.ha2.protocol.election.ElectionRole;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 import java.net.URI;
 import java.util.List;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -59,19 +63,20 @@ public class ClusterContext
     public void created()
     {
         configuration.joined( me );
-        Listeners.notifyListeners(listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
+        Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
         {
             @Override
-            public void notify(ClusterListener listener)
+            public void notify( ClusterListener listener )
             {
                 listener.enteredCluster( configuration.getNodes() );
             }
-        });
+        } );
     }
 
-    public void acquiredConfiguration( final List<URI> nodeList )
+    public void acquiredConfiguration( final List<URI> nodeList, final Map<String,URI> roles )
     {
         configuration.setNodes( nodeList );
+        configuration.setRoles( roles );
     }
 
     public void joined()
@@ -95,10 +100,14 @@ public class ClusterContext
             @Override
             public void notify( ClusterListener listener )
             {
-                if (stateChange.getJoin() != null)
+                if( stateChange.getJoin() != null )
+                {
                     listener.joinedCluster( stateChange.getJoin() );
-                if (stateChange.getLeave() != null)
+                }
+                if( stateChange.getLeave() != null )
+                {
                     listener.leftCluster( stateChange.getLeave() );
+                }
             }
         } );
     }
@@ -114,6 +123,12 @@ public class ClusterContext
                 listener.leftCluster();
             }
         } );
+    }
+
+    public void elected( String name, URI node )
+    {
+        LoggerFactory.getLogger(getClass()).info( node+" elected to be "+name );
+        configuration.setElected(name, node);
     }
 
     public void setMe(URI me)
@@ -141,8 +156,8 @@ public class ClusterContext
         listeners = Listeners.removeListener(listener, listeners);
     }
 
-    public boolean isCoordinator()
+    public boolean isMe( URI server )
     {
-        return configuration.getCoordinator().equals(me);
+        return me.equals( server );
     }
 }

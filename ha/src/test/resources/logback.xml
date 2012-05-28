@@ -24,11 +24,13 @@
     </encoder>
   </appender>
 
+<!--
   <logger name="org.neo4j.kernel.ha2.NetworkMock" level="warn">
   </logger>
 
   <logger name="org.neo4j.kernel.ha2.statemachine.StateTransitionLogger" level="warn">
   </logger>
+-->
 
   <root level="debug">
     <appender-ref ref="CONSOLE" />

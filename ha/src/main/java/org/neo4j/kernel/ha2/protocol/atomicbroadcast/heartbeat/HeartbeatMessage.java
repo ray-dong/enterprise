@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
 import java.io.Serializable;
 
+import java.net.URI;
 import org.neo4j.com_2.message.MessageType;
 
 /**
@@ -30,22 +31,21 @@ import org.neo4j.com_2.message.MessageType;
 public enum HeartbeatMessage
     implements MessageType
 {
-    possibleServers,
     addHeartbeatListener,removeHeartbeatListener,
     join,leave,
-    i_am_alive,timed_out,send_heartbeat;
+    i_am_alive,timed_out,send_heartbeat,reset_send_heartbeat;
 
     public static class IAmAliveState
         implements Serializable
     {
-        private String server;
+        private URI server;
 
-        public IAmAliveState( String server )
+        public IAmAliveState( URI server )
         {
             this.server = server;
         }
 
-        public String getServer()
+        public URI getServer()
         {
             return server;
         }

@@ -52,7 +52,7 @@ public class NetworkSendReceiveTest
             life.add(server1 = new Server( MapUtil.stringMap( NetworkNode.cluster_port.name(), "1234" ) ));
         }
         {
-            life.add(new Server( MapUtil.stringMap( NetworkNode.cluster_port.name(), "1234" ) ));
+            life.add(new Server( MapUtil.stringMap( NetworkNode.cluster_port.name(), "1235" ) ));
         }
         
         life.start();

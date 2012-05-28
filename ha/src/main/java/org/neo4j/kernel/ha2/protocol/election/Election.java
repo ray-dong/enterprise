@@ -18,13 +18,16 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
+package org.neo4j.kernel.ha2.protocol.election;
+
+import java.net.URI;
 
 /**
- * TODO
+ * Election API.
  */
-public interface Heartbeat
+public interface Election
 {
-    void addHeartbeatListener( HeartbeatListener listener );
-    void removeHeartbeatListener( HeartbeatListener listener );
+    void addElectionListener(ElectionListener listener);
+    void removeElectionListener(ElectionListener listener);
+    void demote( URI node);
 }

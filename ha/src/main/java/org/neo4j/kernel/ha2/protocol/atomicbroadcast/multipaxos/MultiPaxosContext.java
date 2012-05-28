@@ -53,11 +53,19 @@ public class MultiPaxosContext
 
     public int getServerId()
     {
+        int i = clusterContext.getMe().hashCode();
+        i = (i/100)*100;
+        return i;
+
+/*
         int i = clusterContext.getConfiguration().getNodes().indexOf( clusterContext.getMe() );
         if (i == -1)
-            i = 99;
+        {
+            i = 90 + clusterContext.getMe().hashCode();
+        }
 
         return i;
+*/
     }
 
     public List<URI> getAcceptors()
@@ -68,11 +76,6 @@ public class MultiPaxosContext
     public Iterable<URI> getLearners()
     {
         return clusterContext.getConfiguration().getNodes();
-    }
-
-    public URI getCoordinator()
-    {
-        return clusterContext.getConfiguration().getCoordinator();
     }
 
     public PaxosInstanceStore getPaxosInstances()

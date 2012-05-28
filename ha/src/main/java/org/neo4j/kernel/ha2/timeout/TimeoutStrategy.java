@@ -31,4 +31,6 @@ public interface TimeoutStrategy
 
     void timeoutTriggered(Message timeoutMessage);
     void timeoutCancelled(Message timeoutMessage);
+
+    void tick(long now);
 }

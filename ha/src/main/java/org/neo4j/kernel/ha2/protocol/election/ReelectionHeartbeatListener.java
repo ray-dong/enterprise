@@ -18,17 +18,29 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.ringpaxos;
+package org.neo4j.kernel.ha2.protocol.election;
 
-import org.neo4j.com_2.message.MessageType;
+import java.net.URI;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatListener;
 
 /**
- * Messages for the Paxos client API
+ * TODO
  */
-public enum AtomicBroadcastMessage
-    implements MessageType
+public class ReelectionHeartbeatListener
+    implements HeartbeatListener
 {
-    joined, join,left, leave, // Group management
-    possibleServers,fail,recover, // Node management
-    propose,addPaxosListener,removePaxosListener; // Atomic Broadcast API
+    ElectionContext electionContext;
+    Election election;
+
+    @Override
+    public void failed( URI server )
+    {
+        // Suggest reelection for all roles of this node
+        election.demote( server );
+    }
+
+    @Override
+    public void alive( URI server )
+    {
+    }
 }

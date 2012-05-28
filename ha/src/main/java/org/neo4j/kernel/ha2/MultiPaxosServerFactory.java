@@ -24,6 +24,12 @@ import java.net.URI;
 
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
+import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatIAmAliveProcessor;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatRefreshProcessor;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastContext;
@@ -40,8 +46,16 @@ import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterState;
+import org.neo4j.kernel.ha2.protocol.election.ElectionContext;
+import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
+import org.neo4j.kernel.ha2.protocol.election.ElectionRole;
+import org.neo4j.kernel.ha2.protocol.election.ElectionState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
+import org.neo4j.kernel.ha2.timeout.LatencyCalculator;
+import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
+
+import static org.neo4j.helpers.collection.Iterables.iterable;
 
 /**
  * TODO
@@ -62,42 +76,45 @@ public class MultiPaxosServerFactory
     }
 
     @Override
-    public ProtocolServer newProtocolServer(Timeouts timeouts, MessageSource input, MessageProcessor output )
+    public ProtocolServer newProtocolServer(TimeoutStrategy timeoutStrategy, MessageSource input, MessageProcessor output )
     {
-        ConnectedStateMachines connectedStateMachines = new ConnectedStateMachines( input, output );
+        LatencyCalculator latencyCalculator = new LatencyCalculator(timeoutStrategy, input);
+
+        // Create state machines
+        ConnectedStateMachines connectedStateMachines = new ConnectedStateMachines( input, output, latencyCalculator );
+        Timeouts timeouts = connectedStateMachines.getTimeouts();
+        connectedStateMachines.addMessageProcessor( new HeartbeatRefreshProcessor( connectedStateMachines.getOutgoing() ) );
+        connectedStateMachines.addMessageProcessor( latencyCalculator );
+        input.addMessageProcessor( new HeartbeatIAmAliveProcessor( connectedStateMachines.getOutgoing() ) );
 
         LearnerContext learnerContext = new LearnerContext();
         ProposerContext proposerContext = new ProposerContext();
-
         final ClusterContext clusterContext = new ClusterContext(proposerContext, learnerContext, new ClusterConfiguration( initialConfig.getNodes() ),timeouts);
-
+        final HeartbeatContext heartbeatContext = new HeartbeatContext(clusterContext);
         final MultiPaxosContext context = new MultiPaxosContext(clusterContext, proposerContext, learnerContext, timeouts);
+        ElectionContext electionContext = new ElectionContext( iterable( new ElectionRole( "coordinator" ) ), clusterContext, heartbeatContext );
 
-        StateMachine paxosStateMachine= new StateMachine(new AtomicBroadcastContext(), AtomicBroadcastMessage.class, AtomicBroadcastState.start);
-        StateMachine acceptor= new StateMachine(context, AcceptorMessage.class, AcceptorState.start);
-        StateMachine coordinator= new StateMachine(context, ProposerMessage.class, ProposerState.start);
-        StateMachine learner= new StateMachine(context, LearnerMessage.class, LearnerState.start);
+        connectedStateMachines.addStateMachine( new StateMachine(new AtomicBroadcastContext(), AtomicBroadcastMessage.class, AtomicBroadcastState.start) );
+        connectedStateMachines.addStateMachine( new StateMachine(context, AcceptorMessage.class, AcceptorState.start) );
+        connectedStateMachines.addStateMachine( new StateMachine(context, ProposerMessage.class, ProposerState.start) );
+        connectedStateMachines.addStateMachine( new StateMachine(context, LearnerMessage.class, LearnerState.start) );
+        connectedStateMachines.addStateMachine( new StateMachine(heartbeatContext, HeartbeatMessage.class, HeartbeatState.start) );
+        connectedStateMachines.addStateMachine( new StateMachine(electionContext, ElectionMessage.class, ElectionState.start) );
 
-        connectedStateMachines.addStateMachine( paxosStateMachine );
-        connectedStateMachines.addStateMachine( acceptor );
-        connectedStateMachines.addStateMachine( coordinator );
-        connectedStateMachines.addStateMachine( learner );
-
-        final ProtocolServer server = new ProtocolServer( connectedStateMachines );
+        final ProtocolServer server = new ProtocolServer( connectedStateMachines);
 
         StateMachine cluster = new StateMachine(clusterContext, ClusterMessage.class, ClusterState.start);
 
-        connectedStateMachines.addStateMachine(cluster);
+        connectedStateMachines.addStateMachine( cluster );
 
         server.addBindingListener( new BindingListener()
         {
             @Override
             public void listeningAt( URI me )
             {
-                clusterContext.setMe(me);
+                clusterContext.setMe( me );
             }
         } );
-
 
         return server;
     }

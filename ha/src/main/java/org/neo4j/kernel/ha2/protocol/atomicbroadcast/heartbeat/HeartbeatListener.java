@@ -20,12 +20,14 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
 
+import java.net.URI;
+
 /**
  * TODO
  */
 public interface HeartbeatListener
 {
-    void failed(String server);
+    void failed(URI server);
 
-    void alive(String server);
+    void alive(URI server);
 }
