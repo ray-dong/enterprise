@@ -69,7 +69,7 @@ public enum LearnerState
                         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( learnState.getInstanceId() );
 
                         // Skip if we already know about this
-                        if( learnState.getInstanceId().getId() <= context.learnerContext.lastReceivedInstanceId )
+                        if( learnState.getInstanceId().getId() <= context.learnerContext.lastDeliveredInstanceId )
                         {
                             break;
                         }
@@ -79,18 +79,18 @@ public enum LearnerState
                         instance.closed(learnState.getValue());
 
                         // If this is the next instance to be learned, then do so and check if we have anything pending to be learnt
-                        if (learnState.getInstanceId().equals( new InstanceId( context.learnerContext.lastReceivedInstanceId +1) ))
+                        if (learnState.getInstanceId().equals( new InstanceId( context.learnerContext.lastDeliveredInstanceId +1) ))
                         {
                             instance.delivered();
                             outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnState.getValue()));
-                            context.learnerContext.lastReceivedInstanceId = learnState.getInstanceId().getId();
+                            context.learnerContext.lastDeliveredInstanceId = learnState.getInstanceId().getId();
 
                             long instanceId = learnState.getInstanceId().getId()+1;
                             while ((instance = context.getPaxosInstances().getPaxosInstance( new InstanceId( instanceId ) )).isState( PaxosInstance.State.closed ))
                             {
                                 instance.delivered();
                                 outgoing.process(Message.internal(AtomicBroadcastMessage.receive, instance.value_2));
-                                context.learnerContext.lastReceivedInstanceId = instance.id.getId();
+                                context.learnerContext.lastDeliveredInstanceId = instance.id.getId();
 
                                 instanceId++;
                             }
@@ -103,6 +103,8 @@ public enum LearnerState
                             } else
                             {
                                 // Found hole - we're waiting for this to be filled, i.e. timeout already set
+                                LoggerFactory.getLogger( LearnerState.class ).warn( "*** HOLE! WAITING FOR "+instanceId);
+
                             }
                         } else
                         {
@@ -116,10 +118,10 @@ public enum LearnerState
                     case learnTimedout:
                     {
                         // Timed out waiting for learned values - send explicit request to someone
-                        if (context.learnerContext.lastReceivedInstanceId != context.learnerContext.lastLearnedInstanceId)
+                        if (context.learnerContext.lastDeliveredInstanceId != context.learnerContext.lastLearnedInstanceId)
                         {
 
-                            for (long instanceId = context.learnerContext.lastReceivedInstanceId+1; instanceId < context.learnerContext.lastLearnedInstanceId; instanceId++)
+                            for (long instanceId = context.learnerContext.lastDeliveredInstanceId +1; instanceId < context.learnerContext.lastLearnedInstanceId; instanceId++)
                             {
                                 InstanceId id = new InstanceId( instanceId );
                                 PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( id );

@@ -38,7 +38,7 @@ import java.util.Map;
  */
 public class ClusterConfiguration
 {
-    private final List<URI> nodes;
+    private List<URI> nodes;
     private Map<String, URI> roles = new HashMap<String, URI>();
     private int allowedFailures = 1;
 
@@ -68,17 +68,19 @@ public class ClusterConfiguration
         if (nodes.contains(nodeUrl))
             return;
 
+        this.nodes = new ArrayList<URI>(nodes);
         nodes.add( nodeUrl );
     }
 
     public void left(URI nodeUrl)
     {
+        this.nodes = new ArrayList<URI>(nodes);
         nodes.remove( nodeUrl );
     }
 
     public void setNodes( Iterable<URI> nodes )
     {
-        this.nodes.clear();
+        this.nodes = new ArrayList<URI>();
         for( URI node : nodes )
         {
             this.nodes.add( node );
@@ -114,7 +116,7 @@ public class ClusterConfiguration
 
     public void left()
     {
-        nodes.clear();
+        this.nodes = new ArrayList<URI>();
     }
 
     public void setElected( String name, URI node )

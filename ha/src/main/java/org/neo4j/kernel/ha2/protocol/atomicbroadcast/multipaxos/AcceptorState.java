@@ -88,14 +88,17 @@ public enum AcceptorState
                         AcceptorMessage.AcceptState acceptState = message.getPayload();
                         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( acceptState.getInstance() );
 
-                        if (acceptState.getBallot() == instance.ballot)
+                        if (acceptState.getInstance() != null)
                         {
-                            instance.accept(acceptState.getValue());
+                            if (acceptState.getBallot() == instance.ballot)
+                            {
+                                instance.accept(acceptState.getValue());
 
-                            outgoing.process( Message.respond( ProposerMessage.accepted, message, new ProposerMessage.AcceptedState( instance.id ) ) );
-                        } else
-                        {
-                            outgoing.process(Message.respond( ProposerMessage.rejectAccept, message, new ProposerMessage.RejectAcceptState( instance.id ) ));
+                                outgoing.process( Message.respond( ProposerMessage.accepted, message, new ProposerMessage.AcceptedState( instance.id ) ) );
+                            } else
+                            {
+                                outgoing.process(Message.respond( ProposerMessage.rejectAccept, message, new ProposerMessage.RejectAcceptState( instance.id ) ));
+                            }
                         }
                         break;
                     }

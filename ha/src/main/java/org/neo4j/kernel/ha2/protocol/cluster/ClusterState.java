@@ -26,7 +26,6 @@ import java.util.List;
 
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
-import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
@@ -72,7 +71,7 @@ public enum ClusterState
                     outgoing.process( internal( ProposerMessage.join ) );
                     outgoing.process( internal( AcceptorMessage.join ) );
                     outgoing.process( internal( LearnerMessage.join ) );
-                    outgoing.process( internal( HeartbeatMessage.join ) );
+//                    outgoing.process( internal( HeartbeatMessage.join ) );
                     outgoing.process( internal( ElectionMessage.join ) );
                     return entered;
                 }
@@ -118,7 +117,7 @@ public enum ClusterState
                     List<URI> nodeList = new ArrayList<URI>(state.getNodes());
                     if (!nodeList.contains(context.me))
                     {
-                        context.learnerContext.lastReceivedInstanceId = state.getLatestReceivedInstanceId().getId();
+                        context.learnerContext.lastDeliveredInstanceId = state.getLatestReceivedInstanceId().getId();
                         context.learnerContext.lastLearnedInstanceId = state.getLatestReceivedInstanceId().getId();
                         context.proposerContext.lastInstanceId = state.getLatestReceivedInstanceId().getId()+1;
 
@@ -177,8 +176,8 @@ public enum ClusterState
                     if (context.getMe().equals( state.getJoin() ))
                     {
                         context.joined();
-                        outgoing.process( internal( ProposerMessage.join ) );
-                        outgoing.process( internal( HeartbeatMessage.join ) );
+                        outgoing.process( internal( AtomicBroadcastMessage.entered ) );
+//                        outgoing.process( internal( HeartbeatMessage.join ) );
                         return entered;
                     } else
                     {
@@ -226,7 +225,7 @@ public enum ClusterState
                 {
                     outgoing.process( respond( ClusterMessage.configurationResponse, message, new ClusterMessage.ConfigurationResponseState( context.getConfiguration().getRoles(),
                                                                                                                                              context.getConfiguration().getNodes(),
-                                                                                                                                             new InstanceId(context.learnerContext.lastReceivedInstanceId ) )));
+                                                                                                                                             new InstanceId(context.learnerContext.lastDeliveredInstanceId ) )));
                     break;
                 }
 

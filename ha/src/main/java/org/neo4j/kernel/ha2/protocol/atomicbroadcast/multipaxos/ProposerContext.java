@@ -36,11 +36,11 @@ public class ProposerContext
 
     public long lastInstanceId = 0;
 
-    public InstanceId newInstanceId( long lastReceivedInstanceId )
+    public InstanceId newInstanceId( long lastLearnedInstanceId )
     {
         // Never propose something lower than last received instance id
-        if (lastReceivedInstanceId >= lastInstanceId)
-            lastInstanceId = lastReceivedInstanceId+1;
+        if (lastLearnedInstanceId >= lastInstanceId)
+            lastInstanceId = lastLearnedInstanceId+1;
 
         return new InstanceId( lastInstanceId++);
     }

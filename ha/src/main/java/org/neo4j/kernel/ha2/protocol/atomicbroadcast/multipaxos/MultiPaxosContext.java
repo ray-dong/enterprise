@@ -53,19 +53,19 @@ public class MultiPaxosContext
 
     public int getServerId()
     {
-        int i = clusterContext.getMe().hashCode();
-        i = (i/100)*100;
-        return i;
-
 /*
+        int i = clusterContext.getMe().hashCode();
+        i = i % 100;
+        return i;
+*/
+
         int i = clusterContext.getConfiguration().getNodes().indexOf( clusterContext.getMe() );
         if (i == -1)
         {
-            i = 90 + clusterContext.getMe().hashCode();
+            i = 800 + clusterContext.getMe().hashCode() % 200;
         }
 
         return i;
-*/
     }
 
     public List<URI> getAcceptors()

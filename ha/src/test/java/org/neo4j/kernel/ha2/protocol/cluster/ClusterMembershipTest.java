@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.protocol.cluster;
 import java.net.URISyntaxException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /**
@@ -69,20 +70,36 @@ public class ClusterMembershipTest
     }
 
     @Test
-    public void oneNodeJoinThenThreeJoinRoughlyAtSameTime()
+    public void oneNodeJoinThenTwoJoinRoughlyAtSameTime()
+        throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
+    {
+         testCluster(3, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+              rounds( 500 ).
+              join( 100, 1 ).
+              join( 100, 2 ).
+              join( 10, 3 ).
+              message( 2000, "*** All are in " ).
+              leave( 0, 3 )
+         );
+    }
+
+    @Test
+    public void oneNodeJoinThenThreeJoinRoughlyAtSameTime2()
         throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
     {
          testCluster(4, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
-              rounds( 150 ).
+              rounds( 800 ).
               join( 100, 1 ).
               join( 100,2 ).
               join( 10, 3 ).
               join( 10, 4 ).
               message( 2000, "*** All are in " ).
-              leave( 10, 4 ).
-              leave( 100, 3 ).
-              leave( 100, 2 ).
-              leave( 100, 1 )
+              broadcast(10, 2, "Hello world").
+              broadcast( 500, 2, "Hello world2" )
+//              leave( 10, 4 ).
+//              leave( 100, 3 ).
+//              leave( 100, 2 ).
+//              leave( 100, 1 )
          );
     }
 
@@ -96,6 +113,21 @@ public class ClusterMembershipTest
               message( 80, "*** 1 and 2 are in cluster" ).
               leave( 10, 2 ).
               join( 20, 3 ).
+              verifyConfigurations( 1000L )
+         );
+    }
+
+    // TODO this should cause server 2 to get a join exception
+    @Ignore
+    @Test
+    public void oneNodeCreatesClusterAndThenAnotherJoinsAsFirstLeaves()
+        throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
+    {
+         testCluster(2, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+              join( 0, 1 ).
+              join( 10, 2 ).
+              message( 0, "*** 1 and 2 are in cluster" ).
+              leave( 20, 1 ).
               verifyConfigurations( 1000L )
          );
     }

@@ -38,6 +38,8 @@ import org.neo4j.kernel.ha2.MultipleFailureLatencyStrategy;
 import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.ScriptableNetworkFailureLatencyStrategy;
 import org.neo4j.kernel.ha2.TestProtocolServer;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.protocol.heartbeat.Heartbeat;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
@@ -60,7 +62,7 @@ public class ClusterMockTest
                                                 .timeout( HeartbeatMessage.send_heartbeat, 300 ));
     }
 
-    List<Cluster> servers = new ArrayList<Cluster>(  );
+    List<TestProtocolServer> servers = new ArrayList<TestProtocolServer>(  );
     List<Cluster> out = new ArrayList<Cluster>( );
     List<Cluster> in = new ArrayList<Cluster>();
     List<AtomicReference<ClusterConfiguration>> configurations = new ArrayList<AtomicReference<ClusterConfiguration>>(  );
@@ -104,8 +106,16 @@ public class ClusterMockTest
                             logger.getLogger().info( uri+": Alive:" + server );
                         }
                     } );
+            server.newClient( AtomicBroadcast.class ).addAtomicBroadcastListener( new AtomicBroadcastListener()
+            {
+                @Override
+                public void receive( Object value )
+                {
+                    logger.getLogger().info( uri+" received: "+value );
+                }
+            } );
 
-            servers.add( cluster );
+            servers.add( server );
             out.add( cluster );
             configurations.add( config2 );
         }
@@ -243,7 +253,7 @@ public class ClusterMockTest
                             @Override
                             public void run()
                             {
-                                Cluster joinCluster = servers.get( joinServer-1 );
+                                Cluster joinCluster = servers.get( joinServer-1 ).newClient( Cluster.class );
                                 for( Cluster cluster : out )
                                 {
                                     if (cluster.equals( joinCluster ))
@@ -278,7 +288,7 @@ public class ClusterMockTest
                             @Override
                             public void run()
                             {
-                                Cluster leaveCluster = servers.get( leaveServer-1 );
+                                Cluster leaveCluster = servers.get( leaveServer-1 ).newClient( Cluster.class );
                                 for( Cluster cluster : in )
                                 {
                                     if (cluster.equals( leaveCluster ))
@@ -300,7 +310,7 @@ public class ClusterMockTest
                             @Override
                             public void run()
                             {
-                                Cluster server = servers.get( serverDown-1 );
+                                Cluster server = servers.get( serverDown-1 ).newClient( Cluster.class );
                                 network.getNetworkLatencyStrategy().getStrategy( ScriptableNetworkFailureLatencyStrategy.class ).nodeIsDown( server.toString() );
                                 logger.getLogger().info( server+ " is down" );
                             }
@@ -314,9 +324,23 @@ public class ClusterMockTest
                             @Override
                             public void run()
                             {
-                                Cluster server = servers.get( serverUp-1 );
-                                network.getNetworkLatencyStrategy().getStrategy( ScriptableNetworkFailureLatencyStrategy.class ).nodeIsUp( server.toString() );
+                                Cluster server = servers.get( serverUp-1 ).newClient( Cluster.class );
+                                network.getNetworkLatencyStrategy().getStrategy( ScriptableNetworkFailureLatencyStrategy.class ).nodeIsUp( server
+                                                                                                                                               .toString() );
                                 logger.getLogger().info( server+ " is up" );
+                            }
+                        }, time );
+        }
+
+        public ClusterTestScriptDSL broadcast( int time, final int server, final Object value )
+        {
+            return addAction( new ClusterAction()
+                        {
+                            @Override
+                            public void run()
+                            {
+                                AtomicBroadcast broadcast = servers.get( server-1 ).newClient( AtomicBroadcast.class );
+                                broadcast.broadcast( value );
                             }
                         }, time );
         }

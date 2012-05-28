@@ -62,9 +62,7 @@ public enum ProposerState
                         ClusterMessage.ConfigurationChangeState state = message.getPayload();
 
                         // Don't include myself in list of acceptors
-                        List<URI> acceptors = new ArrayList<URI>( context.getAcceptors() );
-
-                        propose( context, message, outgoing, state, acceptors );
+                        propose( context, message, outgoing, state, context.getAcceptors() );
                         return coordinator;
                     }
                 }
@@ -91,9 +89,10 @@ public enum ProposerState
                         if (payload instanceof ClusterMessage.ConfigurationChangeState)
                         {
                             ClusterMessage.ConfigurationChangeState state = message.getPayload();
-                            List<URI> acceptors = new ArrayList<URI>(context.getAcceptors());
+                            List<URI> acceptors = context.getAcceptors();
                             if (state.isLeaving( context.clusterContext.getMe() ))
                             {
+                                acceptors = new ArrayList<URI>( acceptors );
                                 acceptors.remove( context.clusterContext.getMe() );
                             }
 
@@ -115,7 +114,7 @@ public enum ProposerState
                         {
                             long ballot = instance.ballot;
                             while (ballot <= rejectPropose.getBallot())
-                                ballot += 100; // Make sure we win next time
+                                ballot += 1000; // Make sure we win next time
 
                             instance.phase1Timeout(ballot );
                             for( URI acceptor : instance.getAcceptors() )
@@ -139,13 +138,13 @@ public enum ProposerState
                         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( instanceId );
                         if (instance.isState( PaxosInstance.State.p1_pending))
                         {
-                            if (instance.ballot > 1000)
+                            if (instance.ballot > 10000)
                             {
                                 // Fail this propose
                                 outgoing.process( Message.internal(AtomicBroadcastMessage.failed, context.proposerContext.bookedInstances.get( instance.id )) );
                             } else
                             {
-                                long ballot = instance.ballot + 100;
+                                long ballot = instance.ballot + 1000;
 
                                 instance.phase1Timeout(ballot);
 
@@ -241,7 +240,7 @@ public enum ProposerState
 
                         if (instance.isState( PaxosInstance.State.p2_pending ))
                         {
-                            long ballot = instance.ballot + 100;
+                            long ballot = instance.ballot + 1000;
                             instance.phase2Timeout( ballot );
 
                             for( URI acceptor : instance.getAcceptors() )
@@ -272,6 +271,8 @@ public enum ProposerState
                                 if (instance.value_2 instanceof ClusterMessage.ConfigurationChangeState)
                                 {
                                     ClusterMessage.ConfigurationChangeState state = (ClusterMessage.ConfigurationChangeState) instance.value_2;
+                                    // TODO getLearners might return wrong list if another join happens at the same time
+                                    // Proper fix is to wait with this learn until we have learned all previous configuration changes
                                     for( URI learner : context.getLearners() )
                                     {
                                         outgoing.process( Message.to( LearnerMessage.learn, learner, new LearnerMessage.LearnState( instance.id, instance.value_2 ) ));
@@ -297,9 +298,16 @@ public enum ProposerState
                                 // Check if we have anything pending - try to start process for it
                                 if (!context.proposerContext.pendingValues.isEmpty() && context.proposerContext.bookedInstances.size() < 10)
                                 {
-                                    Object value = context.proposerContext.pendingValues.remove();
-                                    LoggerFactory.getLogger( ProposerState.class ).debug( "Restarting "+value +" booked:"+context.proposerContext.bookedInstances.size() );
-                                    propose( context, message, outgoing, value, context.getAcceptors() );
+                                    if (context.learnerContext.lastLearnedInstanceId > context.learnerContext.lastDeliveredInstanceId)
+                                    {
+
+                                    } else
+                                    {
+                                        Object value = context.proposerContext.pendingValues.remove();
+                                        LoggerFactory.getLogger( ProposerState.class ).debug( "Restarting "+value +" booked:"+context.proposerContext.bookedInstances.size() );
+                                        outgoing.process( Message.internal( ProposerMessage.propose, value ) );
+    //                                    propose( context, message, outgoing, value, context.getAcceptors() );
+                                    }
                                 }
                             }
                         }
@@ -334,11 +342,11 @@ public enum ProposerState
 
     private static void propose( MultiPaxosContext context, Message message, MessageProcessor outgoing, Object payload, List<URI> acceptors )
     {
-        InstanceId instanceId = context.proposerContext.newInstanceId(context.learnerContext.lastReceivedInstanceId);
+        InstanceId instanceId = context.proposerContext.newInstanceId(context.learnerContext.lastLearnedInstanceId );
 
         context.proposerContext.bookedInstances.put( instanceId, payload );
 
-        long ballot = 100 + context.getServerId(); // First server will have first ballot id be 101
+        long ballot = 1000 + context.getServerId(); // First server will have first ballot id be 1001
 
         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( instanceId );
 
