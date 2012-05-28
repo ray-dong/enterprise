@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatContext;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 
 /**

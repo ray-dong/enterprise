@@ -24,12 +24,11 @@ import java.net.URI;
 
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
-import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatContext;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatIAmAliveProcessor;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatRefreshProcessor;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatState;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatIAmAliveProcessor;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatRefreshProcessor;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastContext;

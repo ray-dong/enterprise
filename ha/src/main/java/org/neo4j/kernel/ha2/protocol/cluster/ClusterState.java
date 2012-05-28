@@ -26,7 +26,7 @@ import java.util.List;
 
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatMessage;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;

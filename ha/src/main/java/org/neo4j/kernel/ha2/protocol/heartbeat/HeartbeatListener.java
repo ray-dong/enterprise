@@ -18,13 +18,16 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
+package org.neo4j.kernel.ha2.protocol.heartbeat;
+
+import java.net.URI;
 
 /**
  * TODO
  */
-public interface Heartbeat
+public interface HeartbeatListener
 {
-    void addHeartbeatListener( HeartbeatListener listener );
-    void removeHeartbeatListener( HeartbeatListener listener );
+    void failed(URI server);
+
+    void alive(URI server);
 }

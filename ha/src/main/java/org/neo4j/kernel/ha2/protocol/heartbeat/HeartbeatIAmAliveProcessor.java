@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
+package org.neo4j.kernel.ha2.protocol.heartbeat;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -27,17 +27,16 @@ import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageType;
 
 /**
- * When a message is sent out, reset the timeout for sending heartbeat to the TO host, since we only have to send i_am_alive if
- * nothing else is going on.
+ * When a message is received, create an I Am Alive message as well, since we know that the sending node is up
  */
-public class HeartbeatRefreshProcessor
+public class HeartbeatIAmAliveProcessor
     implements MessageProcessor
 {
-    private MessageProcessor outgoing;
+    private MessageProcessor output;
 
-    public HeartbeatRefreshProcessor(MessageProcessor outgoing )
+    public HeartbeatIAmAliveProcessor( MessageProcessor output )
     {
-        this.outgoing = outgoing;
+        this.output = output;
     }
 
     @Override
@@ -47,8 +46,8 @@ public class HeartbeatRefreshProcessor
         {
             try
             {
-                String to = message.getHeader( Message.TO );
-                outgoing.process( Message.internal( HeartbeatMessage.reset_send_heartbeat, new URI( to ) ) );
+                String from = message.getHeader( Message.FROM );
+                output.process( message.copyHeadersTo( Message.internal( HeartbeatMessage.i_am_alive, new HeartbeatMessage.IAmAliveState( new URI( from ) ) ), Message.FROM ) );
             }
             catch( URISyntaxException e )
             {

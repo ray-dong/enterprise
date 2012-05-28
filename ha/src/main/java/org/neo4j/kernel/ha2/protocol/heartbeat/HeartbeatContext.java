@@ -18,18 +18,15 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
+package org.neo4j.kernel.ha2.protocol.heartbeat;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.neo4j.com_2.message.Message;
-import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.helpers.Listeners;
-import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
-import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 import static org.neo4j.com_2.message.Message.*;
 

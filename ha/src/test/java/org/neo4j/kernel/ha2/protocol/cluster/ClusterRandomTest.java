@@ -20,29 +20,10 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
-import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-import org.junit.Rule;
 import org.junit.Test;
-import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
-import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
-import org.neo4j.kernel.ha2.NetworkMock;
-import org.neo4j.kernel.ha2.TestProtocolServer;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.Heartbeat;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatListener;
-import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
-import org.neo4j.test.LoggerRule;
-
-import static org.junit.Assert.*;
 
 /**
  * TODO

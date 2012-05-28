@@ -18,36 +18,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
-
-import java.io.Serializable;
-
-import java.net.URI;
-import org.neo4j.com_2.message.MessageType;
+package org.neo4j.kernel.ha2.protocol.heartbeat;
 
 /**
  * TODO
  */
-public enum HeartbeatMessage
-    implements MessageType
+public interface Heartbeat
 {
-    addHeartbeatListener,removeHeartbeatListener,
-    join,leave,
-    i_am_alive,timed_out,send_heartbeat,reset_send_heartbeat;
-
-    public static class IAmAliveState
-        implements Serializable
-    {
-        private URI server;
-
-        public IAmAliveState( URI server )
-        {
-            this.server = server;
-        }
-
-        public URI getServer()
-        {
-            return server;
-        }
-    }
+    void addHeartbeatListener( HeartbeatListener listener );
+    void removeHeartbeatListener( HeartbeatListener listener );
 }

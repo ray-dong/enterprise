@@ -18,7 +18,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat;
+package org.neo4j.kernel.ha2.protocol.heartbeat;
 
 import java.net.URI;
 import org.neo4j.com_2.message.Message;
@@ -86,7 +86,8 @@ public enum HeartbeatState
                     context.alive( state.getServer() );
 
                     context.getClusterContext().timeouts.cancelTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer() );
-                    context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer(), timeout( HeartbeatMessage.timed_out, message, state.getServer() ) );
+                    context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer(), timeout( HeartbeatMessage.timed_out, message, state
+                        .getServer() ) );
 
                     break;
                 }

@@ -21,7 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.election;
 
 import java.net.URI;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.heartbeat.HeartbeatListener;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 
 /**
  * TODO
