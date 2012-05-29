@@ -28,8 +28,13 @@ import java.util.List;
 import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
@@ -73,6 +78,20 @@ public class ClusterMockTest
     public NetworkMock network;
 
     ClusterTestScript script;
+
+    ExecutorService executor;
+
+    @Before
+    public void setup()
+    {
+        executor = Executors.newSingleThreadExecutor();
+    }
+
+    @After
+    public void tearDown()
+    {
+        executor.shutdownNow();
+    }
 
     protected void testCluster(int nrOfServers, NetworkMock mock, ClusterTestScript script)
         throws ExecutionException, InterruptedException, URISyntaxException, TimeoutException
@@ -254,7 +273,7 @@ public class ClusterMockTest
                             public void run()
                             {
                                 Cluster joinCluster = servers.get( joinServer-1 ).newClient( Cluster.class );
-                                for( Cluster cluster : out )
+                                for( final Cluster cluster : out )
                                 {
                                     if (cluster.equals( joinCluster ))
                                     {
@@ -267,12 +286,30 @@ public class ClusterMockTest
                                         {
                                             try
                                             {
-                                                cluster.join( new URI( in.get( 0 ).toString()) );
+                                                final Future<ClusterConfiguration> result = cluster.join( new URI( in.get( 0 ).toString()) );
+                                                executor.submit( new Runnable()
+                                                {
+                                                    @Override
+                                                    public void run()
+                                                    {
+                                                        try
+                                                        {
+                                                            ClusterConfiguration clusterConfiguration = result.get();
+                                                            logger.getLogger().info( "**** Cluster configuration:"+ clusterConfiguration );
+                                                        }
+                                                        catch( Exception e )
+                                                        {
+                                                            logger.getLogger().info( "**** Node could not join cluster:"+ e.getMessage() );
+                                                            out.add( cluster );
+                                                        }
+                                                    }
+                                                });
                                             }
                                             catch( URISyntaxException e )
                                             {
                                                 e.printStackTrace();
                                             }
+
                                         }
                                         break;
                                     }

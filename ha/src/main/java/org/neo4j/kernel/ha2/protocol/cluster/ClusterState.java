@@ -24,6 +24,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
+import java.util.concurrent.TimeoutException;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
@@ -32,6 +33,7 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
 
@@ -84,18 +86,6 @@ public enum ClusterState
                     context.timeouts.setTimeout( clusterNodeUri, timeout( ClusterMessage.configurationTimeout, message ) );
                     return acquiringConfiguration;
                 }
-
-                case leave:
-                {
-                    break;
-                }
-
-                case configuration:
-                    break;
-                case configurationResponse:
-                    break;
-                case configurationTimeout:
-                    break;
             }
             return this;
         }
@@ -131,7 +121,7 @@ public enum ClusterState
                         outgoing.process( internal( AcceptorMessage.join ) );
                         outgoing.process( internal( LearnerMessage.join ) );
                         outgoing.process( internal( AtomicBroadcastMessage.join ) );
-                        outgoing.process(internal( ProposerMessage.propose, newState ));
+                        outgoing.process( internal( ProposerMessage.propose, newState ));
 
                         // TODO timeout this
 
@@ -148,8 +138,9 @@ public enum ClusterState
 
                 case configurationTimeout:
                 {
+                    outgoing.process( internal( ClusterMessage.joinFailure, new TimeoutException( "Join failed, timeout waiting for configuration" ) ) );
                     // TODO
-                    break;
+                    return joining;
                 }
             }
 
@@ -177,7 +168,9 @@ public enum ClusterState
                     {
                         context.joined();
                         outgoing.process( internal( AtomicBroadcastMessage.entered ) );
-//                        outgoing.process( internal( HeartbeatMessage.join ) );
+                        outgoing.process( internal( HeartbeatMessage.join ) );
+
+                        outgoing.process( internal( ClusterMessage.joinResponse, context.getConfiguration() ) );
                         return entered;
                     } else
                     {
@@ -186,13 +179,14 @@ public enum ClusterState
                     }
                 }
 
-                case joinFailed:
+                case joinFailure:
                 {
-                    // Try getting config again
-                    URI clusterNodeUri = context.joining;
-                    outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
-                    context.timeouts.setTimeout( clusterNodeUri, timeout( ClusterMessage.configurationTimeout, message ) );
-                    return acquiringConfiguration;
+                    outgoing.process( internal( AcceptorMessage.leave ) );
+                    outgoing.process( internal( LearnerMessage.leave ) );
+                    outgoing.process( internal( AtomicBroadcastMessage.leave ) );
+                    outgoing.process( internal( ProposerMessage.leave ));
+                    outgoing.process( internal( HeartbeatMessage.leave ));
+                    return start;
                 }
             }
 
@@ -247,6 +241,7 @@ public enum ClusterState
                         outgoing.process( internal( AcceptorMessage.leave ) );
                         outgoing.process( internal( LearnerMessage.leave ) );
                         outgoing.process( internal( AtomicBroadcastMessage.leave ) );
+                        outgoing.process( internal( HeartbeatMessage.leave ) );
 
                         return start;
 
@@ -290,6 +285,7 @@ public enum ClusterState
                         outgoing.process( internal( AcceptorMessage.leave ) );
                         outgoing.process( internal( LearnerMessage.leave ) );
                         outgoing.process( internal( AtomicBroadcastMessage.leave ) );
+                        outgoing.process( internal( HeartbeatMessage.leave ) );
 
                         return start;
                     } else

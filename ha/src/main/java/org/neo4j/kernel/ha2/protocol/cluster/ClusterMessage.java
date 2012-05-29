@@ -40,7 +40,7 @@ public enum ClusterMessage
     addClusterListener, removeClusterListener,
 
     // Protocol messages
-    configuration,configurationResponse,configurationTimeout, configurationChanged, joinFailed;
+    configuration,configurationResponse,configurationTimeout, configurationChanged, joinFailure;
 
     public static class ConfigurationResponseState
         implements Serializable

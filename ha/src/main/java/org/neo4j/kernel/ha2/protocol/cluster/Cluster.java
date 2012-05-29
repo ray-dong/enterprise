@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.cluster;
 
 import java.net.URI;
+import java.util.concurrent.Future;
 
 /**
  * Cluster membership management
@@ -28,7 +29,7 @@ import java.net.URI;
 public interface Cluster
 {
     void create();
-    void join(URI otherServerUrl);
+    Future<ClusterConfiguration> join(URI otherServerUrl);
     void leave();
 
     void addClusterListener(ClusterListener listener);

@@ -118,20 +118,11 @@ public class StateMachineProxyFactory
     {
         if (!responseFutureMap.isEmpty())
         {
-            if (message.hasHeader( Message.TO ))
+            if (!message.hasHeader( Message.TO ))
             {
                 String conversationId = message.getHeader( Message.CONVERSATION_ID );
                 ResponseFuture future = responseFutureMap.get( conversationId );
-                if (future != null && !future.wasInitiatedBy(message.getMessageType().name()))
-                {
-                    future.updateMessage( message );
-                }
-
-            } else
-            {
-                String conversationId = message.getHeader( Message.CONVERSATION_ID );
-                ResponseFuture future = responseFutureMap.get( conversationId );
-                if (future != null && !future.wasInitiatedBy(message.getMessageType().name()))
+                if (future != null)
                 {
                     if (future.setPotentialResponse( message ))
                         responseFutureMap.remove( conversationId );
@@ -194,16 +185,6 @@ public class StateMachineProxyFactory
             this.initiatedByMessageType = initiatedByMessageType;
         }
 
-        public boolean wasInitiatedBy( String name )
-        {
-            return initiatedByMessageType.name().equals( name );
-        }
-
-        public synchronized void updateMessage( Message message )
-        {
-            initiatedByMessageType = MessageType.class.cast(message.getMessageType());
-        }
-
         public synchronized boolean setPotentialResponse( Message response )
         {
             if (isResponse(response))
@@ -219,7 +200,8 @@ public class StateMachineProxyFactory
 
         private boolean isResponse( Message response )
         {
-            return (response.getMessageType().name().equals( initiatedByMessageType.name()+"Response" ));
+            return (response.getMessageType().name().equals( initiatedByMessageType.name()+"Response" ) ||
+                    response.getMessageType().name().equals( initiatedByMessageType.name()+"Failure" ));
         }
 
         @Override

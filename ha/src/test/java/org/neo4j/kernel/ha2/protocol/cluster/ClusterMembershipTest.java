@@ -94,12 +94,7 @@ public class ClusterMembershipTest
               join( 10, 3 ).
               join( 10, 4 ).
               message( 2000, "*** All are in " ).
-              broadcast(10, 2, "Hello world").
-              broadcast( 500, 2, "Hello world2" )
-//              leave( 10, 4 ).
-//              leave( 100, 3 ).
-//              leave( 100, 2 ).
-//              leave( 100, 1 )
+              broadcast(10, 2, "Hello world")
          );
     }
 
@@ -108,27 +103,24 @@ public class ClusterMembershipTest
         throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
     {
          testCluster(3, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+              rounds( 820 ).
               join( 0, 1 ).
               join( 10, 2 ).
               message( 80, "*** 1 and 2 are in cluster" ).
               leave( 10, 2 ).
-              join( 20, 3 ).
-              verifyConfigurations( 1000L )
+              join( 20, 3 )
          );
     }
 
-    // TODO this should cause server 2 to get a join exception
-    @Ignore
     @Test
     public void oneNodeCreatesClusterAndThenAnotherJoinsAsFirstLeaves()
         throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
     {
          testCluster(2, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+              rounds( 810 ).
               join( 0, 1 ).
               join( 10, 2 ).
-              message( 0, "*** 1 and 2 are in cluster" ).
-              leave( 20, 1 ).
-              verifyConfigurations( 1000L )
+              leave( 20, 1 )
          );
     }
 }

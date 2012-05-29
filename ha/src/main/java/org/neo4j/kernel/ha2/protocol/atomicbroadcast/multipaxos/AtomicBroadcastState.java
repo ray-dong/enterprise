@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import static org.neo4j.com_2.message.Message.internal;
 
+import java.util.concurrent.TimeoutException;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
@@ -80,7 +81,7 @@ public enum AtomicBroadcastState
                     case failed:
                     {
                         // Joining failed
-                        outgoing.process( internal( ClusterMessage.joinFailed, message.getPayload() ) );
+                        outgoing.process( internal( ClusterMessage.joinFailure, new TimeoutException( "Could not join cluster" ) ) );
 
                         return start;
                     }
