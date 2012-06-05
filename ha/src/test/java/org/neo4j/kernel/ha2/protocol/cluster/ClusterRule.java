@@ -56,7 +56,7 @@ public class ClusterRule
         throws Throwable
     {
         TestProtocolServer server = network.addServer( "server1" );
-        server.newClient( Cluster.class ).create();
+        server.newClient( Cluster.class ).create("default");
         network.tickUntilDone();
         nodes.add( server );
 

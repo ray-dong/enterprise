@@ -23,17 +23,28 @@ package org.neo4j.kernel.ha2.protocol.cluster;
 import java.net.URI;
 
 /**
- * Listener interface for cluster configuration changes
+ * Noop adapter for ClusterListener
  */
-public interface ClusterListener
+public class ClusterAdapter
+    implements ClusterListener
 {
-    void enteredCluster(ClusterConfiguration nodes);
-    void joinedCluster(URI node);
-    void leftCluster(URI node);
-    void leftCluster();
+    @Override
+    public void enteredCluster( ClusterConfiguration nodes )
+    {
+    }
 
-/*
-    void enterFailed(Throwable cause);
-    void leaveFailed(Throwable cause);
-*/
+    @Override
+    public void joinedCluster( URI node )
+    {
+    }
+
+    @Override
+    public void leftCluster( URI node )
+    {
+    }
+
+    @Override
+    public void leftCluster()
+    {
+    }
 }

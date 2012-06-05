@@ -204,6 +204,7 @@ public class NetworkNode
             catch( Exception e )
             {
                 // Ignore
+                e.printStackTrace(  );
             }
         }
     }
@@ -357,7 +358,7 @@ public class NetworkNode
         {
             pipeline.addLast( "frameDecoder",
                     new ObjectDecoder(frameLength, NetworkNodePipelineFactory.this.getClass().getClassLoader() ) );
-            pipeline.addLast( "frameEncoder", new ObjectEncoder());
+            pipeline.addLast( "frameEncoder", new ObjectEncoder(1024 * 1000));
         }
     }
     
@@ -401,7 +402,7 @@ public class NetworkNode
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
         {
-//            msgLog.logMessage("Receive exception:", e.getCause());
+            msgLog.logMessage("Receive exception:", e.getCause());
         }
     }
 }

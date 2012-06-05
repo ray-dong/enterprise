@@ -24,7 +24,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
 import java.util.logging.Logger;
-
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageType;
@@ -34,7 +33,6 @@ import org.neo4j.kernel.ha2.statemachine.StateMachineConversations;
 import org.neo4j.kernel.ha2.statemachine.StateMachineProxyFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-import org.neo4j.kernel.lifecycle.Lifecycle;
 
 /**
  * A ProtocolServer ties together the underlying ConnectedStateMachines with an understanding of ones

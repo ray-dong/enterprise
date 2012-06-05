@@ -18,22 +18,39 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.cluster;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
 
-import java.net.URI;
+import java.io.IOException;
 
 /**
- * Listener interface for cluster configuration changes
+ * TODO
  */
-public interface ClusterListener
+public class AtomicBroadcastListenerDeserializer
+    implements AtomicBroadcastListener
 {
-    void enteredCluster(ClusterConfiguration nodes);
-    void joinedCluster(URI node);
-    void leftCluster(URI node);
-    void leftCluster();
+    private AtomicBroadcastListener delegate;
+    private AtomicBroadcastSerializer serializer;
 
-/*
-    void enterFailed(Throwable cause);
-    void leaveFailed(Throwable cause);
-*/
+    public AtomicBroadcastListenerDeserializer( AtomicBroadcastSerializer serializer, AtomicBroadcastListener delegate )
+    {
+        this.delegate = delegate;
+        this.serializer = serializer;
+    }
+
+    @Override
+    public void receive( Object value )
+    {
+        try
+        {
+            delegate.receive( serializer.receive( (Payload) value ));
+        }
+        catch( IOException e )
+        {
+            e.printStackTrace();
+        }
+        catch( ClassNotFoundException e )
+        {
+            e.printStackTrace();
+        }
+    }
 }

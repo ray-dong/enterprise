@@ -25,7 +25,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
  */
 public interface AtomicBroadcast
 {
-    void broadcast( Object value );
+    void broadcast( Payload payload );
     void addAtomicBroadcastListener( AtomicBroadcastListener listener );
     void removeAtomicBroadcastListener( AtomicBroadcastListener listener );
 }

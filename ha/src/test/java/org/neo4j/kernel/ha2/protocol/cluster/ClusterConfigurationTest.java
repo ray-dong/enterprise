@@ -53,7 +53,7 @@ public class ClusterConfigurationTest
         }
     }
 
-    ClusterConfiguration configuration = new ClusterConfiguration(new ArrayList<URI>());
+    ClusterConfiguration configuration = new ClusterConfiguration("default", new ArrayList<URI>());
 
     @Test
     public void givenEmptyClusterWhenNodeAddedThenNodeWasAdded()

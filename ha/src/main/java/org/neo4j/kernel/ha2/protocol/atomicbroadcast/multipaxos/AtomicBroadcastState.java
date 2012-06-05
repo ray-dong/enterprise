@@ -26,6 +26,7 @@ import java.util.concurrent.TimeoutException;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 
@@ -86,7 +87,7 @@ public enum AtomicBroadcastState
                         return start;
                     }
 
-                    case receive:
+                    case broadcastResponse:
                     {
                         if (message.getPayload() instanceof ClusterMessage.ConfigurationChangeState)
                             outgoing.process( internal( ClusterMessage.configurationChanged, message.getPayload() ) );
@@ -126,12 +127,12 @@ public enum AtomicBroadcastState
                         break;
                     }
 
-                    case receive:
+                    case broadcastResponse:
                     {
                         if (message.getPayload() instanceof ClusterMessage.ConfigurationChangeState)
                             outgoing.process( internal( ClusterMessage.configurationChanged, message.getPayload() ) );
                         else
-                            context.receive(message.getPayload());
+                            context.receive(message.<Payload>getPayload());
 
                         break;
                     }

@@ -212,11 +212,10 @@ public class ClusterNetworkTest
         cluster.addClusterListener( new ClusterListener()
         {
             @Override
-            public void enteredCluster( Iterable<URI> nodes )
+            public void enteredCluster( ClusterConfiguration configuration )
             {
-                logger.getLogger().info( uri + " entered cluster:" + nodes );
-                config.set( new ClusterConfiguration() );
-                config.get().setNodes( nodes );
+                logger.getLogger().info( uri + " entered cluster:" + configuration.getNodes() );
+                config.set( new ClusterConfiguration(configuration) );
                 in.add( cluster );
             }
 
@@ -295,7 +294,7 @@ public class ClusterNetworkTest
                             logger.getLogger().info( "Join:"+cluster.toString() );
                             if (in.isEmpty())
                             {
-                                cluster.create();
+                                cluster.create("default");
                             } else
                             {
                                 try
@@ -384,7 +383,7 @@ public class ClusterNetworkTest
 
                     if (in.isEmpty())
                     {
-                        cluster.create();
+                        cluster.create("default");
                     } else
                     {
                         try

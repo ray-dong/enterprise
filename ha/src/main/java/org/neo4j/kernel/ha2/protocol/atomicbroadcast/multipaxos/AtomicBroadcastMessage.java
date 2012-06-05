@@ -30,6 +30,6 @@ public enum AtomicBroadcastMessage
     implements MessageType
 {
     entered, join, leave, // Group management
-    receive, failed, // Internal message created by implementation
+    broadcastResponse, failed, // Internal message created by implementation
     broadcast, addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast API
 }

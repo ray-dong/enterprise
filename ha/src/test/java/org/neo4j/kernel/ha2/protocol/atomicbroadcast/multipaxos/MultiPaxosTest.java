@@ -34,6 +34,7 @@ import org.neo4j.kernel.ha2.NetworkMock;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterRule;
+import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.MessageTimeoutStrategy;
 
@@ -53,8 +54,8 @@ public class MultiPaxosTest
     public void testDecision()
             throws ExecutionException, InterruptedException, URISyntaxException
     {
-        Map<String, String> map1 = new AtomicBroadcastMap<String,String>(cluster.getNodes().get( 0 ).newClient( AtomicBroadcast.class ));
-        Map<String, String> map2 = new AtomicBroadcastMap<String,String>(cluster.getNodes().get( 1 ).newClient( AtomicBroadcast.class ));
+        Map<String, String> map1 = new AtomicBroadcastMap<String,String>(cluster.getNodes().get( 0 ).newClient( AtomicBroadcast.class ), cluster.getNodes().get( 0 ).newClient( Snapshot.class ));
+        Map<String, String> map2 = new AtomicBroadcastMap<String,String>(cluster.getNodes().get( 1 ).newClient( AtomicBroadcast.class ), cluster.getNodes().get( 1 ).newClient( Snapshot.class ));
 
         map1.put("foo", "bar");
         network.tickUntilDone();

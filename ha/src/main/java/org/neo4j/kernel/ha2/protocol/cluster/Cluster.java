@@ -28,7 +28,7 @@ import java.util.concurrent.Future;
  */
 public interface Cluster
 {
-    void create();
+    void create(String clusterName);
     Future<ClusterConfiguration> join(URI otherServerUrl);
     void leave();
 

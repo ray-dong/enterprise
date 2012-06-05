@@ -18,22 +18,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.cluster;
-
-import java.net.URI;
+package org.neo4j.kernel.ha2.protocol.snapshot;
 
 /**
- * Listener interface for cluster configuration changes
+ * TODO
  */
-public interface ClusterListener
+public interface Snapshot
 {
-    void enteredCluster(ClusterConfiguration nodes);
-    void joinedCluster(URI node);
-    void leftCluster(URI node);
-    void leftCluster();
-
-/*
-    void enterFailed(Throwable cause);
-    void leaveFailed(Throwable cause);
-*/
+    void setSnapshotProvider(SnapshotProvider snapshotProvider);
+    void refreshSnapshot();
 }

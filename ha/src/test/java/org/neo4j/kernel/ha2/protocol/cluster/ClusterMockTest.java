@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
@@ -45,6 +46,9 @@ import org.neo4j.kernel.ha2.ScriptableNetworkFailureLatencyStrategy;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListenerDeserializer;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastSerializer;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;
 import org.neo4j.kernel.ha2.protocol.heartbeat.Heartbeat;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
@@ -61,7 +65,7 @@ public class ClusterMockTest
 {
     public static NetworkMock DEFAULT_NETWORK()
     {
-        return new NetworkMock( 10, new MultiPaxosServerFactory(new ClusterConfiguration()),
+        return new NetworkMock( 10, new MultiPaxosServerFactory(new ClusterConfiguration("default")),
                                             new MultipleFailureLatencyStrategy( new FixedNetworkLatencyStrategy(10), new ScriptableNetworkFailureLatencyStrategy()),
                                             new MessageTimeoutStrategy(new FixedTimeoutStrategy(800) )
                                                 .timeout( HeartbeatMessage.send_heartbeat, 300 ));
@@ -125,14 +129,14 @@ public class ClusterMockTest
                             logger.getLogger().info( uri+": Alive:" + server );
                         }
                     } );
-            server.newClient( AtomicBroadcast.class ).addAtomicBroadcastListener( new AtomicBroadcastListener()
+            server.newClient( AtomicBroadcast.class ).addAtomicBroadcastListener( new AtomicBroadcastListenerDeserializer( new AtomicBroadcastSerializer(), new AtomicBroadcastListener()
             {
                 @Override
                 public void receive( Object value )
                 {
                     logger.getLogger().info( uri+" received: "+value );
                 }
-            } );
+            } ));
 
             servers.add( server );
             out.add( cluster );
@@ -150,7 +154,7 @@ public class ClusterMockTest
         }
 
         // Let messages settle
-        network.tick( 10 );
+        network.tick( 100 );
         verifyConfigurations();
 
         logger.getLogger().info( "All nodes leave" );
@@ -173,11 +177,10 @@ public class ClusterMockTest
         cluster.addClusterListener( new ClusterListener()
         {
             @Override
-            public void enteredCluster( Iterable<URI> nodes )
+            public void enteredCluster( ClusterConfiguration configuration )
             {
-                logger.getLogger().info( uri + " entered cluster:" + nodes );
-                config.set( new ClusterConfiguration() );
-                config.get().setNodes( nodes );
+                logger.getLogger().info( uri + " entered cluster:" + configuration.getNodes() );
+                config.set( new ClusterConfiguration( configuration ) );
                 in.add( cluster );
             }
 
@@ -255,6 +258,7 @@ public class ClusterMockTest
         }
 
         private Queue<ClusterAction> actions = new LinkedList<ClusterAction>();
+        private AtomicBroadcastSerializer serializer = new AtomicBroadcastSerializer();
 
         private int rounds = 100;
         private long now = 0;
@@ -281,7 +285,7 @@ public class ClusterMockTest
                                         logger.getLogger().info( "Join:"+cluster.toString() );
                                         if (in.isEmpty())
                                         {
-                                            cluster.create();
+                                            cluster.create("default");
                                         } else
                                         {
                                             try
@@ -377,7 +381,14 @@ public class ClusterMockTest
                             public void run()
                             {
                                 AtomicBroadcast broadcast = servers.get( server-1 ).newClient( AtomicBroadcast.class );
-                                broadcast.broadcast( value );
+                                try
+                                {
+                                    broadcast.broadcast( serializer.broadcast( value ) );
+                                }
+                                catch( IOException e )
+                                {
+                                    e.printStackTrace();
+                                }
                             }
                         }, time );
         }
@@ -457,19 +468,23 @@ public class ClusterMockTest
         {
             if( time == 0 )
             {
-                logger.getLogger().info( "Random seed:" + seed );
+                logger.getLogger().info( "Random seed:" + seed+"L" );
             }
 
-            if (random.nextDouble() >= 0.9)
+            if (random.nextDouble() >= 0.8)
             {
-                if (random.nextDouble() > 0.5  && !out.isEmpty())
+                double inOrOut = (in.size()-out.size())/((double)servers.size());
+                double whatToDo = random.nextDouble() + inOrOut;
+                logger.getLogger().info( "What to do:"+whatToDo );
+
+                if (whatToDo < 0.5  && !out.isEmpty())
                 {
                     int idx = random.nextInt( out.size() );
                     Cluster cluster = out.remove( idx );
 
                     if (in.isEmpty())
                     {
-                        cluster.create();
+                        cluster.create("default");
                     } else
                     {
                         try

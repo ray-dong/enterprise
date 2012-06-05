@@ -18,22 +18,19 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.cluster;
+package org.neo4j.kernel.ha2.protocol.snapshot;
 
-import java.net.URI;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 /**
- * Listener interface for cluster configuration changes
+ * Handle snapshot data for cluster state.
  */
-public interface ClusterListener
+public interface SnapshotProvider
 {
-    void enteredCluster(ClusterConfiguration nodes);
-    void joinedCluster(URI node);
-    void leftCluster(URI node);
-    void leftCluster();
-
-/*
-    void enterFailed(Throwable cause);
-    void leaveFailed(Throwable cause);
-*/
+    void getState(ObjectOutputStream output)
+        throws IOException;
+    void setState(ObjectInputStream input)
+        throws IOException, ClassNotFoundException;
 }

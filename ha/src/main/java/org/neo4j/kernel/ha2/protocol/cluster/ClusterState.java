@@ -34,6 +34,7 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
+import org.neo4j.kernel.ha2.protocol.snapshot.SnapshotMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
 
@@ -68,13 +69,15 @@ public enum ClusterState
 
                 case create:
                 {
-                    context.created();
+                    String name = message.getPayload();
+                    context.created(name);
                     outgoing.process( internal( AtomicBroadcastMessage.entered ) );
                     outgoing.process( internal( ProposerMessage.join ) );
                     outgoing.process( internal( AcceptorMessage.join ) );
                     outgoing.process( internal( LearnerMessage.join ) );
 //                    outgoing.process( internal( HeartbeatMessage.join ) );
                     outgoing.process( internal( ElectionMessage.join ) );
+                    outgoing.process( internal( SnapshotMessage.join ) );
                     return entered;
                 }
 
@@ -132,6 +135,7 @@ public enum ClusterState
                         outgoing.process( internal( AcceptorMessage.join ) );
                         outgoing.process( internal( LearnerMessage.join ) );
                         outgoing.process( internal( AtomicBroadcastMessage.entered ) );
+                        outgoing.process( internal( SnapshotMessage.join ) );
                         return entered;
                     }
                 }
@@ -169,6 +173,7 @@ public enum ClusterState
                         context.joined();
                         outgoing.process( internal( AtomicBroadcastMessage.entered ) );
                         outgoing.process( internal( HeartbeatMessage.join ) );
+                        outgoing.process( internal( SnapshotMessage.join ) );
 
                         outgoing.process( internal( ClusterMessage.joinResponse, context.getConfiguration() ) );
                         return entered;
@@ -242,6 +247,7 @@ public enum ClusterState
                         outgoing.process( internal( LearnerMessage.leave ) );
                         outgoing.process( internal( AtomicBroadcastMessage.leave ) );
                         outgoing.process( internal( HeartbeatMessage.leave ) );
+                        outgoing.process( internal( SnapshotMessage.leave ) );
 
                         return start;
 
@@ -286,6 +292,7 @@ public enum ClusterState
                         outgoing.process( internal( LearnerMessage.leave ) );
                         outgoing.process( internal( AtomicBroadcastMessage.leave ) );
                         outgoing.process( internal( HeartbeatMessage.leave ) );
+                        outgoing.process( internal( SnapshotMessage.leave ) );
 
                         return start;
                     } else

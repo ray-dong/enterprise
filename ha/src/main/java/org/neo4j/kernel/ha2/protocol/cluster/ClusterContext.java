@@ -21,8 +21,13 @@
 package org.neo4j.kernel.ha2.protocol.cluster;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Map;
+import java.util.concurrent.Future;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.helpers.Listeners;
+import org.neo4j.kernel.ha2.ConnectedStateMachines;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerContext;
 import org.neo4j.kernel.ha2.protocol.election.ElectionRole;
@@ -44,10 +49,14 @@ public class ClusterContext
     Iterable<ClusterListener> listeners = Listeners.newListeners();
     ProposerContext proposerContext;
     LearnerContext learnerContext;
-    public final ClusterConfiguration configuration;
+    public ClusterConfiguration configuration;
     public final Timeouts timeouts;
 
-    public ClusterContext(ProposerContext proposerContext, LearnerContext learnerContext, ClusterConfiguration configuration, Timeouts timeouts)
+    public ClusterContext( ProposerContext proposerContext,
+                           LearnerContext learnerContext,
+                           ClusterConfiguration configuration,
+                           Timeouts timeouts
+    )
     {
         this.proposerContext = proposerContext;
         this.learnerContext = learnerContext;
@@ -55,20 +64,32 @@ public class ClusterContext
         this.timeouts = timeouts;
     }
 
+    // Cluster API
+    public void addClusterListener(ClusterListener listener)
+    {
+        listeners = Listeners.addListener( listener, listeners );
+    }
+
+    public void removeClusterListener(ClusterListener listener)
+    {
+        listeners = Listeners.removeListener(listener, listeners);
+    }
+
+    // Implementation
     public void joining(URI node)
     {
         joining = node;
     }
 
-    public void created()
+    public void created( String name )
     {
-        configuration.joined( me );
+        configuration = new ClusterConfiguration( name, Collections.singleton(me) );
         Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
         {
             @Override
             public void notify( ClusterListener listener )
             {
-                listener.enteredCluster( configuration.getNodes() );
+                listener.enteredCluster( configuration );
             }
         } );
     }
@@ -87,7 +108,7 @@ public class ClusterContext
             @Override
             public void notify( ClusterListener listener )
             {
-                listener.enteredCluster( configuration.getNodes() );
+                listener.enteredCluster( configuration );
             }
         } );
     }
@@ -144,16 +165,6 @@ public class ClusterContext
     public ClusterConfiguration getConfiguration()
     {
         return configuration;
-    }
-
-    public void addClusterListener(ClusterListener listener)
-    {
-        listeners = Listeners.addListener( listener, listeners );
-    }
-
-    public void removeClusterListener(ClusterListener listener)
-    {
-        listeners = Listeners.removeListener(listener, listeners);
     }
 
     public boolean isMe( URI server )

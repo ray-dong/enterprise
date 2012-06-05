@@ -66,23 +66,26 @@ public class Timeouts
 
     public void tick(long time)
     {
-        // Time has passed
-        now = time;
-
-        timeoutStrategy.tick( now );
-
-        // Check if any timeouts needs to be triggered
-        triggeredTimeouts.clear();
-        for( Map.Entry<Object,Timeout> timeout : timeouts.entrySet() )
+        synchronized(this)
         {
-            if (timeout.getValue().checkTimeout(now))
-                triggeredTimeouts.add( timeout );
-        }
+            // Time has passed
+            now = time;
 
-        // Remove all timeouts that were triggered
-        for( Map.Entry<Object,Timeout> triggeredTimeout : triggeredTimeouts )
-        {
-            timeouts.remove( triggeredTimeout.getKey() );
+            timeoutStrategy.tick( now );
+
+            // Check if any timeouts needs to be triggered
+            triggeredTimeouts.clear();
+            for( Map.Entry<Object,Timeout> timeout : timeouts.entrySet() )
+            {
+                if (timeout.getValue().checkTimeout(now))
+                    triggeredTimeouts.add( timeout );
+            }
+
+            // Remove all timeouts that were triggered
+            for( Map.Entry<Object,Timeout> triggeredTimeout : triggeredTimeouts )
+            {
+                timeouts.remove( triggeredTimeout.getKey() );
+            }
         }
 
         // Trigger timeouts

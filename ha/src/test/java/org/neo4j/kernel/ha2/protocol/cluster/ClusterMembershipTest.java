@@ -123,4 +123,16 @@ public class ClusterMembershipTest
               leave( 20, 1 )
          );
     }
+
+    @Test
+    public void oneNodeCreatesClusterAndThenAnotherJoinsAsFirstLeaves2()
+        throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
+    {
+         testCluster(2, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+              rounds( 100 ).
+              join( 0, 1 ).
+              join( 10, 2 ).
+              leave( 60, 1 )
+         );
+    }
 }

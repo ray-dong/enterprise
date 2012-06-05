@@ -20,11 +20,18 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
+import org.neo4j.kernel.ha2.protocol.snapshot.SnapshotProvider;
+import org.slf4j.LoggerFactory;
 
 /**
  * Map that is synced through an Atomic Broadcast protocol
@@ -36,11 +43,31 @@ public class AtomicBroadcastMap<K,V>
     private AtomicBroadcast atomicBroadcast;
     private volatile MapCommand lastCommand;
     protected final AtomicBroadcastListener atomicBroadcastListener;
+    private final AtomicBroadcastSerializer serializer = new AtomicBroadcastSerializer();
 
-    public AtomicBroadcastMap( AtomicBroadcast atomicBroadcast )
+    public AtomicBroadcastMap( AtomicBroadcast atomicBroadcast, Snapshot snapshot )
     {
+        snapshot.setSnapshotProvider( new SnapshotProvider()
+        {
+            @Override
+            public void getState( ObjectOutputStream output )
+                throws IOException
+            {
+                output.writeObject( new HashMap( map) );
+            }
+
+            @Override
+            public void setState( ObjectInputStream input )
+                throws IOException, ClassNotFoundException
+            {
+                map = new ConcurrentHashMap((Map<K, V>) input.readObject());
+                LoggerFactory.getLogger( getClass() ).info( "Updated snapshot state:" + map );
+            }
+        } );
+
         this.atomicBroadcast = atomicBroadcast;
-        atomicBroadcastListener = new AtomicBroadcastListenerFilter( MapCommand.class, new AtomicBroadcastListener()
+        atomicBroadcastListener = new AtomicBroadcastListenerDeserializer(serializer,
+                                  new AtomicBroadcastListenerFilter( MapCommand.class, new AtomicBroadcastListener()
         {
             @Override
             public void receive( Object value )
@@ -48,7 +75,7 @@ public class AtomicBroadcastMap<K,V>
                 MapCommand command = (MapCommand) value;
                 command.execute( map );
 
-                System.out.println( "Map:"+map );
+                LoggerFactory.getLogger( getClass() ).info( "Map:" + map );
 
                 synchronized( AtomicBroadcastMap.this )
                 {
@@ -59,7 +86,7 @@ public class AtomicBroadcastMap<K,V>
                     }
                 }
             }
-        });
+        }));
         atomicBroadcast.addAtomicBroadcastListener( atomicBroadcastListener );
     }
 
@@ -94,7 +121,7 @@ public class AtomicBroadcastMap<K,V>
     @Override
     public V get( Object key )
     {
-        System.out.println("GET "+(lastCommand != null ? lastCommand.toString() : ""));
+        LoggerFactory.getLogger(getClass()).info( "GET " + ( lastCommand != null ? lastCommand.toString() : "" ) );
         checkUpToDate();
         return map.get( key );
     }
@@ -102,28 +129,56 @@ public class AtomicBroadcastMap<K,V>
     @Override
     public V put( K key, V value )
     {
-        atomicBroadcast.broadcast( lastCommand = new Put( key, value ) );
-        System.out.println("PUT "+lastCommand);
-        return map.get( key );
+        try
+        {
+            atomicBroadcast.broadcast( serializer.broadcast(lastCommand = new Put( key, value ) ));
+            LoggerFactory.getLogger(getClass()).info( "PUT " + lastCommand );
+            return map.get( key );
+        }
+        catch( IOException e )
+        {
+            throw new IllegalStateException( e );
+        }
     }
 
     @Override
     public V remove( Object key )
     {
-        atomicBroadcast.broadcast( lastCommand = new Remove( key ) );
-        return map.get( key );
+        try
+        {
+            atomicBroadcast.broadcast( serializer.broadcast(lastCommand = new Remove( key ) ));
+            return map.get( key );
+        }
+        catch( IOException e )
+        {
+            throw new IllegalStateException( e );
+        }
     }
 
     @Override
     public void putAll( Map<? extends K, ? extends V> m )
     {
-        atomicBroadcast.broadcast( lastCommand = new PutAll( m ) );
+        try
+        {
+            atomicBroadcast.broadcast( serializer.broadcast(lastCommand = new PutAll( m ) ));
+        }
+        catch( IOException e )
+        {
+            throw new IllegalStateException( e );
+        }
     }
 
     @Override
     public void clear()
     {
-        atomicBroadcast.broadcast( lastCommand = new Clear() );
+        try
+        {
+            atomicBroadcast.broadcast( serializer.broadcast( lastCommand = new Clear() ));
+        }
+        catch( IOException e )
+        {
+            throw new IllegalStateException( e );
+        }
     }
 
     @Override
@@ -157,7 +212,7 @@ public class AtomicBroadcastMap<K,V>
     {
         if (lastCommand != null)
         {
-            System.out.println("Wait for command");
+            LoggerFactory.getLogger(getClass()).info( "Wait for command" );
             try
             {
                 this.wait();

@@ -296,11 +296,11 @@ public enum ProposerState
                                 context.proposerContext.bookedInstances.remove( instance.id );
 
                                 // Check if we have anything pending - try to start process for it
-                                if (!context.proposerContext.pendingValues.isEmpty() && context.proposerContext.bookedInstances.size() < 10)
+                                if (!context.proposerContext.pendingValues.isEmpty() && context.proposerContext.bookedInstances.size() < MAX_CONCURRENT_INSTANCES)
                                 {
                                     if (context.learnerContext.lastLearnedInstanceId > context.learnerContext.lastDeliveredInstanceId)
                                     {
-
+                                        LoggerFactory.getLogger( ProposerState.class ).debug( "** WHAT TO DO HERE ***" );
                                     } else
                                     {
                                         Object value = context.proposerContext.pendingValues.remove();
@@ -339,6 +339,8 @@ public enum ProposerState
                 return this;
             }
         };
+
+    public final int MAX_CONCURRENT_INSTANCES = 10;
 
     private static void propose( MultiPaxosContext context, Message message, MessageProcessor outgoing, Object payload, List<URI> acceptors )
     {

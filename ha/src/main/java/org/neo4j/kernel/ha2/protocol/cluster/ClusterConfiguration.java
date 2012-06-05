@@ -38,12 +38,14 @@ import java.util.Map;
  */
 public class ClusterConfiguration
 {
+    private final String name;
     private List<URI> nodes;
     private Map<String, URI> roles = new HashMap<String, URI>();
     private int allowedFailures = 1;
 
-    public ClusterConfiguration(String... nodes)
+    public ClusterConfiguration(String name, String... nodes)
     {
+        this.name = name;
         this.nodes = new ArrayList<URI>();
         for (String node : nodes)
         {
@@ -58,9 +60,16 @@ public class ClusterConfiguration
         }
     }
 
-    public ClusterConfiguration(Collection<URI> nodes)
+    public ClusterConfiguration(String name, Collection<URI> nodes)
     {
+        this.name = name;
         this.nodes = new ArrayList<URI>(nodes);
+    }
+
+    public ClusterConfiguration(ClusterConfiguration copy)
+    {
+        this.name = copy.name;
+        this.nodes = new ArrayList<URI>( copy.nodes );
     }
 
     public void joined( URI nodeUrl )
@@ -95,7 +104,12 @@ public class ClusterConfiguration
 
     public List<URI> getNodes()
     {
-        return Collections.unmodifiableList(nodes);
+        return nodes;
+    }
+
+    public String getName()
+    {
+        return name;
     }
 
     public Map<String, URI> getRoles()

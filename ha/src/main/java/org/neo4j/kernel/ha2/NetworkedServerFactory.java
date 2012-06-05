@@ -27,11 +27,13 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.neo4j.com_2.NetworkNode;
 import org.neo4j.helpers.DaemonThreadFactory;
+import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
+import org.slf4j.LoggerFactory;
 
 /**
  * TODO
@@ -63,6 +65,7 @@ public class NetworkedServerFactory
             public void listeningAt( URI me )
             {
                 protocolServer.listeningAt( me );
+                protocolServer.addStateTransitionListener( new StateTransitionLogger( me.toString(), LoggerFactory.getLogger( StateTransitionLogger.class ) ) );
             }
 
             @Override
@@ -75,7 +78,6 @@ public class NetworkedServerFactory
             {
             }
         } );
-        life.add( protocolServer );
 
         // Timeout timer - triggers every 10 ms
         life.add( new Lifecycle()
@@ -105,10 +107,7 @@ public class NetworkedServerFactory
                         long time = now - previousTime;
                         previousTime = now;
 
-                        synchronized( protocolServer.getTimeouts() )
-                        {
-                            protocolServer.getTimeouts().tick( time );
-                        }
+                        protocolServer.getTimeouts().tick( time );
                     }
                 }, 0, 10, TimeUnit.MILLISECONDS );
             }

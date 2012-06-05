@@ -20,23 +20,33 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.concurrent.BrokenBarrierException;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 
+import java.util.concurrent.Semaphore;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
 import org.neo4j.com_2.NetworkNode;
 import org.neo4j.helpers.collection.MapUtil;
+import org.neo4j.kernel.ha2.BindingListener;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkedServerFactory;
 import org.neo4j.kernel.ha2.ProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
+import org.neo4j.kernel.ha2.protocol.cluster.Cluster;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterAdapter;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterListener;
+import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
+import org.slf4j.LoggerFactory;
 
 /**
  * TODO
@@ -45,41 +55,100 @@ public class MultiPaxosNetworkTest
 {
     @Test
     public void testBroadcast()
-            throws ExecutionException, InterruptedException, URISyntaxException
+        throws ExecutionException, InterruptedException, URISyntaxException, BrokenBarrierException
     {
-        LifeSupport life = new LifeSupport();
+        final LifeSupport life = new LifeSupport();
         NetworkedServerFactory serverFactory = new NetworkedServerFactory( life,
-                new MultiPaxosServerFactory(new ClusterConfiguration("neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
-                new FixedTimeoutStrategy( 10000 ), StringLogger.SYSTEM );
+                new MultiPaxosServerFactory(new ClusterConfiguration("default", "neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
+                new FixedTimeoutStrategy( 2000 ), StringLogger.SYSTEM );
 
-        ProtocolServer server1 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5001") );
-        ProtocolServer server2 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5002") );
-        ProtocolServer server3 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5003") );
+        final ProtocolServer server1 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5001") );
+        final ProtocolServer server2 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5002") );
+        final ProtocolServer server3 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5003") );
 
-        life.start();
+        server1.addBindingListener( new BindingListener()
+        {
+            @Override
+            public void listeningAt( URI me )
+            {
+                server1.newClient( Cluster.class ).create( "default" );
+            }
+        } );
+
+        server2.addBindingListener( new BindingListener()
+        {
+            @Override
+            public void listeningAt( URI me )
+            {
+                server2.newClient( Cluster.class ).join( server1.getServerId() );
+            }
+        } );
 
         AtomicBroadcast atomicBroadcast1 = server1.newClient( AtomicBroadcast.class );
         AtomicBroadcast atomicBroadcast2 = server2.newClient( AtomicBroadcast.class );
         AtomicBroadcast atomicBroadcast3 = server3.newClient( AtomicBroadcast.class );
+        Snapshot snapshot1 = server1.newClient( Snapshot.class );
+        Snapshot snapshot2 = server2.newClient( Snapshot.class );
+        Snapshot snapshot3 = server3.newClient( Snapshot.class );
 
-        AtomicBroadcastMap<String,String> map = new AtomicBroadcastMap<String,String>( atomicBroadcast1 );
-        AtomicBroadcastMap<String,String> map2 = new AtomicBroadcastMap<String,String>( atomicBroadcast2 );
+        final AtomicBroadcastMap<String,String> map = new AtomicBroadcastMap<String,String>( atomicBroadcast1, snapshot1 );
+        final AtomicBroadcastMap<String,String> map2 = new AtomicBroadcastMap<String,String>( atomicBroadcast2, snapshot2 );
+        final AtomicBroadcastMap<String,String> map3 = new AtomicBroadcastMap<String,String>( atomicBroadcast3, snapshot3 );
 
-        for (int i = 0; i < 10; i++ )
+        final Semaphore semaphore = new Semaphore(0 );
+
+        server2.newClient( Cluster.class ).addClusterListener( new ClusterAdapter()
+        {
+            @Override
+            public void enteredCluster( ClusterConfiguration nodes )
+            {
+                semaphore.release();
+            }
+        } );
+
+        life.start();
+
+        semaphore.acquire( );
+
+        Thread.sleep( 10000 );
+
+        LoggerFactory.getLogger(getClass()).info( "Joined cluster - set data" );
+
+        for (int i = 0; i < 100; i++ )
         {
             map.put( "foo" + i, "bar" + i );
         }
 
-        System.out.println( "Set all values" );
+        LoggerFactory.getLogger(getClass()).info( "Set all values" );
 
         String value = map.get( "foo1");
-        System.out.println( "Read value" );
+
+
+        LoggerFactory.getLogger(getClass()).info( "3 joins 1" );
+        server3.newClient( Cluster.class ).addClusterListener( new ClusterAdapter()
+        {
+            @Override
+            public void enteredCluster( ClusterConfiguration nodes )
+            {
+                semaphore.release();
+            }
+        } );
+        server3.newClient( Cluster.class ).join( server1.getServerId() );
+        semaphore.acquire(  );
+
+        LoggerFactory.getLogger(getClass()).info( "Read value1" );
         Assert.assertThat(value, CoreMatchers.equalTo( "bar1" ));
 
-        System.out.println( "Read value:"+map2.get("foo1") );
+        map2.put( "foo2","666" );
+
+        LoggerFactory.getLogger(getClass()).info( "Read value2:"+map2.get("foo1") );
+        LoggerFactory.getLogger(getClass()).info( "Read value3:"+map2.get("foo2") );
+
+        LoggerFactory.getLogger(getClass()).info( "Read value4:"+map3.get("foo1") );
 
         map.close();
 
         life.stop();
+
     }
 }

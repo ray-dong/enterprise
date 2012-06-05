@@ -82,14 +82,14 @@ public enum LearnerState
                         if (learnState.getInstanceId().equals( new InstanceId( context.learnerContext.lastDeliveredInstanceId +1) ))
                         {
                             instance.delivered();
-                            outgoing.process(Message.internal(AtomicBroadcastMessage.receive, learnState.getValue()));
+                            outgoing.process(Message.internal(AtomicBroadcastMessage.broadcastResponse, learnState.getValue()));
                             context.learnerContext.lastDeliveredInstanceId = learnState.getInstanceId().getId();
 
                             long instanceId = learnState.getInstanceId().getId()+1;
                             while ((instance = context.getPaxosInstances().getPaxosInstance( new InstanceId( instanceId ) )).isState( PaxosInstance.State.closed ))
                             {
                                 instance.delivered();
-                                outgoing.process(Message.internal(AtomicBroadcastMessage.receive, instance.value_2));
+                                outgoing.process(Message.internal(AtomicBroadcastMessage.broadcastResponse, instance.value_2));
                                 context.learnerContext.lastDeliveredInstanceId = instance.id.getId();
 
                                 instanceId++;

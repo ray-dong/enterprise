@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 
 /**
@@ -41,7 +42,7 @@ public class AtomicBroadcastContext
         listeners = Listeners.removeListener( listener, listeners );
     }
 
-    public void receive( final Object value )
+    public void receive( final Payload value )
     {
         Listeners.notifyListeners( listeners, new Listeners.Notification<AtomicBroadcastListener>()
                 {
