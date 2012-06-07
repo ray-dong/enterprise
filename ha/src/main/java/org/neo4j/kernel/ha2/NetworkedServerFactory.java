@@ -26,7 +26,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.neo4j.com_2.NetworkNodeTCP;
-import org.neo4j.com_2.NetworkNodeUDP;
 import org.neo4j.helpers.DaemonThreadFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;

@@ -20,7 +20,6 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
 
 /**

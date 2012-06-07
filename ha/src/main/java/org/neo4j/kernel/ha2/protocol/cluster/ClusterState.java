@@ -23,18 +23,11 @@ package org.neo4j.kernel.ha2.protocol.cluster;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
-
 import java.util.concurrent.TimeoutException;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
-import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
-import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
-import org.neo4j.kernel.ha2.protocol.snapshot.SnapshotMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
 
@@ -70,7 +63,7 @@ public enum ClusterState
                 case create:
                 {
                     String name = message.getPayload();
-                    context.created(name);
+                    context.created( name );
                     return entered;
                 }
 

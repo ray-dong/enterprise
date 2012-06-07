@@ -23,7 +23,6 @@ package org.neo4j.kernel.ha2;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
-import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 /**
  * TODO

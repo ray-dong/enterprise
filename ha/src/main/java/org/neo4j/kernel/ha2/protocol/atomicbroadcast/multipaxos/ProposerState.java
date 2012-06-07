@@ -20,14 +20,13 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
-
-import java.net.URI;
 import org.slf4j.LoggerFactory;
 
 /**

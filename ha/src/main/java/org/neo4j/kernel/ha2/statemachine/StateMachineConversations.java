@@ -20,9 +20,8 @@
 
 package org.neo4j.kernel.ha2.statemachine;
 
-import org.neo4j.kernel.ha2.BindingListener;
-
 import java.net.URI;
+import org.neo4j.kernel.ha2.BindingListener;
 
 /**
  * Generate id's for state machine conversations. This should be shared between all state machines in a server.

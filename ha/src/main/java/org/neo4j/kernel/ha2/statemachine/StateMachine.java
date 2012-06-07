@@ -22,7 +22,6 @@ package org.neo4j.kernel.ha2.statemachine;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageType;

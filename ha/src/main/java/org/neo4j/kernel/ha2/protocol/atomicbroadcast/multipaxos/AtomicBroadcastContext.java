@@ -23,7 +23,6 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;
-import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 
 /**
  * Context shared by all Paxos state machines.

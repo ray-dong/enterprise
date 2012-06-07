@@ -20,11 +20,10 @@
 
 package org.neo4j.kernel.ha2.timeout;
 
-import org.neo4j.com_2.message.Message;
-import org.neo4j.com_2.message.MessageType;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageType;
 
 /**
  * Created with IntelliJ IDEA.

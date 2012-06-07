@@ -20,21 +20,14 @@
 
 package org.neo4j.kernel.ha2.protocol.cluster;
 
-import java.util.ArrayList;
+import java.net.URI;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Future;
-import org.neo4j.com_2.message.Message;
-import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.helpers.Listeners;
-import org.neo4j.kernel.ha2.ConnectedStateMachines;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerContext;
-import org.neo4j.kernel.ha2.protocol.election.ElectionRole;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-
-import java.net.URI;
-import java.util.List;
 import org.slf4j.LoggerFactory;
 
 /**

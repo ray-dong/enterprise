@@ -23,7 +23,6 @@ package org.neo4j.kernel.ha2.protocol.heartbeat;
 import java.net.URI;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
-import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +108,9 @@ public enum HeartbeatState
                         for( URI aliveServer : context.getAlive() )
                         {
                             if (!aliveServer.equals( context.getClusterContext().getMe() ))
-                                outgoing.process( Message.to( HeartbeatMessage.suspicions, aliveServer, new HeartbeatMessage.SuspicionsState(context.getSuspicionsFor( context.getClusterContext().getMe() )) ) );
+                                outgoing.process( Message.to( HeartbeatMessage.suspicions, aliveServer, new HeartbeatMessage.SuspicionsState(context.getSuspicionsFor( context
+                                                                                                                                                                           .getClusterContext()
+                                                                                                                                                                           .getMe() )) ) );
                         }
 
                     } else
