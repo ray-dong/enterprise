@@ -39,7 +39,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.neo4j.com_2.NetworkNode;
+import org.neo4j.com_2.NetworkNodeUDP;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
@@ -150,7 +150,8 @@ public class ClusterNetworkTest
 
             NetworkedServerFactory factory = new NetworkedServerFactory( life, new MultiPaxosServerFactory(  ), new FixedTimeoutStrategy( 1000 ), logbackService.getLogger( "neo4j.ha" ) );
 
-            ProtocolServer server = factory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_address.name(), uri.getHost(), NetworkNode.cluster_port.name(), uri.getPort()+"" ) );
+            ProtocolServer server = factory.newNetworkedServer( MapUtil.stringMap( NetworkNodeUDP.cluster_address.name(), uri.getHost(), NetworkNodeUDP
+                .cluster_port.name(), uri.getPort()+"" ) );
             final Cluster cluster2 = server.newClient( Cluster.class );
             final AtomicReference<ClusterConfiguration> config2 = clusterStateListener( uri, cluster2 );
 
@@ -215,7 +216,7 @@ public class ClusterNetworkTest
             public void enteredCluster( ClusterConfiguration configuration )
             {
                 logger.getLogger().info( uri + " entered cluster:" + configuration.getNodes() );
-                config.set( new ClusterConfiguration(configuration) );
+                config.set( new ClusterConfiguration( configuration ) );
                 in.add( cluster );
             }
 

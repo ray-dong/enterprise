@@ -26,7 +26,7 @@ import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
 
 /**
- * TODO
+ * State machine for the snapshot API
  */
 public enum SnapshotState
     implements State<SnapshotContext, SnapshotMessage>
@@ -58,7 +58,7 @@ public enum SnapshotState
 
                 case join:
                 {
-                    if (context.getClusterContext().isMe( context.getClusterContext().getConfiguration().getNodes().get( 0 ) ))
+                    if (context.getClusterContext().isMe( context.getClusterContext().getConfiguration().getNodes().get( 0 ) ) || context.getSnapshotProvider() == null)
                     {
                         return ready;
                     } else

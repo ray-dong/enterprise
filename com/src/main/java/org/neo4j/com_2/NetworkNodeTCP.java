@@ -29,9 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-
 import org.jboss.netty.bootstrap.ClientBootstrap;
-import org.jboss.netty.bootstrap.ConnectionlessBootstrap;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.Channel;
 import org.jboss.netty.channel.ChannelException;
@@ -42,16 +40,12 @@ import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.ExceptionEvent;
-import org.jboss.netty.channel.FixedReceiveBufferSizePredictorFactory;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.group.ChannelGroup;
 import org.jboss.netty.channel.group.DefaultChannelGroup;
-import org.jboss.netty.channel.socket.DatagramChannel;
-import org.jboss.netty.channel.socket.DatagramChannelFactory;
 import org.jboss.netty.channel.socket.ServerSocketChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioClientSocketChannelFactory;
-import org.jboss.netty.channel.socket.nio.NioDatagramChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.jboss.netty.handler.codec.serialization.ObjectDecoder;
 import org.jboss.netty.handler.codec.serialization.ObjectEncoder;
@@ -61,43 +55,48 @@ import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
+import org.neo4j.graphdb.factory.Default;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 
 /**
- * TODO
+ * TCP version of a Networked Node. This handles receiving messages to be consumed by local statemachines and sending outgoing messages
  */
-public class NetworkNode
+public class NetworkNodeTCP
     implements MessageProcessor, MessageSource, Lifecycle
 {
-    public static final GraphDatabaseSetting.PortSetting cluster_port = new GraphDatabaseSetting.PortSetting( "ha.cluster_port" );
-    public static final GraphDatabaseSetting.StringSetting cluster_address = new GraphDatabaseSetting.StringSetting( "ha.cluster_address", GraphDatabaseSetting.ANY, "Must be a valid hostname" );
-    protected ConnectionlessBootstrap bootstrap;
-
-    public interface Configuration
+    public static class Configuration
     {
-        String address(String def);
-        int[] port(int[] defaultPortRange, int min, int max);
+        @Default("5001")
+        public static final GraphDatabaseSetting.PortSetting cluster_port = new GraphDatabaseSetting.PortSetting( "ha.cluster_port" );
+
+        @Default("localhost")
+        public static final GraphDatabaseSetting.StringSetting cluster_address = new GraphDatabaseSetting.StringSetting( "ha.cluster_address", GraphDatabaseSetting.ANY, "Must be a valid hostname" );
     }
 
     public interface ChannelFactory
     {
         Channel openChannel(URI uri);
     }
-    
+
     public interface NetworkChannelsListener
     {
         void listeningAt(URI me);
         void channelOpened(URI to);
         void channelClosed(URI to);
     }
-    
+
     // Receiving
     private ExecutorService executor;
+    private ServerBootstrap serverBootstrap;
     private Channel channel;
     private Iterable<MessageProcessor> processors = Listeners.newListeners();
+
+    // Sending
+    private ClientBootstrap clientBootstrap;
+    private DefaultChannelFactory channelFactory;
 
     private Map<String,String> config;
     private StringLogger msgLog;
@@ -106,9 +105,7 @@ public class NetworkNode
     private Map<URI, Channel> connections = new ConcurrentHashMap<URI, Channel>();
     private Iterable<NetworkChannelsListener> listeners = Listeners.newListeners();
 
-    ChannelGroup channelGroup = new DefaultChannelGroup();
-
-    public NetworkNode( Map<String,String> config, StringLogger msgLog )
+    public NetworkNodeTCP( Map<String,String> config, StringLogger msgLog )
     {
         this.config = config;
         this.msgLog = msgLog;
@@ -118,24 +115,24 @@ public class NetworkNode
     public void init()
         throws Throwable
     {
+        channelFactory = new DefaultChannelFactory();
         executor = Executors.newCachedThreadPool();
-        DatagramChannelFactory f = new NioDatagramChannelFactory( executor );
 
-        bootstrap = new ConnectionlessBootstrap(f);
+        // Listen for incoming connections
+        ServerSocketChannelFactory channelFactory = new NioServerSocketChannelFactory(
+                executor, executor, 3 );
+        serverBootstrap = new ServerBootstrap( channelFactory );
+        serverBootstrap.setPipelineFactory(new NetworkNodePipelineFactory());
 
-        // Configure the pipeline factory.
-        bootstrap.setPipelineFactory( new NetworkNodePipelineFactory() );
+        int[] ports = Configuration.cluster_port.getPorts( config );
 
-        // Enable broadcast
-        bootstrap.setOption( "broadcast", "true" );
-
-        bootstrap.setOption( "receiveBufferSizePredictorFactory", new FixedReceiveBufferSizePredictorFactory( 1024 ) );
-
-        int[] ports = cluster_port.getPorts( config );
-        
         int minPort = ports[0];
         int maxPort = ports.length == 2 ? ports[1] : minPort;
-        
+
+        // Start client bootstrap
+        clientBootstrap = new ClientBootstrap( new NioClientSocketChannelFactory(executor, executor) );
+        clientBootstrap.setPipelineFactory(new NetworkNodePipelineFactory());
+
         // Try all ports in the given range
         listen( minPort, maxPort );
     }
@@ -148,11 +145,11 @@ public class NetworkNode
         {
             try
             {
-                channel = bootstrap.bind(new InetSocketAddress("localhost", checkPort));
-
+                channel = serverBootstrap.bind(new InetSocketAddress(Configuration.cluster_address.getString( config ), checkPort));
                 listeningAt( ( getURI( (InetSocketAddress) channel.getLocalAddress() ) ) );
 
-                channelGroup = new DefaultChannelGroup();
+
+                ChannelGroup channelGroup = new DefaultChannelGroup();
                 channelGroup.add(channel);
                 return;
             }
@@ -183,8 +180,10 @@ public class NetworkNode
         throws Throwable
     {
         channel.close();
-
-        channelGroup.close();
+        for( Channel channel1 : connections.values() )
+        {
+            channel1.close();
+        }
     }
 
     // MessageSource implementation
@@ -204,7 +203,6 @@ public class NetworkNode
             catch( Exception e )
             {
                 // Ignore
-                e.printStackTrace(  );
             }
         }
     }
@@ -233,13 +231,13 @@ public class NetworkNode
             receive(message);
         }
     }
-    
-    
+
+
     private URI getURI(InetSocketAddress address) throws URISyntaxException
     {
         return new URI("neo4j:/" + address);
     }
-    
+
     public void listeningAt( final URI me)
     {
         this.me = me;
@@ -280,10 +278,25 @@ public class NetworkNode
             msgLog.logMessage("Not valid URI:" + message.getHeader( Message.TO ), true);
         }
 
+        Channel channel = getChannel(to);
+
         try
         {
-            msgLog.logMessage("Sending to "+to+": "+message, true);
-            channel.write( message, new InetSocketAddress( to.getHost(), to.getPort() ) );
+            if (channel == null)
+            {
+                channel = channelFactory.openChannel(to);
+                openedChannel(to, channel);
+            }
+        } catch (Exception e)
+        {
+            msgLog.logMessage("Could not connect to:" + to, true);
+            return;
+        }
+
+        try
+        {
+//            msgLog.logMessage("Sending to "+to+": "+message, true);
+            channel.write(message);
         } catch (Exception e)
         {
             e.printStackTrace();
@@ -331,7 +344,7 @@ public class NetworkNode
     {
         return connections.get(uri);
     }
-    
+
     public void addNetworkChannelsListener(NetworkChannelsListener listener)
     {
         listeners = Listeners.addListener( listener, listeners );
@@ -341,6 +354,36 @@ public class NetworkNode
     {
         listeners = Listeners.removeListener( listener, listeners );
     }
+
+    private class DefaultChannelFactory implements ChannelFactory
+    {
+        @Override
+        public Channel openChannel(URI neo4jUri)
+        {
+            SocketAddress address = new InetSocketAddress(neo4jUri.getHost(), neo4jUri.getPort());
+
+            ChannelFuture channelFuture = clientBootstrap.connect( address );
+//            channelFuture.awaitUninterruptibly( 5, TimeUnit.SECONDS );
+
+            try
+            {
+                if ( channelFuture.await(5, TimeUnit.SECONDS) && channelFuture.getChannel().isConnected())
+                {
+                    msgLog.logMessage( me+" opened a new channel to " + address, true );
+                    return channelFuture.getChannel();
+                }
+
+                String msg = "Client could not connect to " + address;
+                throw new ComException(msg);
+            }
+            catch ( InterruptedException e )
+            {
+                msgLog.logMessage( "Interrupted", e );
+                throw new ComException(e);
+            }
+        }
+    }
+
     private class NetworkNodePipelineFactory
         implements ChannelPipelineFactory
     {
@@ -357,11 +400,11 @@ public class NetworkNode
         private void addSerialization(ChannelPipeline pipeline, int frameLength)
         {
             pipeline.addLast( "frameDecoder",
-                    new ObjectDecoder(frameLength, NetworkNodePipelineFactory.this.getClass().getClassLoader() ) );
-            pipeline.addLast( "frameEncoder", new ObjectEncoder(1024 * 1000));
+                    new ObjectDecoder(1024*1000, NetworkNodePipelineFactory.this.getClass().getClassLoader() ) );
+            pipeline.addLast( "frameEncoder", new ObjectEncoder());
         }
     }
-    
+
     private class MessageReceiver
             extends SimpleChannelHandler
     {
@@ -376,7 +419,7 @@ public class NetworkNode
         public void messageReceived(ChannelHandlerContext ctx, MessageEvent event) throws Exception
         {
             final Message message = (Message) event.getMessage();
-            msgLog.logMessage("Received:" + message, true);
+//            msgLog.logMessage("Received:" + message, true);
             executor.submit( new Runnable()
             {
                 @Override

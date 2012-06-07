@@ -18,12 +18,29 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.com_2;
+package org.neo4j.kernel.ha2.protocol.heartbeat;
+
+import java.net.URI;
+import org.neo4j.com_2.message.Message;
+import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterAdapter;
 
 /**
- * TODO
+ * When a node joins a cluster, setup a heartbeat for it
  */
-public interface NetworkMessageListener
+public class HeartbeatJoinListener
+    extends ClusterAdapter
 {
-    void received(Object message);
+    private MessageProcessor outgoing;
+
+    public HeartbeatJoinListener( MessageProcessor outgoing )
+    {
+        this.outgoing = outgoing;
+    }
+
+    @Override
+    public void joinedCluster( URI node )
+    {
+        outgoing.process( Message.internal(HeartbeatMessage.reset_send_heartbeat, node) );
+    }
 }

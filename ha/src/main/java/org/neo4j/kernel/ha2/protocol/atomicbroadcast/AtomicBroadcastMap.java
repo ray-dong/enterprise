@@ -75,7 +75,7 @@ public class AtomicBroadcastMap<K,V>
                 MapCommand command = (MapCommand) value;
                 command.execute( map );
 
-                LoggerFactory.getLogger( getClass() ).info( "Map:" + map );
+        LoggerFactory.getLogger( getClass() ).info(  "Map:"+map );
 
                 synchronized( AtomicBroadcastMap.this )
                 {
@@ -121,7 +121,7 @@ public class AtomicBroadcastMap<K,V>
     @Override
     public V get( Object key )
     {
-        LoggerFactory.getLogger(getClass()).info( "GET " + ( lastCommand != null ? lastCommand.toString() : "" ) );
+        LoggerFactory.getLogger(getClass()).info( "GET "+(lastCommand != null ? lastCommand.toString () : ""));
         checkUpToDate();
         return map.get( key );
     }
@@ -132,7 +132,7 @@ public class AtomicBroadcastMap<K,V>
         try
         {
             atomicBroadcast.broadcast( serializer.broadcast(lastCommand = new Put( key, value ) ));
-            LoggerFactory.getLogger(getClass()).info( "PUT " + lastCommand );
+            LoggerFactory.getLogger(getClass()).info("PUT "+lastCommand);
             return map.get( key );
         }
         catch( IOException e )
@@ -212,7 +212,7 @@ public class AtomicBroadcastMap<K,V>
     {
         if (lastCommand != null)
         {
-            LoggerFactory.getLogger(getClass()).info( "Wait for command" );
+            LoggerFactory.getLogger(getClass()).info("Wait for  command");
             try
             {
                 this.wait();

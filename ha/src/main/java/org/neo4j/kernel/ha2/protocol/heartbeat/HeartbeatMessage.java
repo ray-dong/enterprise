@@ -23,6 +23,8 @@ package org.neo4j.kernel.ha2.protocol.heartbeat;
 import java.io.Serializable;
 
 import java.net.URI;
+import java.util.List;
+import java.util.Set;
 import org.neo4j.com_2.message.MessageType;
 
 /**
@@ -33,7 +35,7 @@ public enum HeartbeatMessage
 {
     addHeartbeatListener,removeHeartbeatListener,
     join,leave,
-    i_am_alive,timed_out,send_heartbeat,reset_send_heartbeat;
+    i_am_alive,timed_out,send_heartbeat,reset_send_heartbeat, suspicions;
 
     public static class IAmAliveState
         implements Serializable
@@ -48,6 +50,22 @@ public enum HeartbeatMessage
         public URI getServer()
         {
             return server;
+        }
+    }
+
+    public static class SuspicionsState
+        implements Serializable
+    {
+        private Set<URI> suspicions;
+
+        public SuspicionsState( Set<URI> suspicions )
+        {
+            this.suspicions = suspicions;
+        }
+
+        public Set<URI> getSuspicions()
+        {
+            return suspicions;
         }
     }
 }

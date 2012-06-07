@@ -49,10 +49,10 @@ public class NetworkSendReceiveTest
 
         Server server1;
         {
-            life.add(server1 = new Server( MapUtil.stringMap( NetworkNode.cluster_port.name(), "1234" ) ));
+            life.add(server1 = new Server( MapUtil.stringMap( NetworkNodeUDP.cluster_port.name(), "1234" ) ));
         }
         {
-            life.add(new Server( MapUtil.stringMap( NetworkNode.cluster_port.name(), "1235" ) ));
+            life.add(new Server( MapUtil.stringMap( NetworkNodeUDP.cluster_port.name(), "1235" ) ));
         }
         
         life.start();
@@ -74,13 +74,13 @@ public class NetworkSendReceiveTest
         implements Lifecycle, MessageProcessor
     {
 
-        protected NetworkNode node;
+        protected NetworkNodeUDP node;
 
         private final LifeSupport life = new LifeSupport();
         
         private Server( Map<String,String> config )
         {
-            node = new NetworkNode(config, StringLogger.SYSTEM);
+            node = new NetworkNodeUDP(config, StringLogger.SYSTEM);
 
             life.add( node );
             life.add(new LifecycleAdapter()

@@ -50,14 +50,14 @@ public class ClusterHeartbeatTest
         throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
     {
          testCluster(3, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
-             rounds( 200 ).
+             rounds( 250 ).
              join( 100, 1 ).
              join( 100,2 ).
              join( 100,3 ).
              down( 500, 3).
              message( 1000, "*** Should have seen failure by now" ).
              up(0, 3).
-             message( 150, "*** Should have recovered by now" ).
+             message( 200, "*** Should have recovered by now" ).
              leave(200, 1).
              leave(200, 2).
              leave(200, 3));

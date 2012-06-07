@@ -24,8 +24,10 @@ import java.net.URI;
 
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
+import org.neo4j.kernel.ha2.protocol.cluster.Cluster;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatIAmAliveProcessor;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatJoinListener;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatRefreshProcessor;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatState;
@@ -53,10 +55,12 @@ import org.neo4j.kernel.ha2.protocol.snapshot.SnapshotContext;
 import org.neo4j.kernel.ha2.protocol.snapshot.SnapshotMessage;
 import org.neo4j.kernel.ha2.protocol.snapshot.SnapshotState;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
+import org.neo4j.kernel.ha2.statemachine.StateMachineRules;
 import org.neo4j.kernel.ha2.timeout.LatencyCalculator;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 
+import static org.neo4j.com_2.message.Message.internal;
 import static org.neo4j.helpers.collection.Iterables.iterable;
 
 /**
@@ -86,11 +90,6 @@ public class MultiPaxosServerFactory
         ConnectedStateMachines connectedStateMachines = new ConnectedStateMachines( input, output, latencyCalculator );
         Timeouts timeouts = connectedStateMachines.getTimeouts();
         connectedStateMachines.addMessageProcessor( latencyCalculator );
-
-/*
-        connectedStateMachines.addMessageProcessor( new HeartbeatRefreshProcessor( connectedStateMachines.getOutgoing() ) );
-        input.addMessageProcessor( new HeartbeatIAmAliveProcessor( connectedStateMachines.getOutgoing() ) );
-*/
 
         LearnerContext learnerContext = new LearnerContext();
         ProposerContext proposerContext = new ProposerContext();
@@ -122,6 +121,65 @@ public class MultiPaxosServerFactory
                 clusterContext.setMe( me );
             }
         } );
+
+        connectedStateMachines.addMessageProcessor( new HeartbeatRefreshProcessor( connectedStateMachines.getOutgoing() ) );
+        input.addMessageProcessor( new HeartbeatIAmAliveProcessor( connectedStateMachines.getOutgoing() ) );
+        server.newClient( Cluster.class ).addClusterListener( new HeartbeatJoinListener(connectedStateMachines.getOutgoing()));
+
+        StateMachineRules rules = new StateMachineRules( connectedStateMachines.getOutgoing() )
+           .rule( ClusterState.start, ClusterMessage.create, ClusterState.entered,
+                  internal( AtomicBroadcastMessage.entered ),
+                  internal( ProposerMessage.join ),
+                  internal( AcceptorMessage.join ),
+                  internal( LearnerMessage.join ),
+                  internal( HeartbeatMessage.join ),
+                  internal( ElectionMessage.join ),
+                  internal( SnapshotMessage.join ) )
+
+           .rule( ClusterState.acquiringConfiguration, ClusterMessage.configurationResponse, ClusterState.joining,
+                  internal( AcceptorMessage.join ),
+                  internal( LearnerMessage.join ),
+                  internal( AtomicBroadcastMessage.join ) )
+
+           .rule( ClusterState.acquiringConfiguration, ClusterMessage.configurationResponse, ClusterState.entered,
+                  internal( AtomicBroadcastMessage.entered ),
+                  internal( AcceptorMessage.join ),
+                  internal( LearnerMessage.join ),
+                  internal( HeartbeatMessage.join ),
+                  internal( SnapshotMessage.join ) )
+
+           .rule( ClusterState.joining, ClusterMessage.configurationChanged, ClusterState.entered,
+                  internal( AtomicBroadcastMessage.entered ),
+                  internal( AcceptorMessage.join ),
+                  internal( LearnerMessage.join ),
+                  internal( HeartbeatMessage.join ),
+                  internal( SnapshotMessage.join ) )
+
+           .rule( ClusterState.joining, ClusterMessage.joinFailure, ClusterState.start,
+                  internal( AtomicBroadcastMessage.leave ),
+                  internal( AcceptorMessage.leave ),
+                  internal( LearnerMessage.leave ),
+                  internal( ProposerMessage.leave ))
+
+           .rule( ClusterState.entered, ClusterMessage.leave, ClusterState.start,
+                  internal( AtomicBroadcastMessage.leave ),
+                  internal( AcceptorMessage.leave ),
+                  internal( LearnerMessage.leave ),
+                  internal( HeartbeatMessage.leave ),
+                  internal( SnapshotMessage.leave ),
+                  internal( ProposerMessage.leave ))
+
+           .rule( ClusterState.leaving, ClusterMessage.configurationChanged, ClusterState.start,
+                  internal( AtomicBroadcastMessage.leave ),
+                  internal( AcceptorMessage.leave ),
+                  internal( LearnerMessage.leave ),
+                  internal( HeartbeatMessage.leave ),
+                  internal( SnapshotMessage.leave ),
+                  internal( ProposerMessage.leave ));
+
+
+
+        connectedStateMachines.addStateTransitionListener(rules);
 
         return server;
     }

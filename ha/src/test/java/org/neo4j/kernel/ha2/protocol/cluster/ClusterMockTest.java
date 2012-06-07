@@ -67,8 +67,8 @@ public class ClusterMockTest
     {
         return new NetworkMock( 10, new MultiPaxosServerFactory(new ClusterConfiguration("default")),
                                             new MultipleFailureLatencyStrategy( new FixedNetworkLatencyStrategy(10), new ScriptableNetworkFailureLatencyStrategy()),
-                                            new MessageTimeoutStrategy(new FixedTimeoutStrategy(800) )
-                                                .timeout( HeartbeatMessage.send_heartbeat, 300 ));
+                                            new MessageTimeoutStrategy(new FixedTimeoutStrategy(500) )
+                                                .timeout( HeartbeatMessage.send_heartbeat, 200 ));
     }
 
     List<TestProtocolServer> servers = new ArrayList<TestProtocolServer>(  );

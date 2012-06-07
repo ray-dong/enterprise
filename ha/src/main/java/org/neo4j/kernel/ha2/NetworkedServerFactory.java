@@ -25,11 +25,11 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.neo4j.com_2.NetworkNode;
+import org.neo4j.com_2.NetworkNodeTCP;
+import org.neo4j.com_2.NetworkNodeUDP;
 import org.neo4j.helpers.DaemonThreadFactory;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
-import org.neo4j.kernel.ha2.timeout.Timeouts;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
@@ -55,11 +55,11 @@ public class NetworkedServerFactory
 
     public ProtocolServer newNetworkedServer(final Map<String, String> configuration)
     {
-        final NetworkNode node = new NetworkNode( configuration, logger );
+        final NetworkNodeTCP node = new NetworkNodeTCP( configuration, logger );
         life.add( node );
 
         final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeoutStrategy, node, node);
-        node.addNetworkChannelsListener( new NetworkNode.NetworkChannelsListener()
+        node.addNetworkChannelsListener( new NetworkNodeTCP.NetworkChannelsListener()
         {
             @Override
             public void listeningAt( URI me )

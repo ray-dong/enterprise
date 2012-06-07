@@ -71,13 +71,6 @@ public enum ClusterState
                 {
                     String name = message.getPayload();
                     context.created(name);
-                    outgoing.process( internal( AtomicBroadcastMessage.entered ) );
-                    outgoing.process( internal( ProposerMessage.join ) );
-                    outgoing.process( internal( AcceptorMessage.join ) );
-                    outgoing.process( internal( LearnerMessage.join ) );
-//                    outgoing.process( internal( HeartbeatMessage.join ) );
-                    outgoing.process( internal( ElectionMessage.join ) );
-                    outgoing.process( internal( SnapshotMessage.join ) );
                     return entered;
                 }
 
@@ -121,9 +114,6 @@ public enum ClusterState
                         ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState();
                         newState.join( context.me );
 
-                        outgoing.process( internal( AcceptorMessage.join ) );
-                        outgoing.process( internal( LearnerMessage.join ) );
-                        outgoing.process( internal( AtomicBroadcastMessage.join ) );
                         outgoing.process( internal( ProposerMessage.propose, newState ));
 
                         // TODO timeout this
@@ -132,10 +122,6 @@ public enum ClusterState
                     } else
                     {
                         // TODO Already in, go to joined state
-                        outgoing.process( internal( AcceptorMessage.join ) );
-                        outgoing.process( internal( LearnerMessage.join ) );
-                        outgoing.process( internal( AtomicBroadcastMessage.entered ) );
-                        outgoing.process( internal( SnapshotMessage.join ) );
                         return entered;
                     }
                 }
@@ -171,10 +157,6 @@ public enum ClusterState
                     if (context.getMe().equals( state.getJoin() ))
                     {
                         context.joined();
-                        outgoing.process( internal( AtomicBroadcastMessage.entered ) );
-                        outgoing.process( internal( HeartbeatMessage.join ) );
-                        outgoing.process( internal( SnapshotMessage.join ) );
-
                         outgoing.process( internal( ClusterMessage.joinResponse, context.getConfiguration() ) );
                         return entered;
                     } else
@@ -186,11 +168,6 @@ public enum ClusterState
 
                 case joinFailure:
                 {
-                    outgoing.process( internal( AcceptorMessage.leave ) );
-                    outgoing.process( internal( LearnerMessage.leave ) );
-                    outgoing.process( internal( AtomicBroadcastMessage.leave ) );
-                    outgoing.process( internal( ProposerMessage.leave ));
-                    outgoing.process( internal( HeartbeatMessage.leave ));
                     return start;
                 }
             }
@@ -242,13 +219,6 @@ public enum ClusterState
                     {
                         context.left();
 
-                        outgoing.process( internal( ProposerMessage.leave ) );
-                        outgoing.process( internal( AcceptorMessage.leave ) );
-                        outgoing.process( internal( LearnerMessage.leave ) );
-                        outgoing.process( internal( AtomicBroadcastMessage.leave ) );
-                        outgoing.process( internal( HeartbeatMessage.leave ) );
-                        outgoing.process( internal( SnapshotMessage.leave ) );
-
                         return start;
 
                     } else
@@ -286,13 +256,6 @@ public enum ClusterState
                     if (state.isLeaving(context.getMe()))
                     {
                         context.left();
-
-                        outgoing.process( internal( ProposerMessage.leave ) );
-                        outgoing.process( internal( AcceptorMessage.leave ) );
-                        outgoing.process( internal( LearnerMessage.leave ) );
-                        outgoing.process( internal( AtomicBroadcastMessage.leave ) );
-                        outgoing.process( internal( HeartbeatMessage.leave ) );
-                        outgoing.process( internal( SnapshotMessage.leave ) );
 
                         return start;
                     } else

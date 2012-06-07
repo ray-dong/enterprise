@@ -23,15 +23,16 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutionException;
 
 import java.util.concurrent.Semaphore;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
-import org.neo4j.com_2.NetworkNode;
+import org.neo4j.com_2.NetworkNodeTCP;
+import org.neo4j.com_2.NetworkNodeUDP;
 import org.neo4j.helpers.collection.MapUtil;
+import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha2.BindingListener;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkedServerFactory;
@@ -41,12 +42,13 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap;
 import org.neo4j.kernel.ha2.protocol.cluster.Cluster;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterAdapter;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
-import org.neo4j.kernel.ha2.protocol.cluster.ClusterListener;
 import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.slf4j.LoggerFactory;
+
+import static org.neo4j.com_2.NetworkNodeTCP.Configuration.cluster_port;
 
 /**
  * TODO
@@ -62,9 +64,9 @@ public class MultiPaxosNetworkTest
                 new MultiPaxosServerFactory(new ClusterConfiguration("default", "neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
                 new FixedTimeoutStrategy( 2000 ), StringLogger.SYSTEM );
 
-        final ProtocolServer server1 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5001") );
-        final ProtocolServer server2 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5002") );
-        final ProtocolServer server3 = serverFactory.newNetworkedServer( MapUtil.stringMap( NetworkNode.cluster_port.name(),"5003") );
+        final ProtocolServer server1 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5001") ));
+        final ProtocolServer server2 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5002") ) );
+        final ProtocolServer server3 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5003") ) );
 
         server1.addBindingListener( new BindingListener()
         {
@@ -108,9 +110,7 @@ public class MultiPaxosNetworkTest
 
         life.start();
 
-        semaphore.acquire( );
-
-        Thread.sleep( 10000 );
+        semaphore.acquire();
 
         LoggerFactory.getLogger(getClass()).info( "Joined cluster - set data" );
 
@@ -142,9 +142,9 @@ public class MultiPaxosNetworkTest
         map2.put( "foo2","666" );
 
         LoggerFactory.getLogger(getClass()).info( "Read value2:"+map2.get("foo1") );
-        LoggerFactory.getLogger(getClass()).info( "Read value3:"+map2.get("foo2") );
+        LoggerFactory.getLogger(getClass()).info( "Read value3:" + map2.get( "foo2" ) );
 
-        LoggerFactory.getLogger(getClass()).info( "Read value4:"+map3.get("foo1") );
+        LoggerFactory.getLogger(getClass()).info( "Read value4:" + map3.get( "foo1" ) );
 
         map.close();
 

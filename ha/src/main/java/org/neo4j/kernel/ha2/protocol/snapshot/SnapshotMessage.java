@@ -40,12 +40,10 @@ public enum SnapshotMessage
     refreshSnapshot,
     sendSnapshot, snapshot;
 
+    // TODO This needs to be replaced with something that can handle bigger snapshots
     public static class SnapshotState
         implements Serializable
     {
-        private static byte[] sentBuf;
-        private static byte[] receivedBuf;
-
         private long lastDeliveredInstanceId = -1;
         transient SnapshotProvider provider;
 
@@ -101,7 +99,6 @@ public enum SnapshotMessage
             {
                 e.printStackTrace();
             }
-            sentBuf = buf;
         }
 
         private void readObject( java.io.ObjectInputStream in )
@@ -110,8 +107,6 @@ public enum SnapshotMessage
             in.defaultReadObject();
             buf = new byte[in.readInt()];
             in.readFully( buf );
-            LoggerFactory.getLogger(getClass()).debug( "sent=received: " + new String( sentBuf ).equals( new String( buf ) ) );
-
         }
     }
 }

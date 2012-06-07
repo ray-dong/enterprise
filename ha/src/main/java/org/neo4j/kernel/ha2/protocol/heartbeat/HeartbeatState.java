@@ -23,7 +23,9 @@ package org.neo4j.kernel.ha2.protocol.heartbeat;
 import java.net.URI;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
+import org.slf4j.LoggerFactory;
 
 import static org.neo4j.com_2.message.Message.*;
 
@@ -99,9 +101,17 @@ public enum HeartbeatState
                     // Check if this node is no longer a part of the cluster
                     if (context.getClusterContext().getConfiguration().getNodes().contains( server ))
                     {
-                        context.failed( server );
+                        context.suspect( server );
 
                         context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+server, timeout( HeartbeatMessage.timed_out, message, server ) );
+
+                        // Send suspicions messages to all non-failed servers
+                        for( URI aliveServer : context.getAlive() )
+                        {
+                            if (!aliveServer.equals( context.getClusterContext().getMe() ))
+                                outgoing.process( Message.to( HeartbeatMessage.suspicions, aliveServer, new HeartbeatMessage.SuspicionsState(context.getSuspicionsFor( context.getClusterContext().getMe() )) ) );
+                        }
+
                     } else
                     {
                         // If no longer part of cluster, then don't bother
@@ -132,6 +142,22 @@ public enum HeartbeatState
                     String timeoutName = HeartbeatMessage.send_heartbeat + "-" + to;
                     context.getClusterContext().timeouts.cancelTimeout( timeoutName );
                     context.getClusterContext().timeouts.setTimeout( timeoutName, Message.timeout( HeartbeatMessage.send_heartbeat, message, to ) );
+                    break;
+                }
+
+                case suspicions:
+                {
+                    HeartbeatMessage.SuspicionsState suspicions = message.getPayload();
+                    URI from = new URI( message.getHeader( Message.FROM ) );
+
+                    context.suspicions( from, suspicions.getSuspicions() );
+
+                    if (context.shouldPromoteMeToCoordinator())
+                    {
+                        // TODO Master election
+                        LoggerFactory.getLogger(getClass()).info( "Elect me to be master! "+context.getClusterContext().getMe() );
+                    }
+
                     break;
                 }
 

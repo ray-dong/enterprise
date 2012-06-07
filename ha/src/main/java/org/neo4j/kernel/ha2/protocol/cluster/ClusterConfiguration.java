@@ -30,14 +30,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Created with IntelliJ IDEA.
- * User: rickard
- * Date: 2012-05-16
- * Time: 14:46
- * To change this template use File | Settings | File Templates.
+ * Cluster configuration. Includes name of cluster, list of nodes, and role mappings
+ *
  */
 public class ClusterConfiguration
 {
+    public static final String COORDINATOR = "coordinator";
+
     private final String name;
     private List<URI> nodes;
     private Map<String, URI> roles = new HashMap<String, URI>();
@@ -141,5 +140,15 @@ public class ClusterConfiguration
     public void removeElected( String roleName )
     {
         roles.remove( roleName );
+    }
+
+    public URI getCoordinator()
+    {
+        return nodes.get( 0 );
+    }
+
+    public URI getElected( String coordinator )
+    {
+        return roles.get( coordinator );
     }
 }

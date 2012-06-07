@@ -56,6 +56,45 @@ public class StateTransition
     }
 
     @Override
+    public boolean equals( Object o )
+    {
+        if( this == o )
+        {
+            return true;
+        }
+        if( o == null || getClass() != o.getClass() )
+        {
+            return false;
+        }
+
+        StateTransition that = (StateTransition) o;
+
+        if( !message.equals( that.message ) )
+        {
+            return false;
+        }
+        if( !newState.equals( that.newState ) )
+        {
+            return false;
+        }
+        if( !oldState.equals( that.oldState ) )
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        int result = oldState.hashCode();
+        result = 31 * result + message.hashCode();
+        result = 31 * result + newState.hashCode();
+        return result;
+    }
+
+    @Override
     public String toString()
     {
         if (message.getPayload() instanceof String)
