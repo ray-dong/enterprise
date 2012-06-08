@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
@@ -49,10 +50,10 @@ public enum ProposerState
                     case join:
                     {
                         // TODO Handle coordinator configuration
-//                        if (context.clusterContext.isCoordinator())
+                        if (context.clusterContext.isElectedAs( ClusterConfiguration.COORDINATOR) )
                             return coordinator;
-//                        else
-//                            return proposer;
+                        else
+                            return proposer;
                     }
 
                     case propose:
@@ -222,12 +223,17 @@ public enum ProposerState
                         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( state.getInstance() );
                         context.timeouts.cancelTimeout( state.getInstance() );
 
-                        if (instance.clientValue)
-                        {
-                            propose( context, message, outgoing, instance.value_2, instance.getAcceptors() );
-                        }
+                        LoggerFactory.getLogger( getClass() ).warn( "Accept rejected:"+instance.state );
 
-                        instance.acceptRejected();
+                        if (instance.isState( PaxosInstance.State.p2_pending ))
+                        {
+                            if (instance.clientValue)
+                            {
+                                propose( context, message, outgoing, instance.value_2, instance.getAcceptors() );
+                            }
+
+                            instance.acceptRejected();
+                        }
 
                         break;
                     }
@@ -257,7 +263,6 @@ public enum ProposerState
                         ProposerMessage.AcceptedState acceptedState = message.getPayload();
                         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( acceptedState.getInstance() );
 
-                        // Sanity check the id
                         if (instance.isState( PaxosInstance.State.p2_pending ))
                         {
                             instance.accepted(acceptedState);
@@ -327,13 +332,21 @@ public enum ProposerState
     proposer
         {
             @Override
-            public ProposerState handle( MultiPaxosContext paxosContext,
-                                         Message<ProposerMessage> proposerMessageMessage,
+            public ProposerState handle( MultiPaxosContext context,
+                                         Message<ProposerMessage> message,
                                          MessageProcessor outgoing
             )
                 throws Throwable
             {
-                // TODO Implement idle proposer state
+                switch( message.getMessageType() )
+                {
+                    case propose:
+                    {
+                        // Return URI of who I think is coordinator
+                        AtomicBroadcastMessage.RedirectState state = new AtomicBroadcastMessage.RedirectState(context.clusterContext.getConfiguration().getElected( ClusterConfiguration.COORDINATOR ));
+                        outgoing.process( Message.respond( AtomicBroadcastMessage.redirect, message, state ) );
+                    }
+                }
 
                 return this;
             }

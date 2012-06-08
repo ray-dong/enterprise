@@ -164,4 +164,9 @@ public class ClusterContext
     {
         return me.equals( server );
     }
+
+    public boolean isElectedAs( String roleName )
+    {
+        return me.equals( configuration.getElected( roleName ));
+    }
 }

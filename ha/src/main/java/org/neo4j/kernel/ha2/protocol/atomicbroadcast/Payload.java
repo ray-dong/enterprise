@@ -60,7 +60,7 @@ public class Payload
     {
         out.write( len );
         out.write( buf, 0, len );
-        System.out.println( "Wrote payload" );
+//        System.out.println( "Wrote payload" );
     }
 
     @Override
@@ -77,6 +77,6 @@ public class Payload
         {
             e.printStackTrace();
         }
-        System.out.println( "Read payload" );
+//        System.out.println( "Read payload" );
     }
 }

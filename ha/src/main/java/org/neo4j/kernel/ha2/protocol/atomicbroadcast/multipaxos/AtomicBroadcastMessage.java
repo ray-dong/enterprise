@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.io.Serializable;
+import java.net.URI;
 import org.neo4j.com_2.message.MessageType;
 
 /**
@@ -29,6 +31,22 @@ public enum AtomicBroadcastMessage
     implements MessageType
 {
     entered, join, leave, // Group management
-    broadcastResponse, failed, // Internal message created by implementation
+    broadcastResponse, redirect, failed, // Internal message created by implementation
     broadcast, addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast API
+
+    public static class RedirectState
+        implements Serializable
+    {
+        private URI coordinator;
+
+        public RedirectState( URI coordinator )
+        {
+            this.coordinator = coordinator;
+        }
+
+        public URI getCoordinator()
+        {
+            return coordinator;
+        }
+    }
 }

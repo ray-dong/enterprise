@@ -39,6 +39,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.neo4j.com_2.NetworkNodeTCP;
 import org.neo4j.com_2.NetworkNodeUDP;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.configuration.Config;
@@ -49,6 +50,7 @@ import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.logging.LogbackService;
 import org.neo4j.test.LoggerRule;
+import org.slf4j.LoggerFactory;
 
 import static org.junit.Assert.*;
 
@@ -148,7 +150,7 @@ public class ClusterNetworkTest
         {
             final URI uri = new URI( "neo4j://localhost:800"+(i+1) );
 
-            NetworkedServerFactory factory = new NetworkedServerFactory( life, new MultiPaxosServerFactory(  ), new FixedTimeoutStrategy( 1000 ), logbackService.getLogger( "neo4j.ha" ) );
+            NetworkedServerFactory factory = new NetworkedServerFactory( life, new MultiPaxosServerFactory(  ), new FixedTimeoutStrategy( 1000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
 
             ProtocolServer server = factory.newNetworkedServer( MapUtil.stringMap( NetworkNodeUDP.cluster_address.name(), uri.getHost(), NetworkNodeUDP
                 .cluster_port.name(), uri.getPort()+"" ) );

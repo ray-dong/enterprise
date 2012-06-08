@@ -68,6 +68,7 @@ public class ClusterConfiguration
     {
         this.name = copy.name;
         this.nodes = new ArrayList<URI>( copy.nodes );
+        this.roles = new HashMap<String, URI>( copy.roles );
     }
 
     public void joined( URI nodeUrl )
@@ -141,13 +142,8 @@ public class ClusterConfiguration
         roles.remove( roleName );
     }
 
-    public URI getCoordinator()
+    public URI getElected( String roleName )
     {
-        return nodes.get( 0 );
-    }
-
-    public URI getElected( String coordinator )
-    {
-        return roles.get( coordinator );
+        return roles.get( roleName );
     }
 }

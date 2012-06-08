@@ -60,6 +60,7 @@ import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
+import org.slf4j.Logger;
 
 /**
  * TCP version of a Networked Node. This handles receiving messages to be consumed by local statemachines and sending outgoing messages
@@ -99,16 +100,16 @@ public class NetworkNodeTCP
     private DefaultChannelFactory channelFactory;
 
     private Map<String,String> config;
-    private StringLogger msgLog;
+    private Logger msgLog;
     private URI me;
 
     private Map<URI, Channel> connections = new ConcurrentHashMap<URI, Channel>();
     private Iterable<NetworkChannelsListener> listeners = Listeners.newListeners();
 
-    public NetworkNodeTCP( Map<String,String> config, StringLogger msgLog )
+    public NetworkNodeTCP( Map<String,String> config, Logger logger )
     {
         this.config = config;
-        this.msgLog = msgLog;
+        this.msgLog = logger;
     }
 
     @Override
@@ -275,7 +276,8 @@ public class NetworkNodeTCP
         }
         catch( URISyntaxException e )
         {
-            msgLog.logMessage("Not valid URI:" + message.getHeader( Message.TO ), true);
+            msgLog.error("Not valid URI:" + message.getHeader( Message.TO ), true);
+            return;
         }
 
         Channel channel = getChannel(to);
@@ -289,7 +291,7 @@ public class NetworkNodeTCP
             }
         } catch (Exception e)
         {
-            msgLog.logMessage("Could not connect to:" + to, true);
+            msgLog.error("Could not connect to:" + to, true);
             return;
         }
 
@@ -369,7 +371,7 @@ public class NetworkNodeTCP
             {
                 if ( channelFuture.await(5, TimeUnit.SECONDS) && channelFuture.getChannel().isConnected())
                 {
-                    msgLog.logMessage( me+" opened a new channel to " + address, true );
+                    msgLog.info( me+" opened a new channel to " + address, true );
                     return channelFuture.getChannel();
                 }
 
@@ -378,7 +380,7 @@ public class NetworkNodeTCP
             }
             catch ( InterruptedException e )
             {
-                msgLog.logMessage( "Interrupted", e );
+                msgLog.warn( "Interrupted", e );
                 throw new ComException(e);
             }
         }
@@ -445,7 +447,7 @@ public class NetworkNodeTCP
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
         {
-            msgLog.logMessage("Receive exception:", e.getCause());
+            msgLog.error("Receive exception:", e.getCause());
         }
     }
 }

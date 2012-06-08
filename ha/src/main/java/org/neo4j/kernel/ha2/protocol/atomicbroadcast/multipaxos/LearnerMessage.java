@@ -30,7 +30,7 @@ public enum LearnerMessage
     implements MessageType
 {
     join,leave,
-    learn,learnRequest, learnTimedout;
+    learn,learnRequest, learnFailed, learnTimedout;
 
     public static class LearnState
         implements Serializable
@@ -67,6 +67,28 @@ public enum LearnerMessage
         private InstanceId instanceId;
 
         public LearnRequestState( InstanceId instanceId)
+        {
+            this.instanceId = instanceId;
+        }
+
+        public InstanceId getInstanceId()
+        {
+            return instanceId;
+        }
+
+        @Override
+        public String toString()
+        {
+            return instanceId.toString();
+        }
+    }
+
+    public static class LearnFailedState
+        implements Serializable
+    {
+        private InstanceId instanceId;
+
+        public LearnFailedState( InstanceId instanceId)
         {
             this.instanceId = instanceId;
         }

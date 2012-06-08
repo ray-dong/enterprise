@@ -26,7 +26,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
-import java.util.logging.Logger;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
@@ -35,6 +34,8 @@ import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.neo4j.com_2.message.Message.*;
 
@@ -44,7 +45,7 @@ import static org.neo4j.com_2.message.Message.*;
 public class ConnectedStateMachines
     implements MessageProcessor, MessageSource
 {
-    private final Logger logger = Logger.getLogger( ConnectedStateMachines.class.getName() );
+    private final Logger logger = LoggerFactory.getLogger( ConnectedStateMachines.class );
     
     private final MessageProcessor sender;
     private Timeouts timeouts;
@@ -111,44 +112,49 @@ public class ConnectedStateMachines
             // Process and send messages
             // Allow state machines to send messages to each other as well in this loop
             Message<? extends MessageType> outgoingMessage;
-            while ((outgoingMessage = outgoing.nextOutgoingMessage()) != null)
+            try
             {
-                message.copyHeadersTo( outgoingMessage, CONVERSATION_ID, CREATED_BY );
-
-                for( MessageProcessor outgoingProcessor : outgoingProcessors )
+                while ((outgoingMessage = outgoing.nextOutgoingMessage()) != null)
                 {
-                    try
+                    message.copyHeadersTo( outgoingMessage, CONVERSATION_ID, CREATED_BY );
+
+                    for( MessageProcessor outgoingProcessor : outgoingProcessors )
                     {
-                        outgoingProcessor.process( outgoingMessage );
+                        try
+                        {
+                            outgoingProcessor.process( outgoingMessage );
+                        }
+                        catch( Throwable e )
+                        {
+                            logger.warn( "Outgoing message processor threw exception", e );
+                        }
                     }
-                    catch( Throwable e )
+
+                    if( outgoingMessage.hasHeader( Message.TO ))
                     {
-                        logger.warning( "Outgoing message processor threw exception" );
-                        logger.throwing( ConnectedStateMachines.class.getName(), "process", e );
+                        try
+                        {
+                            sender.process( outgoingMessage );
+                        }
+                        catch( Throwable e )
+                        {
+                            logger.warn( "Message sending threw exception", e );
+                        }
+                    } else
+                    {
+                        // Deliver internally if possible
+                        StateMachine internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
+        //                if (internalStatemachine != null && stateMachine != internalStatemachine )
+                        if (internalStatemachine != null)
+                        {
+                            internalStatemachine.handle( (Message)outgoingMessage, outgoing );
+                        }
                     }
                 }
-
-                if( outgoingMessage.hasHeader( Message.TO ))
-                {
-                    try
-                    {
-                        sender.process( outgoingMessage );
-                    }
-                    catch( Throwable e )
-                    {
-                        logger.warning( "Message sending threw exception" );
-                        logger.throwing( ConnectedStateMachines.class.getName(), "process", e );
-                    }
-                } else
-                {
-                    // Deliver internally if possible
-                    StateMachine internalStatemachine = stateMachines.get( outgoingMessage.getMessageType().getClass() );
-    //                if (internalStatemachine != null && stateMachine != internalStatemachine )
-                    if (internalStatemachine != null)
-                    {
-                        internalStatemachine.handle( (Message)outgoingMessage, outgoing );
-                    }
-                }
+            }
+            catch( Exception e )
+            {
+                logger.warn( "Error processing message "+message, e );
             }
         }
     }
@@ -186,12 +192,12 @@ public class ConnectedStateMachines
         private Queue<Message<? extends MessageType>> outgoingMessages = new LinkedList<Message<? extends MessageType>>();
 
         @Override
-        public void process( Message<? extends MessageType> message )
+        public synchronized void process( Message<? extends MessageType> message )
         {
             outgoingMessages.offer( message );
         }
 
-        public Message<? extends MessageType> nextOutgoingMessage()
+        public synchronized Message<? extends MessageType> nextOutgoingMessage()
         {
             return outgoingMessages.poll();
         }

@@ -47,7 +47,8 @@ public class HeartbeatIAmAliveProcessor
             try
             {
                 String from = message.getHeader( Message.FROM );
-                output.process( message.copyHeadersTo( Message.internal( HeartbeatMessage.i_am_alive, new HeartbeatMessage.IAmAliveState( new URI( from ) ) ), Message.FROM ) );
+                if (!from.equals( message.getHeader( Message.TO ) ))
+                    output.process( message.copyHeadersTo( Message.internal( HeartbeatMessage.i_am_alive, new HeartbeatMessage.IAmAliveState( new URI( from ) ) ), Message.FROM ) );
             }
             catch( URISyntaxException e )
             {

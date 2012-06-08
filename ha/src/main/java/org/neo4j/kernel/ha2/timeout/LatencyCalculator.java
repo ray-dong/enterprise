@@ -58,33 +58,39 @@ public class LatencyCalculator
             @Override
             public void process( Message<? extends MessageType> message )
             {
-                Long sent = conversations.get( message.getHeader( Message.CONVERSATION_ID ) );
-                if (sent != null)
+                synchronized(LatencyCalculator.this)
                 {
-                    long received = now;
-
-                    String from = message.getHeader( Message.FROM );
-                    List<Long> hostLatencies = latencies.get( from );
-                    if (hostLatencies == null)
+                    Long sent = conversations.get( message.getHeader( Message.CONVERSATION_ID ) );
+                    if (sent != null)
                     {
-                        hostLatencies = new ArrayList<Long>(  );
-                        latencies.put( from, hostLatencies );
-                    }
-                    hostLatencies.add( received-sent );
+                        long received = now;
 
-                    if (hostLatencies.size() == latencyCount)
-                    {
-                        long latencySum = 0;
-                        for( Long hostLatency : hostLatencies )
+                        String from = message.getHeader( Message.FROM );
+                        List<Long> hostLatencies = latencies.get( from );
+                        if (hostLatencies == null)
                         {
-                            latencySum += hostLatency;
+                            hostLatencies = new ArrayList<Long>(  );
+                            latencies.put( from, hostLatencies );
                         }
+                        long latency = received - sent;
+                        if (latency < 0)
+                            logger.warn( "Negative latency!" );
+                        hostLatencies.add( latency );
 
-                        long latencyAvg = latencySum / latencyCount;
+                        if (hostLatencies.size() == latencyCount)
+                        {
+                            long latencySum = 0;
+                            for( Long hostLatency : hostLatencies )
+                            {
+                                latencySum += hostLatency;
+                            }
 
-                        logger.info( from+" roundtrip latency: "+latencyAvg );
+                            long latencyAvg = latencySum / latencyCount;
 
-                        hostLatencies.clear();
+//                            logger.info( from+" roundtrip latency: "+latencyAvg );
+
+                            hostLatencies.clear();
+                        }
                     }
                 }
             }
@@ -118,7 +124,7 @@ public class LatencyCalculator
         delegate.timeoutCancelled( timeoutMessage );
     }
 
-    public void tick(long now)
+    public synchronized void tick(long now)
     {
         this.now = now;
         delegate.tick( now );

@@ -24,13 +24,11 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ExecutionException;
-
 import java.util.concurrent.Semaphore;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
 import org.neo4j.com_2.NetworkNodeTCP;
-import org.neo4j.com_2.NetworkNodeUDP;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha2.BindingListener;
@@ -44,11 +42,10 @@ import org.neo4j.kernel.ha2.protocol.cluster.ClusterAdapter;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
-import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.slf4j.LoggerFactory;
 
-import static org.neo4j.com_2.NetworkNodeTCP.Configuration.cluster_port;
+import static org.neo4j.com_2.NetworkNodeTCP.Configuration.*;
 
 /**
  * TODO
@@ -62,11 +59,15 @@ public class MultiPaxosNetworkTest
         final LifeSupport life = new LifeSupport();
         NetworkedServerFactory serverFactory = new NetworkedServerFactory( life,
                 new MultiPaxosServerFactory(new ClusterConfiguration("default", "neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
-                new FixedTimeoutStrategy( 2000 ), StringLogger.SYSTEM );
+                new FixedTimeoutStrategy( 5000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
 
         final ProtocolServer server1 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5001") ));
-        final ProtocolServer server2 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5002") ) );
-        final ProtocolServer server3 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5003") ) );
+        final ProtocolServer server2 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply( MapUtil
+                                                                                                                                                  .stringMap( cluster_port
+                                                                                                                                                                  .name(), "5002" ) ) );
+        final ProtocolServer server3 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply( MapUtil
+                                                                                                                                                  .stringMap( cluster_port
+                                                                                                                                                                  .name(), "5003" ) ) );
 
         server1.addBindingListener( new BindingListener()
         {
@@ -99,12 +100,27 @@ public class MultiPaxosNetworkTest
 
         final Semaphore semaphore = new Semaphore(0 );
 
+        server1.newClient( Cluster.class ).addClusterListener( new ClusterAdapter()
+        {
+            @Override
+            public void joinedCluster( URI node )
+            {
+                LoggerFactory.getLogger(getClass()).info( "1 sees join by "+node );
+            }
+        } );
+
         server2.newClient( Cluster.class ).addClusterListener( new ClusterAdapter()
         {
             @Override
             public void enteredCluster( ClusterConfiguration nodes )
             {
                 semaphore.release();
+            }
+
+            @Override
+            public void joinedCluster( URI node )
+            {
+                LoggerFactory.getLogger(getClass()).info( "2 sees join by "+node );
             }
         } );
 
@@ -130,6 +146,7 @@ public class MultiPaxosNetworkTest
             @Override
             public void enteredCluster( ClusterConfiguration nodes )
             {
+                LoggerFactory.getLogger(getClass()).info( "3 entered cluster of:"+nodes.getNodes() );
                 semaphore.release();
             }
         } );
@@ -145,8 +162,13 @@ public class MultiPaxosNetworkTest
         LoggerFactory.getLogger(getClass()).info( "Read value3:" + map2.get( "foo2" ) );
 
         LoggerFactory.getLogger(getClass()).info( "Read value4:" + map3.get( "foo1" ) );
+        LoggerFactory.getLogger(getClass()).info( "Read value5:" + map3.get( "foo99" ) );
+        Assert.assertThat(map3.get( "foo1" ), CoreMatchers.equalTo( "bar1" ));
+        Assert.assertThat(map3.get( "foo99" ), CoreMatchers.equalTo( "bar99" ));
 
         map.close();
+        map2.close();
+        map3.close();
 
         life.stop();
 

@@ -75,7 +75,7 @@ public class AtomicBroadcastMap<K,V>
                 MapCommand command = (MapCommand) value;
                 command.execute( map );
 
-        LoggerFactory.getLogger( getClass() ).info(  "Map:"+map );
+//                LoggerFactory.getLogger( getClass() ).info(  "Map:"+map );
 
                 synchronized( AtomicBroadcastMap.this )
                 {
@@ -210,12 +210,12 @@ public class AtomicBroadcastMap<K,V>
 
     private synchronized void checkUpToDate()
     {
-        if (lastCommand != null)
+        while (lastCommand != null)
         {
-            LoggerFactory.getLogger(getClass()).info("Wait for  command");
+            LoggerFactory.getLogger(getClass()).info("Wait for command:"+lastCommand);
             try
             {
-                this.wait();
+                this.wait(5000);
             }
             catch( InterruptedException e )
             {

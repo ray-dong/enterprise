@@ -41,7 +41,7 @@ public class PaxosInstance
 
     PaxosInstanceStore store;
     InstanceId id = null;
-    private State state = State.empty;
+    State state = State.empty;
     long ballot = 0;
     List<URI> acceptors;
     List<ProposerMessage.PromiseState> promises = new ArrayList<ProposerMessage.PromiseState>();
@@ -114,6 +114,7 @@ public class PaxosInstance
         phase1Ballot = 0;
         value_1 = null;
         value_2 = null;
+        clientValue = false;
     }
 
     public void phase2Timeout( long ballot )

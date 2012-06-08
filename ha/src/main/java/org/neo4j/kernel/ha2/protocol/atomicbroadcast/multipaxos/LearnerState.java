@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.net.URI;
+import java.util.List;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;
@@ -148,7 +150,24 @@ public enum LearnerState
                         } else
                         {
                             LoggerFactory.getLogger(getClass()).debug( "Did not have learned value for instance "+state.getInstanceId() );
+                            outgoing.process( Message.respond( LearnerMessage.learnFailed, message, new LearnerMessage.LearnFailedState(state.getInstanceId()) ) );
                         }
+                        break;
+                    }
+
+                    case learnFailed:
+                    {
+                        LearnerMessage.LearnFailedState state = message.getPayload();
+                        PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( state.getInstanceId() );
+                        if (!(instance.isState( PaxosInstance.State.closed ) || instance.isState( PaxosInstance.State.delivered )))
+                        {
+                            List<URI> nodes = context.clusterContext.getConfiguration().getNodes();
+                            URI learnDeniedNode = new URI( message.getHeader( Message.FROM ) );
+                            int nextPotentialLearnerIndex = (nodes.indexOf( learnDeniedNode )+1) % nodes.size();
+                            URI learnerNode = context.clusterContext.getConfiguration().getNodes().get( nextPotentialLearnerIndex );
+                            outgoing.process( Message.to( LearnerMessage.learnRequest, learnerNode, new LearnerMessage.LearnRequestState(state.getInstanceId()) ) );
+                        }
+
                         break;
                     }
 

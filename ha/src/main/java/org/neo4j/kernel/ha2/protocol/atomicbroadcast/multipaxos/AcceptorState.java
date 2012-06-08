@@ -97,7 +97,8 @@ public enum AcceptorState
                                 outgoing.process( Message.respond( ProposerMessage.accepted, message, new ProposerMessage.AcceptedState( instance.id ) ) );
                             } else
                             {
-                                outgoing.process(Message.respond( ProposerMessage.rejectAccept, message, new ProposerMessage.RejectAcceptState( instance.id ) ));
+                                LoggerFactory.getLogger(AcceptorState.class).info( "Reject "+acceptState.getInstance()+" accept ballot:"+acceptState.getBallot()+" actual ballot:"+instance.ballot );
+                                outgoing.process(Message.respond( ProposerMessage.rejectAccept, message, new ProposerMessage.RejectAcceptState( acceptState.getInstance() ) ));
                             }
                         }
                         break;

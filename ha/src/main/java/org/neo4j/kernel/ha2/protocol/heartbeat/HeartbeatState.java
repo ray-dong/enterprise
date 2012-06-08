@@ -57,12 +57,14 @@ public enum HeartbeatState
                     break;
                 }
 
+/*
                 case join:
                 {
                     // Setup heartbeat timeouts
                     context.startHeartbeatTimers(message);
                     return heartbeat;
                 }
+*/
             }
 
             return this;

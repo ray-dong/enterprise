@@ -32,6 +32,7 @@ import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -42,9 +43,9 @@ public class NetworkedServerFactory
     private LifeSupport life;
     private ProtocolServerFactory protocolServerFactory;
     private TimeoutStrategy timeoutStrategy;
-    private StringLogger logger;
+    private Logger logger;
 
-    public NetworkedServerFactory( LifeSupport life, ProtocolServerFactory protocolServerFactory, TimeoutStrategy timeoutStrategy, StringLogger logger )
+    public NetworkedServerFactory( LifeSupport life, ProtocolServerFactory protocolServerFactory, TimeoutStrategy timeoutStrategy, Logger logger )
     {
         this.life = life;
         this.protocolServerFactory = protocolServerFactory;
@@ -55,7 +56,6 @@ public class NetworkedServerFactory
     public ProtocolServer newNetworkedServer(final Map<String, String> configuration)
     {
         final NetworkNodeTCP node = new NetworkNodeTCP( configuration, logger );
-        life.add( node );
 
         final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeoutStrategy, node, node);
         node.addNetworkChannelsListener( new NetworkNodeTCP.NetworkChannelsListener()
@@ -87,6 +87,7 @@ public class NetworkedServerFactory
             public void init()
                 throws Throwable
             {
+                protocolServer.getTimeouts().tick( System.currentTimeMillis() );
             }
 
             @Override
@@ -97,16 +98,12 @@ public class NetworkedServerFactory
 
                 scheduler.scheduleWithFixedDelay( new Runnable()
                 {
-                    long previousTime = System.currentTimeMillis();
-
                     @Override
                     public void run()
                     {
                         long now = System.currentTimeMillis();
-                        long time = now - previousTime;
-                        previousTime = now;
 
-                        protocolServer.getTimeouts().tick( time );
+                        protocolServer.getTimeouts().tick( now );
                     }
                 }, 0, 10, TimeUnit.MILLISECONDS );
             }
@@ -124,7 +121,10 @@ public class NetworkedServerFactory
             {
             }
         } );
-        
+
+        // Add this last to ensure that timeout service is setup first
+        life.add( node );
+
         return protocolServer;
     }
 }
