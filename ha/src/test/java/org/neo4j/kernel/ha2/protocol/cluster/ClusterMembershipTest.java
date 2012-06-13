@@ -41,9 +41,25 @@ public class ClusterMembershipTest
              join( 100, 1 ).
              join( 100,2 ).
              join( 100,3 ).
-             leave( 100, 3 ).
+             message( 100,"*** Cluster formed, now leave" ).
+             leave( 0, 3 ).
              leave( 100, 2 ).
              leave( 100, 1 ));
+    }
+
+    @Test
+    public void threeNodesJoinAndThenLeaveInOriginalOrder()
+        throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
+    {
+         testCluster(3, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+             rounds( 70 ).
+             join( 100, 1 ).
+             join( 100,2 ).
+             join( 100,3 ).
+             message( 100,"*** Cluster formed, now leave" ).
+             leave( 0, 1 ).
+             leave( 100, 2 ).
+             leave( 100, 3 ));
     }
 
     @Test

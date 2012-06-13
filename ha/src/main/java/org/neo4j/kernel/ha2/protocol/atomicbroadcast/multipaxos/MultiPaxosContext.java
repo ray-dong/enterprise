@@ -22,8 +22,11 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.net.URI;
 import java.util.List;
+import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
+
+import static org.neo4j.helpers.collection.Iterables.*;
 
 /**
  * Context shared by all Paxos state machines.
@@ -64,7 +67,9 @@ public class MultiPaxosContext
 
     public List<URI> getAcceptors()
     {
-        return clusterContext.getConfiguration().getNodes();
+        // Only use 2f+1 acceptors
+        return toList( limit( clusterContext.getConfiguration()
+                                  .getAllowedFailures() * 2 + 1, clusterContext.getConfiguration().getNodes() ) );
     }
 
     public Iterable<URI> getLearners()
@@ -80,9 +85,13 @@ public class MultiPaxosContext
     public int getMinimumQuorumSize( List<URI> acceptors )
     {
         // n >= 2f+1
-        if (acceptors.size() >= 2*clusterContext.getConfiguration().getAllowedFailures() + 1)
-            return acceptors.size()-clusterContext.getConfiguration().getAllowedFailures();
+        if( acceptors.size() >= 2 * clusterContext.getConfiguration().getAllowedFailures() + 1 )
+        {
+            return acceptors.size() - clusterContext.getConfiguration().getAllowedFailures();
+        }
         else
+        {
             return acceptors.size();
+        }
     }
 }

@@ -36,8 +36,6 @@ import org.slf4j.LoggerFactory;
  */
 public class ClusterContext
 {
-    URI joining;
-
     URI me;
     Iterable<ClusterListener> listeners = Listeners.newListeners();
     ProposerContext proposerContext;
@@ -69,11 +67,6 @@ public class ClusterContext
     }
 
     // Implementation
-    public void joining(URI node)
-    {
-        joining = node;
-    }
-
     public void created( String name )
     {
         configuration = new ClusterConfiguration( name, Collections.singleton(me) );
@@ -106,26 +99,6 @@ public class ClusterContext
         } );
     }
 
-    public void updated( final ClusterMessage.ConfigurationChangeState stateChange)
-    {
-        stateChange.apply( configuration );
-        Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
-        {
-            @Override
-            public void notify( ClusterListener listener )
-            {
-                if( stateChange.getJoin() != null )
-                {
-                    listener.joinedCluster( stateChange.getJoin() );
-                }
-                if( stateChange.getLeave() != null )
-                {
-                    listener.leftCluster( stateChange.getLeave() );
-                }
-            }
-        } );
-    }
-
     public void left()
     {
         configuration.left();
@@ -139,10 +112,46 @@ public class ClusterContext
         } );
     }
 
-    public void elected( String name, URI node )
+    public void joined( final URI node)
     {
-        LoggerFactory.getLogger(getClass()).info( node+" elected to be "+name );
-        configuration.setElected(name, node);
+        configuration.joined( node );
+        Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
+        {
+            @Override
+            public void notify( ClusterListener listener )
+            {
+                listener.joinedCluster( node );
+            }
+        } );
+    }
+
+    public void left( final URI node)
+    {
+        configuration.left(node);
+        Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
+        {
+            @Override
+            public void notify( ClusterListener listener )
+            {
+                listener.leftCluster( node );
+            }
+        } );
+    }
+
+    public void elected( final String name, final URI node )
+    {
+        if (!node.equals(configuration.getElected( name )))
+        {
+            configuration.elected( name, node );
+            Listeners.notifyListeners( listeners, new Listeners.Notification<org.neo4j.kernel.ha2.protocol.cluster.ClusterListener>()
+            {
+                @Override
+                public void notify( ClusterListener listener )
+                {
+                    listener.elected( name, node );
+                }
+            } );
+        }
     }
 
     public void setMe(URI me)

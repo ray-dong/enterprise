@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.net.URI;
 import java.util.concurrent.TimeoutException;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
@@ -123,7 +124,8 @@ public enum AtomicBroadcastState
                 {
                     case broadcast:
                     {
-                        outgoing.process( internal( ProposerMessage.propose, message.getPayload() ) );
+                        URI coordinator = context.getCoordinator();
+                        outgoing.process( to( ProposerMessage.propose, coordinator, message.getPayload() ) );
                         break;
                     }
 

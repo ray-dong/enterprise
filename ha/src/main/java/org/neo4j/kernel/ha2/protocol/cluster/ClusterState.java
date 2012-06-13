@@ -70,7 +70,6 @@ public enum ClusterState
                 case join:
                 {
                     URI clusterNodeUri = message.getPayload();
-                    context.joining( clusterNodeUri );
                     outgoing.process( to( ClusterMessage.configuration, clusterNodeUri ) );
                     context.timeouts.setTimeout( clusterNodeUri, timeout( ClusterMessage.configurationTimeout, message ) );
                     return acquiringConfiguration;
@@ -107,7 +106,8 @@ public enum ClusterState
                         ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState();
                         newState.join( context.me );
 
-                        outgoing.process( internal( ProposerMessage.propose, newState ));
+                        // Let the coordinator propose this
+                        outgoing.process( to( ProposerMessage.propose, state.getRoles().get( ClusterConfiguration.COORDINATOR ), newState ));
 
                         // TODO timeout this
 
@@ -154,7 +154,7 @@ public enum ClusterState
                         return entered;
                     } else
                     {
-                        context.updated( state );
+                        state.apply( context );
                         return this;
                     }
                 }
@@ -201,7 +201,7 @@ public enum ClusterState
                 case configurationChanged:
                 {
                     ClusterMessage.ConfigurationChangeState state = message.getPayload();
-                    context.updated( state );
+                    state.apply( context );
                     break;
                 }
 
@@ -253,7 +253,7 @@ public enum ClusterState
                         return start;
                     } else
                     {
-                        state.apply(context.getConfiguration());
+                        state.apply(context);
                     }
                 }
             }

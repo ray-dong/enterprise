@@ -49,21 +49,7 @@ public enum ProposerState
                 {
                     case join:
                     {
-                        // TODO Handle coordinator configuration
-                        if (context.clusterContext.isElectedAs( ClusterConfiguration.COORDINATOR) )
-                            return coordinator;
-                        else
-                            return proposer;
-                    }
-
-                    case propose:
-                    {
-                        // Joining cluster
-                        ClusterMessage.ConfigurationChangeState state = message.getPayload();
-
-                        // Don't include myself in list of acceptors
-                        propose( context, message, outgoing, state, context.getAcceptors() );
-                        return coordinator;
+                        return proposer;
                     }
                 }
 
@@ -71,7 +57,7 @@ public enum ProposerState
             }
         },
 
-    coordinator
+    proposer
         {
             @Override
             public ProposerState handle( MultiPaxosContext context,
@@ -90,10 +76,12 @@ public enum ProposerState
                         {
                             ClusterMessage.ConfigurationChangeState state = message.getPayload();
                             List<URI> acceptors = context.getAcceptors();
-                            if (state.isLeaving( context.clusterContext.getMe() ))
+
+                            // Never include node that is leaving
+                            if (state.getLeave() != null)
                             {
                                 acceptors = new ArrayList<URI>( acceptors );
-                                acceptors.remove( context.clusterContext.getMe() );
+                                acceptors.remove( state.getLeave() );
                             }
 
                             propose( context, message, outgoing, payload, acceptors );
@@ -282,12 +270,9 @@ public enum ProposerState
                                         outgoing.process( Message.to( LearnerMessage.learn, learner, new LearnerMessage.LearnState( instance.id, instance.value_2 ) ));
                                     }
 
-                                    // Am I joining?
-                                    if (!state.isLeaving( context.clusterContext.getMe() ))
-                                    {
-                                        // Tell myself of this cluster configuration change
-                                        outgoing.process( Message.internal( LearnerMessage.learn, new LearnerMessage.LearnState( instance.id, instance.value_2 ) ));
-                                    }
+                                    // Tell joiner of this cluster configuration change
+                                    if (state.getJoin() != null)
+                                        outgoing.process( Message.to( LearnerMessage.learn, state.getJoin(), new LearnerMessage.LearnState( instance.id, instance.value_2 ) ));
                                 } else
                                 {
                                     // Tell learners
@@ -327,29 +312,6 @@ public enum ProposerState
                 return this;
             }
 
-        },
-
-    proposer
-        {
-            @Override
-            public ProposerState handle( MultiPaxosContext context,
-                                         Message<ProposerMessage> message,
-                                         MessageProcessor outgoing
-            )
-                throws Throwable
-            {
-                switch( message.getMessageType() )
-                {
-                    case propose:
-                    {
-                        // Return URI of who I think is coordinator
-                        AtomicBroadcastMessage.RedirectState state = new AtomicBroadcastMessage.RedirectState(context.clusterContext.getConfiguration().getElected( ClusterConfiguration.COORDINATOR ));
-                        outgoing.process( Message.respond( AtomicBroadcastMessage.redirect, message, state ) );
-                    }
-                }
-
-                return this;
-            }
         };
 
     public final int MAX_CONCURRENT_INSTANCES = 10;
@@ -364,7 +326,7 @@ public enum ProposerState
 
         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( instanceId );
 
-        if (instance.isState( PaxosInstance.State.empty ))
+        if (!(instance.isState( PaxosInstance.State.closed ) || instance.isState( PaxosInstance.State.delivered )))
         {
             instance.propose(instanceId, ballot, acceptors);
 

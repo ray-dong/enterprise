@@ -58,10 +58,10 @@ public class HeartbeatContext
         failed.clear();
     }
 
-    public void alive( final URI node )
+    public boolean alive( final URI node )
     {
         Set<URI> serverSuspicions = getSuspicionsFor( context.getMe() );
-        serverSuspicions.remove( node );
+        boolean suspected = serverSuspicions.remove( node );
 
         if (!isFailed( node ) && failed.remove( node ))
         {
@@ -74,6 +74,8 @@ public class HeartbeatContext
                 }
             } );
         }
+
+        return suspected;
     }
 
     public void suspect(final URI node)
@@ -194,11 +196,6 @@ public class HeartbeatContext
         return suspicions.size() > context.getConfiguration().getNodes().size() / 2;
     }
 
-    public boolean shouldPromoteMeToCoordinator()
-    {
-        return isFailed( context.getConfiguration().getNodes().get( 0 ) ) && isNextInLine();
-    }
-
     public List<URI> getSuspicionsOf( URI uri )
     {
         List<URI> suspicions = new ArrayList<URI>(  );
@@ -220,20 +217,5 @@ public class HeartbeatContext
             nodeSuspicions.put( uri, serverSuspicions );
         }
         return serverSuspicions;
-    }
-
-    private boolean isNextInLine()
-    {
-        for( URI node : context.getConfiguration().getNodes() )
-        {
-            if (getSuspicionsFor( node ).contains( context.getConfiguration()
-                                                       .getElected( ClusterConfiguration.COORDINATOR ) ))
-                return false; // Someone else suspects coordinator and is before me
-
-            if (node.equals( context.getMe() ))
-                return true;
-        }
-
-        return true;
     }
 }

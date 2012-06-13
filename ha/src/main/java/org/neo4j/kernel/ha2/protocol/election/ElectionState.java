@@ -24,7 +24,11 @@ import java.net.URI;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerState;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
+import org.slf4j.LoggerFactory;
 
 /**
  * TODO
@@ -43,22 +47,14 @@ public enum ElectionState
             {
                 switch( message.getMessageType() )
                 {
-                    case addElectionListener:
+                    case created:
                     {
-                        context.addElectionListener(message.<ElectionListener>getPayload());
-                        break;
-                    }
-
-                    case removeElectionListener:
-                    {
-                        context.removeElectionListener( message.<ElectionListener>getPayload() );
-                        break;
+                        context.created();
+                        return election;
                     }
 
                     case join:
                     {
-                        context.created();
-
                         return election;
                     }
                 }
@@ -78,74 +74,72 @@ public enum ElectionState
             {
                 switch( message.getMessageType() )
                 {
-                    case addElectionListener:
-                    {
-                        context.addElectionListener(message.<ElectionListener>getPayload());
-                        break;
-                    }
-
-                    case removeElectionListener:
-                    {
-                        context.removeElectionListener(message.<ElectionListener>getPayload());
-                        break;
-                    }
-
                     case demote:
                     {
                         URI demoteNode = message.getPayload();
 
-                        context.clearSuggestions(demoteNode);
-
-                        // Allow other live nodes to suggest which one should take over
-                        for( URI uri : context.getClusterContext().getConfiguration().getNodes() )
+                        // Start election process for all roles that this node hade
+                        for( String role : context.getRoles( demoteNode ) )
                         {
-                            if (!context.getHeartbeatContext().getFailed().contains( uri ))
+                            if (!context.isElectionProcessInProgress( role ))
                             {
-                                // This is a candidate - allow it to suggest itself for promotion
-                                outgoing.process( Message.to( ElectionMessage.suggest, uri, demoteNode ));
+                                context.startElectionProcess( role );
+
+                                // Allow other live nodes to vote which one should take over
+                                for( URI uri : context.getClusterContext().getConfiguration().getNodes() )
+                                {
+                                    if (!context.getHeartbeatContext().getFailed().contains( uri ))
+                                    {
+                                        // This is a candidate - allow it to vote itself for promotion
+                                        outgoing.process( Message.to( ElectionMessage.vote, uri, role ));
+                                    }
+                                }
+                                context.getClusterContext().timeouts.setTimeout( "election-"+role, Message.timeout( ElectionMessage.electionTimeout, message ) );
                             }
                         }
-                        context.getClusterContext().timeouts.setTimeout( "demote-"+demoteNode, Message.timeout( ElectionMessage.suggestTimeout, message ) );
+
                         break;
                     }
 
-                    case suggest:
+                    case vote:
                     {
-                        URI demoteNode = message.getPayload();
+                        String role = message.getPayload();
 
-                        if (context.getHeartbeatContext().isFailed( demoteNode ))
+/*
+                        URI currentlyElectedNode = context.getClusterContext().getConfiguration().getElected( role );
+                        if (currentlyElectedNode == null || context.nodeIsSuspected(currentlyElectedNode))
                         {
-                            outgoing.process( Message.respond( ElectionMessage.suggestion, message, new ElectionMessage.SuggestionData( demoteNode, context
-                                .getClusterContext()
-                                .getConfiguration()
-                                .getNodes()
-                                .indexOf( context.getClusterContext().getMe() ))));
-                        }
+*/
+                            outgoing.process( Message.respond( ElectionMessage.voted, message, new ElectionMessage.VotedData( role, context.getCredentialsForRole( role ))));
+//                        }
                         break;
                     }
 
-                    case suggestion:
+                    case voted:
                     {
-                        ElectionMessage.SuggestionData data = message.getPayload();
-                        context.suggestion( data.getDemoteNode(), new URI( message.getHeader( Message.FROM )), data );
+                        ElectionMessage.VotedData data = message.getPayload();
+                        context.voted( data.getRole(), new URI( message.getHeader( Message.FROM ) ), data.getVoteCredentials() );
 
-                        if (context.getSuggestions().get( data.getDemoteNode() ).size() == (context.getClusterContext().getConfiguration().getNodes().size()-context.getHeartbeatContext().getFailed().size()))
+                        if (context.getVoteCount(data.getRole()) == context.getNeededVoteCount())
                         {
-                            // We have all suggestions now
-                            URI winner = context.getPreferredSuggestion(data.getDemoteNode());
+                            context.getClusterContext().timeouts.cancelTimeout( "election-"+data.getRole() );
+
+                            // We have all votes now
+                            URI winner = context.getElectionWinner( data.getRole() );
 
                             // Broadcast this
-                            for( String role : context.getRoles( data.getDemoteNode() ))
-                            {
-                                outgoing.process( Message.internal( AtomicBroadcastMessage.broadcast, new RoleElection( role, winner ) ) );
-                            }
+                            ClusterMessage.ConfigurationChangeState configurationChangeState = new ClusterMessage.ConfigurationChangeState();
+                            configurationChangeState.elected( data.getRole(), winner );
+                            outgoing.process( Message.internal( ProposerMessage.propose,
+                                                                configurationChangeState ));
                         }
                         break;
                     }
 
-                    case suggestTimeout:
+                    case electionTimeout:
                     {
-
+                        // Something was lost
+                        LoggerFactory.getLogger(getClass()).warn( "Election timed out" );
                     }
                 }
 

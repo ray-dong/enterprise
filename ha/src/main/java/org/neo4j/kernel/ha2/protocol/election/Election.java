@@ -27,7 +27,5 @@ import java.net.URI;
  */
 public interface Election
 {
-    void addElectionListener(ElectionListener listener);
-    void removeElectionListener(ElectionListener listener);
     void demote( URI node);
 }

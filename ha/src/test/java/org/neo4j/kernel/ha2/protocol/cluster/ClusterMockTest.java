@@ -205,6 +205,12 @@ public class ClusterMockTest
                 out.add( cluster );
                 config.set( null );
             }
+
+            @Override
+            public void elected( String role, URI electedNode )
+            {
+                logger.getLogger().info( uri + " sees an election: "+electedNode+" elected as "+role );
+            }
         } );
         return config;
     }

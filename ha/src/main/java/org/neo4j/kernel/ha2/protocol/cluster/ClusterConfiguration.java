@@ -25,8 +25,13 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.neo4j.helpers.Function;
+import org.neo4j.helpers.Specification;
+import org.neo4j.helpers.collection.Iterables;
 
 /**
  * Cluster configuration. Includes name of cluster, list of nodes, and role mappings
@@ -84,6 +89,22 @@ public class ClusterConfiguration
     {
         this.nodes = new ArrayList<URI>(nodes);
         nodes.remove( nodeUrl );
+
+        // Remove any roles that this node had
+        Iterator<Map.Entry<String,URI>> entries = roles.entrySet().iterator();
+        while( entries.hasNext() )
+        {
+            Map.Entry<String, URI> roleEntry = entries.next();
+
+            if (roleEntry.getValue().equals( nodeUrl ))
+                entries.remove();
+        }
+    }
+
+    public void elected( String name, URI node )
+    {
+        roles = new HashMap<String, URI>( roles );
+        roles.put( name, node );
     }
 
     public void setNodes( Iterable<URI> nodes )
@@ -121,29 +142,44 @@ public class ClusterConfiguration
         return allowedFailures;
     }
 
-    @Override
-    public String toString()
-    {
-        return "Nodes:"+nodes;
-    }
-
     public void left()
     {
         this.nodes = new ArrayList<URI>();
     }
 
-    public void setElected( String name, URI node )
-    {
-        roles.put( name, node );
-    }
-
     public void removeElected( String roleName )
     {
+        roles = new HashMap<String, URI>( roles );
         roles.remove( roleName );
     }
 
     public URI getElected( String roleName )
     {
         return roles.get( roleName );
+    }
+
+    public Iterable<String> getRoles( final URI node)
+    {
+        return Iterables.map( new Function<Map.Entry<String, URI>, String>()
+        {
+            @Override
+            public String map( Map.Entry<String, URI> stringURIEntry )
+            {
+                return stringURIEntry.getKey();
+            }
+        }, Iterables.filter( new Specification<Map.Entry<String, URI>>()
+        {
+            @Override
+            public boolean satisfiedBy( Map.Entry<String, URI> item )
+            {
+                return item.getValue().equals( node );
+            }
+        }, roles.entrySet() ) );
+    }
+
+    @Override
+    public String toString()
+    {
+        return "Nodes:"+nodes+" Roles:"+roles;
     }
 }

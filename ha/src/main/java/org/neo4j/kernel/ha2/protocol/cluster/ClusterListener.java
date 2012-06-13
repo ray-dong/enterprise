@@ -31,9 +31,5 @@ public interface ClusterListener
     void joinedCluster(URI node);
     void leftCluster(URI node);
     void leftCluster();
-
-/*
-    void enterFailed(Throwable cause);
-    void leaveFailed(Throwable cause);
-*/
+    void elected(String role, URI electedNode);
 }

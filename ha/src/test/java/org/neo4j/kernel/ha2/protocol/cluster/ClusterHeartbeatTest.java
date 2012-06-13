@@ -46,7 +46,7 @@ public class ClusterHeartbeatTest
     }
 
     @Test
-    public void threeNodesJoinAndThenOneDies()
+    public void threeNodesJoinAndThenSlaveDies()
         throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
     {
          testCluster(3, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
@@ -54,11 +54,35 @@ public class ClusterHeartbeatTest
              join( 100, 1 ).
              join( 100,2 ).
              join( 100,3 ).
+             message( 100, "*** All nodes up and ok" ).
              down( 500, 3).
              message( 1000, "*** Should have seen failure by now" ).
              up(0, 3).
              message( 200, "*** Should have recovered by now" ).
              leave(200, 1).
+             leave(200, 2).
+             leave(200, 3));
+    }
+
+    @Test
+    public void threeNodesJoinAndThenCoordinatorDies()
+        throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
+    {
+         testCluster(3, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
+             rounds( 300 ).
+             join( 100, 1 ).
+             join( 100,2 ).
+             join( 100,3 ).
+             message( 100, "*** All nodes up and ok" ).
+             down( 500, 1).
+             message( 1000, "*** Should have seen failure by now" ).
+             up(0, 1).
+             message( 200, "*** Should have recovered by now" ).
+             down( 0, 2 ).
+             message( 1000, "*** Should have seen failure by now" ).
+             up(0, 2).
+             message( 200, "*** All nodes leave" ).
+             leave(0, 1).
              leave(200, 2).
              leave(200, 3));
     }

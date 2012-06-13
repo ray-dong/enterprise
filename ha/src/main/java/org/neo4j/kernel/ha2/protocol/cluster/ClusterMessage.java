@@ -39,6 +39,7 @@ public enum ClusterMessage
     addClusterListener, removeClusterListener,
 
     // Protocol messages
+    joining,joiningTimeout,
     configuration,configurationResponse,configurationTimeout, configurationChanged, joinFailure;
 
     public static class ConfigurationResponseState
@@ -77,6 +78,9 @@ public enum ClusterMessage
         private URI join;
         private URI leave;
 
+        private String role;
+        private URI winner;
+
         public void join(URI uri)
         {
             this.join = uri;
@@ -85,6 +89,12 @@ public enum ClusterMessage
         public void leave(URI uri)
         {
             this.leave = uri;
+        }
+
+        public void elected( String role, URI winner )
+        {
+            this.role = role;
+            this.winner = winner;
         }
 
         public URI getJoin()
@@ -97,13 +107,16 @@ public enum ClusterMessage
             return leave;
         }
 
-        public void apply(ClusterConfiguration config)
+        public void apply(ClusterContext context)
         {
             if (join != null)
-                config.joined( join );
+                context.joined( join );
 
             if (leave != null)
-                config.left( leave );
+                context.left( leave );
+
+            if (role != null)
+                context.elected( role, winner );
         }
 
         public boolean isLeaving( URI me )
@@ -114,7 +127,12 @@ public enum ClusterMessage
         @Override
         public String toString()
         {
-            return "Change cluster config: "+(join == null ? "leave:"+leave : "join:"+join.toString());
+            if (join != null)
+                return "Change cluster config, join:"+join;
+            if (leave != null)
+                return "Change cluster config, leave:"+leave;
+
+            return "Change cluster config, elected:"+winner+" as "+role;
         }
     }
 

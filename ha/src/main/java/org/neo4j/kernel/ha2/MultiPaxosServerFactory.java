@@ -40,10 +40,13 @@ import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterState;
+import org.neo4j.kernel.ha2.protocol.election.Election;
 import org.neo4j.kernel.ha2.protocol.election.ElectionContext;
+import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
 import org.neo4j.kernel.ha2.protocol.election.ElectionRole;
 import org.neo4j.kernel.ha2.protocol.election.ElectionState;
+import org.neo4j.kernel.ha2.protocol.election.ReelectionHeartbeatListener;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatIAmAliveProcessor;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatJoinListener;
@@ -95,10 +98,11 @@ public class MultiPaxosServerFactory
         final ClusterContext clusterContext = new ClusterContext(proposerContext, learnerContext, new ClusterConfiguration( initialConfig.getName(), initialConfig.getNodes() ),timeouts);
         final HeartbeatContext heartbeatContext = new HeartbeatContext(clusterContext);
         final MultiPaxosContext context = new MultiPaxosContext(clusterContext, proposerContext, learnerContext, timeouts);
-        ElectionContext electionContext = new ElectionContext( iterable( new ElectionRole( "coordinator" ) ), clusterContext, heartbeatContext );
+        ElectionContext electionContext = new ElectionContext( iterable( new ElectionRole( ClusterConfiguration.COORDINATOR ) ), clusterContext, heartbeatContext );
         SnapshotContext snapshotContext = new SnapshotContext( clusterContext, learnerContext );
+        AtomicBroadcastContext atomicBroadcastContext = new AtomicBroadcastContext( clusterContext );
 
-        connectedStateMachines.addStateMachine( new StateMachine(new AtomicBroadcastContext(), AtomicBroadcastMessage.class, AtomicBroadcastState.start) );
+        connectedStateMachines.addStateMachine( new StateMachine( atomicBroadcastContext, AtomicBroadcastMessage.class, AtomicBroadcastState.start) );
         connectedStateMachines.addStateMachine( new StateMachine(context, AcceptorMessage.class, AcceptorState.start) );
         connectedStateMachines.addStateMachine( new StateMachine(context, ProposerMessage.class, ProposerState.start) );
         connectedStateMachines.addStateMachine( new StateMachine(context, LearnerMessage.class, LearnerState.start) );
@@ -121,9 +125,20 @@ public class MultiPaxosServerFactory
             }
         } );
 
-        connectedStateMachines.addMessageProcessor( new HeartbeatRefreshProcessor( connectedStateMachines.getOutgoing() ) );
-        input.addMessageProcessor( new HeartbeatIAmAliveProcessor( connectedStateMachines.getOutgoing() ) );
+//        connectedStateMachines.addMessageProcessor( new HeartbeatRefreshProcessor( connectedStateMachines.getOutgoing() ) );
+//        input.addMessageProcessor( new HeartbeatIAmAliveProcessor( connectedStateMachines.getOutgoing() ) );
+
         server.newClient( Cluster.class ).addClusterListener( new HeartbeatJoinListener(connectedStateMachines.getOutgoing()));
+
+        heartbeatContext.addHeartbeatListener( new ReelectionHeartbeatListener(server.newClient( Election.class )) );
+        electionContext.setElectionCredentialsProvider( new ElectionCredentialsProvider()
+        {
+            @Override
+            public Comparable<Object> getCredentials( String role )
+            {
+                return (Comparable) server.getServerId().toString();
+            }
+        } );
 
         StateMachineRules rules = new StateMachineRules( connectedStateMachines.getOutgoing() )
            .rule( ClusterState.start, ClusterMessage.create, ClusterState.entered,
@@ -132,7 +147,7 @@ public class MultiPaxosServerFactory
                   internal( AcceptorMessage.join ),
                   internal( LearnerMessage.join ),
                   internal( HeartbeatMessage.join ),
-                  internal( ElectionMessage.join ),
+                  internal( ElectionMessage.created ),
                   internal( SnapshotMessage.join ) )
 
            .rule( ClusterState.acquiringConfiguration, ClusterMessage.configurationResponse, ClusterState.joining,
@@ -145,13 +160,16 @@ public class MultiPaxosServerFactory
                   internal( AcceptorMessage.join ),
                   internal( LearnerMessage.join ),
                   internal( HeartbeatMessage.join ),
+                  internal( ElectionMessage.join ),
                   internal( SnapshotMessage.join ) )
 
            .rule( ClusterState.joining, ClusterMessage.configurationChanged, ClusterState.entered,
                   internal( AtomicBroadcastMessage.entered ),
+                  internal( ProposerMessage.join ),
                   internal( AcceptorMessage.join ),
                   internal( LearnerMessage.join ),
                   internal( HeartbeatMessage.join ),
+                  internal( ElectionMessage.join ),
                   internal( SnapshotMessage.join ) )
 
            .rule( ClusterState.joining, ClusterMessage.joinFailure, ClusterState.start,
@@ -166,6 +184,7 @@ public class MultiPaxosServerFactory
                   internal( LearnerMessage.leave ),
                   internal( HeartbeatMessage.leave ),
                   internal( SnapshotMessage.leave ),
+                  internal( ElectionMessage.leave ),
                   internal( ProposerMessage.leave ) )
 
            .rule( ClusterState.leaving, ClusterMessage.configurationChanged, ClusterState.start,
@@ -173,6 +192,7 @@ public class MultiPaxosServerFactory
                   internal( AcceptorMessage.leave ),
                   internal( LearnerMessage.leave ),
                   internal( HeartbeatMessage.leave ),
+                  internal( ElectionMessage.leave ),
                   internal( SnapshotMessage.leave ),
                   internal( ProposerMessage.leave ) );
 

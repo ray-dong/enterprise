@@ -20,16 +20,26 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import java.net.URI;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 
 /**
  * Context shared by all Paxos state machines.
  */
 public class AtomicBroadcastContext
 {
-    Iterable<AtomicBroadcastListener> listeners = Listeners.newListeners();
+    private final ClusterContext context;
+
+    private Iterable<AtomicBroadcastListener> listeners = Listeners.newListeners();
+
+    public AtomicBroadcastContext( ClusterContext context )
+    {
+        this.context = context;
+    }
 
     public void addAtomicBroadcastListener( AtomicBroadcastListener listener )
     {
@@ -51,5 +61,10 @@ public class AtomicBroadcastContext
                         listener.receive( value );
                     }
                 } );
+    }
+
+    public URI getCoordinator()
+    {
+        return context.getConfiguration().getElected( ClusterConfiguration.COORDINATOR );
     }
 }

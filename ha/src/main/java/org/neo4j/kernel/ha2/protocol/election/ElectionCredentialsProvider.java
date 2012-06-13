@@ -18,38 +18,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.cluster;
-
-import java.net.URI;
+package org.neo4j.kernel.ha2.protocol.election;
 
 /**
- * Noop adapter for ClusterListener
+ * Implementations of this provide the credential for the local node to be used in elec
  */
-public class ClusterAdapter
-    implements ClusterListener
+public interface ElectionCredentialsProvider
 {
-    @Override
-    public void enteredCluster( ClusterConfiguration nodes )
-    {
-    }
-
-    @Override
-    public void joinedCluster( URI node )
-    {
-    }
-
-    @Override
-    public void leftCluster( URI node )
-    {
-    }
-
-    @Override
-    public void leftCluster()
-    {
-    }
-
-    @Override
-    public void elected( String role, URI electedNode )
-    {
-    }
+    Comparable<Object> getCredentials(String role);
 }

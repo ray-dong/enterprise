@@ -20,7 +20,6 @@
 
 package org.neo4j.kernel.ha2.protocol.election;
 
-import java.net.URI;
 import org.neo4j.com_2.message.MessageType;
 
 /**
@@ -29,30 +28,28 @@ import org.neo4j.com_2.message.MessageType;
 public enum ElectionMessage
     implements MessageType
 {
-    join,leave,
-    addElectionListener,removeElectionListener,
-    demote, suggest, suggestTimeout, suggestion;
+    created,join,leave,
+    demote, vote, electionTimeout, voted;
 
-    public static class SuggestionData
+    public static class VotedData
     {
-        private URI demoteNode;
-        private int index;
+        private String role;
+        private Comparable<Object> voteCredentials;
 
-        public SuggestionData( URI demoteNode, int index )
+        public VotedData( String role, Comparable<Object> voteCredentials )
         {
-            this.demoteNode = demoteNode;
-            this.index = index;
+            this.role = role;
+            this.voteCredentials = voteCredentials;
         }
 
-        public URI getDemoteNode()
+        public String getRole()
         {
-            return demoteNode;
+            return role;
         }
 
-        public int getIndex()
+        public Comparable<Object> getVoteCredentials()
         {
-            return index;
+            return voteCredentials;
         }
     }
-
 }

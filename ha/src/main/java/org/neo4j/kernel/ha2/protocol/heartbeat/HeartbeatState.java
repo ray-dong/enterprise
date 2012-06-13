@@ -57,14 +57,12 @@ public enum HeartbeatState
                     break;
                 }
 
-/*
                 case join:
                 {
                     // Setup heartbeat timeouts
                     context.startHeartbeatTimers(message);
                     return heartbeat;
                 }
-*/
             }
 
             return this;
@@ -86,7 +84,17 @@ public enum HeartbeatState
                 {
                     HeartbeatMessage.IAmAliveState state = (HeartbeatMessage.IAmAliveState) message.getPayload();
 
-                    context.alive( state.getServer() );
+                    if (context.alive( state.getServer() ))
+                    {
+                        // Send suspicions messages to all non-failed servers
+                        for( URI aliveServer : context.getAlive() )
+                        {
+                            if (!aliveServer.equals( context.getClusterContext().getMe() ))
+                                outgoing.process( Message.to( HeartbeatMessage.suspicions, aliveServer, new HeartbeatMessage.SuspicionsState(context.getSuspicionsFor( context
+                                                                                                                                                                           .getClusterContext()
+                                                                                                                                                                           .getMe() )) ) );
+                        }
+                    }
 
                     context.getClusterContext().timeouts.cancelTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer() );
                     context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer(), timeout( HeartbeatMessage.timed_out, message, state
@@ -155,11 +163,13 @@ public enum HeartbeatState
 
                     context.suspicions( from, suspicions.getSuspicions() );
 
+/*
                     if (context.shouldPromoteMeToCoordinator())
                     {
                         // TODO Master election
                         LoggerFactory.getLogger(getClass()).info( "Elect me to be master! "+context.getClusterContext().getMe() );
                     }
+*/
 
                     break;
                 }

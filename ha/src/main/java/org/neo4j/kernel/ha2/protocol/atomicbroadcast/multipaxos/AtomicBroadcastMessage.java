@@ -31,22 +31,29 @@ public enum AtomicBroadcastMessage
     implements MessageType
 {
     entered, join, leave, // Group management
-    broadcastResponse, redirect, failed, // Internal message created by implementation
+    broadcastResponse, failed, // Internal message created by implementation
     broadcast, addAtomicBroadcastListener, removeAtomicBroadcastListener; // AtomicBroadcast API
 
     public static class RedirectState
         implements Serializable
     {
         private URI coordinator;
+        private Object value;
 
-        public RedirectState( URI coordinator )
+        public RedirectState( URI coordinator, Object value )
         {
             this.coordinator = coordinator;
+            this.value = value;
         }
 
         public URI getCoordinator()
         {
             return coordinator;
+        }
+
+        public Object getValue()
+        {
+            return value;
         }
     }
 }

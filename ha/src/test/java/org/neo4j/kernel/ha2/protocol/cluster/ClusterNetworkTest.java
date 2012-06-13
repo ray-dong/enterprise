@@ -242,6 +242,12 @@ public class ClusterNetworkTest
                 out.add( cluster );
                 config.set( null );
             }
+
+            @Override
+            public void elected( String role, URI electedNode )
+            {
+                logger.getLogger().info( uri + " sees an election:" + electedNode+" as "+role );
+            }
         } );
         return config;
     }

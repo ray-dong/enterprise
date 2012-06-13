@@ -36,13 +36,12 @@ import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
  */
 public class ElectionContext
 {
-    Iterable<ElectionListener> listeners = Listeners.newListeners();
-
     private List<ElectionRole> roles = new ArrayList<ElectionRole>(  );
     private ClusterContext clusterContext;
     private HeartbeatContext heartbeatContext;
 
-    private Map<URI, List<Suggestion>> suggestions = new HashMap<URI, List<Suggestion>>(  );
+    private Map<String, List<Vote>> votes = new HashMap<String, List<Vote>>(  );
+    private ElectionCredentialsProvider electionCredentialsProvider;
 
     public ElectionContext( Iterable<ElectionRole> roles, ClusterContext clusterContext, HeartbeatContext heartbeatContext )
     {
@@ -51,14 +50,9 @@ public class ElectionContext
         this.clusterContext = clusterContext;
     }
 
-    public void addElectionListener( ElectionListener listener )
+    public void setElectionCredentialsProvider( ElectionCredentialsProvider electionCredentialsProvider )
     {
-        listeners = Listeners.addListener( listener, listeners );
-    }
-
-    public void removeElectionListener(ElectionListener listener)
-    {
-        listeners = Listeners.removeListener( listener, listeners );
+        this.electionCredentialsProvider = electionCredentialsProvider;
     }
 
     public void created()
@@ -101,44 +95,80 @@ public class ElectionContext
         clusterContext.getConfiguration().removeElected(roleName);
     }
 
-    public void clearSuggestions( URI demoteNode )
+    public boolean isElectionProcessInProgress(String role)
     {
-        suggestions.remove( demoteNode );
+        return votes.containsKey( role );
     }
 
-    public void suggestion(URI demoteNode, URI suggestedNode, ElectionMessage.SuggestionData data)
+    public void startElectionProcess( String role )
     {
-        List<Suggestion> suggestionList = (List<Suggestion>) suggestions.get( demoteNode );
-        if (suggestionList == null)
-        {
-            suggestionList = new ArrayList<Suggestion>(  );
-            suggestions.put( demoteNode, suggestionList );
-        }
-        suggestionList.add( new Suggestion( suggestedNode, data ) );
+        List<Vote> voteList = new ArrayList<Vote>(  );
+        votes.put( role, voteList );
     }
 
-    public Map<URI, List<Suggestion>> getSuggestions()
+    public void voted( String role, URI suggestedNode, Comparable<Object> suggestionCredentials )
     {
-        return suggestions;
+        List<Vote> voteList = votes.get( role );
+        if ( voteList == null)
+            return; // We're not doing any election process for this role
+        voteList.add( new Vote( suggestedNode, suggestionCredentials ) );
     }
 
-    public URI getPreferredSuggestion( URI demoteNode )
+    public Map<String, List<Vote>> getVotes()
     {
-        List<Suggestion> suggestionList = suggestions.get( demoteNode );
-        Collections.sort( suggestionList );
-        return suggestionList.get( 0 ).getSuggestedNode();
+        return votes;
     }
 
-    private static class Suggestion
-        implements Comparable<Suggestion>
+    public URI getElectionWinner( String role )
     {
-        URI suggestedNode;
-        ElectionMessage.SuggestionData data;
+        List<Vote> voteList = votes.get( role );
+        if ( voteList == null || voteList.isEmpty())
+            return null;
 
-        private Suggestion( URI suggestedNode, ElectionMessage.SuggestionData data )
+        votes.remove( role );
+
+        // Sort based on credentials
+        // The most suited candidate should come out on top
+        Collections.sort( voteList );
+        Collections.reverse( voteList );
+
+        return voteList.get( 0 ).getSuggestedNode();
+    }
+
+    public Comparable<Object> getCredentialsForRole( String role )
+    {
+        return electionCredentialsProvider.getCredentials( role );
+    }
+
+    public int getVoteCount( String role )
+    {
+        List<Vote> voteList = votes.get( role );
+        if ( voteList == null)
+            return 0;
+
+        return voteList.size();
+    }
+
+    public int getNeededVoteCount()
+    {
+        return clusterContext.getConfiguration().getNodes().size()-heartbeatContext.getFailed().size();
+    }
+
+    public boolean nodeIsSuspected( URI node )
+    {
+        return heartbeatContext.getSuspicionsFor( clusterContext.getMe() ).contains( node );
+    }
+
+    private static class Vote
+        implements Comparable<Vote>
+    {
+        private final URI suggestedNode;
+        private final Comparable<Object> voteCredentials;
+
+        private Vote( URI suggestedNode, Comparable<Object> voteCredentials )
         {
             this.suggestedNode = suggestedNode;
-            this.data = data;
+            this.voteCredentials = voteCredentials;
         }
 
         public URI getSuggestedNode()
@@ -147,9 +177,9 @@ public class ElectionContext
         }
 
         @Override
-        public int compareTo( Suggestion o )
+        public int compareTo( Vote o )
         {
-            return o.data.getIndex() - data.getIndex();
+            return o.voteCredentials.compareTo( voteCredentials );
         }
     }
 }

@@ -29,8 +29,12 @@ import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 public class ReelectionHeartbeatListener
     implements HeartbeatListener
 {
-    ElectionContext electionContext;
-    Election election;
+    private final Election election;
+
+    public ReelectionHeartbeatListener( Election election )
+    {
+        this.election = election;
+    }
 
     @Override
     public void failed( URI server )

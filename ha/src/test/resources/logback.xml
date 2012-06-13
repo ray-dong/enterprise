@@ -24,19 +24,19 @@
     </encoder>
   </appender>
 
+  <!--
   <logger name="org.neo4j.kernel.ha2.NetworkMock" level="warn">
   </logger>
 
   <logger name="org.neo4j.kernel.ha2.statemachine.StateTransitionLogger" level="warn">
   </logger>
 
-<!--
   <logger name="org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastMap" level="warn">
   </logger>
--->
 
   <logger name="org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerState" level="warn">
   </logger>
+-->
 
   <root level="debug">
     <appender-ref ref="CONSOLE" />
