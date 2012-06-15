@@ -96,6 +96,11 @@ public class ProtocolServer
         return me;
     }
 
+    public ConnectedStateMachines getConnectedStateMachines()
+    {
+        return connectedStateMachines;
+    }
+
     public void addStateTransitionListener( StateTransitionListener stateTransitionListener )
     {
         connectedStateMachines.addStateTransitionListener( stateTransitionListener );

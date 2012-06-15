@@ -58,7 +58,7 @@ public class MultiPaxosNetworkTest
     {
         final LifeSupport life = new LifeSupport();
         NetworkedServerFactory serverFactory = new NetworkedServerFactory( life,
-                new MultiPaxosServerFactory(new ClusterConfiguration("default", "neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
+                new MultiPaxosServerFactory(new ClusterConfiguration("default", "neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003"), new InMemoryAcceptorInstanceStore()),
                 new FixedTimeoutStrategy( 5000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
 
         final ProtocolServer server1 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5001") ));

@@ -23,6 +23,8 @@ package org.neo4j.kernel.ha2;
 import java.net.URI;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorInstanceStore;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorState;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastContext;
@@ -72,15 +74,12 @@ public class MultiPaxosServerFactory
     implements ProtocolServerFactory
 {
     private ClusterConfiguration initialConfig;
+    private AcceptorInstanceStore acceptorInstanceStore;
 
-    public MultiPaxosServerFactory()
-    {
-        this(new ClusterConfiguration( "default" ));
-    }
-
-    public MultiPaxosServerFactory(ClusterConfiguration initialConfig)
+    public MultiPaxosServerFactory(ClusterConfiguration initialConfig, AcceptorInstanceStore acceptorInstanceStore)
     {
         this.initialConfig = initialConfig;
+        this.acceptorInstanceStore = acceptorInstanceStore;
     }
 
     @Override
@@ -93,17 +92,18 @@ public class MultiPaxosServerFactory
         Timeouts timeouts = connectedStateMachines.getTimeouts();
         connectedStateMachines.addMessageProcessor( latencyCalculator );
 
+        AcceptorContext acceptorContext = new AcceptorContext( acceptorInstanceStore );
         LearnerContext learnerContext = new LearnerContext();
         ProposerContext proposerContext = new ProposerContext();
         final ClusterContext clusterContext = new ClusterContext(proposerContext, learnerContext, new ClusterConfiguration( initialConfig.getName(), initialConfig.getNodes() ),timeouts);
         final HeartbeatContext heartbeatContext = new HeartbeatContext(clusterContext);
-        final MultiPaxosContext context = new MultiPaxosContext(clusterContext, proposerContext, learnerContext, timeouts);
+        final MultiPaxosContext context = new MultiPaxosContext(clusterContext, proposerContext, learnerContext, heartbeatContext, timeouts);
         ElectionContext electionContext = new ElectionContext( iterable( new ElectionRole( ClusterConfiguration.COORDINATOR ) ), clusterContext, heartbeatContext );
         SnapshotContext snapshotContext = new SnapshotContext( clusterContext, learnerContext );
         AtomicBroadcastContext atomicBroadcastContext = new AtomicBroadcastContext( clusterContext );
 
         connectedStateMachines.addStateMachine( new StateMachine( atomicBroadcastContext, AtomicBroadcastMessage.class, AtomicBroadcastState.start) );
-        connectedStateMachines.addStateMachine( new StateMachine(context, AcceptorMessage.class, AcceptorState.start) );
+        connectedStateMachines.addStateMachine( new StateMachine(acceptorContext, AcceptorMessage.class, AcceptorState.start) );
         connectedStateMachines.addStateMachine( new StateMachine(context, ProposerMessage.class, ProposerState.start) );
         connectedStateMachines.addStateMachine( new StateMachine(context, LearnerMessage.class, LearnerState.start) );
         connectedStateMachines.addStateMachine( new StateMachine(heartbeatContext, HeartbeatMessage.class, HeartbeatState.start) );
@@ -125,8 +125,8 @@ public class MultiPaxosServerFactory
             }
         } );
 
-//        connectedStateMachines.addMessageProcessor( new HeartbeatRefreshProcessor( connectedStateMachines.getOutgoing() ) );
-//        input.addMessageProcessor( new HeartbeatIAmAliveProcessor( connectedStateMachines.getOutgoing() ) );
+        connectedStateMachines.addMessageProcessor( new HeartbeatRefreshProcessor( connectedStateMachines.getOutgoing() ) );
+        input.addMessageProcessor( new HeartbeatIAmAliveProcessor( connectedStateMachines.getOutgoing() ) );
 
         server.newClient( Cluster.class ).addClusterListener( new HeartbeatJoinListener(connectedStateMachines.getOutgoing()));
 

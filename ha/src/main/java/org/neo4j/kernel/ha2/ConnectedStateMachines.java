@@ -30,6 +30,7 @@ import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.statemachine.StateMachine;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
@@ -184,6 +185,11 @@ public class ConnectedStateMachines
             states.add( stateMachine.getState().getClass().getSuperclass().getSimpleName()+":"+stateMachine.getState().toString() );
         }
         return states.toString();
+    }
+
+    public StateMachine getStateMachine( Class<? extends MessageType> messageType)
+    {
+        return stateMachines.get( messageType );
     }
 
     private class OutgoingMessageProcessor

@@ -46,6 +46,7 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkedServerFactory;
 import org.neo4j.kernel.ha2.ProtocolServer;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InMemoryAcceptorInstanceStore;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.logging.LogbackService;
@@ -150,7 +151,7 @@ public class ClusterNetworkTest
         {
             final URI uri = new URI( "neo4j://localhost:800"+(i+1) );
 
-            NetworkedServerFactory factory = new NetworkedServerFactory( life, new MultiPaxosServerFactory(  ), new FixedTimeoutStrategy( 1000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
+            NetworkedServerFactory factory = new NetworkedServerFactory( life, new MultiPaxosServerFactory( new ClusterConfiguration( "default" ), new InMemoryAcceptorInstanceStore() ), new FixedTimeoutStrategy( 1000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
 
             ProtocolServer server = factory.newNetworkedServer( MapUtil.stringMap( NetworkNodeUDP.cluster_address.name(), uri.getHost(), NetworkNodeUDP
                 .cluster_port.name(), uri.getPort()+"" ) );

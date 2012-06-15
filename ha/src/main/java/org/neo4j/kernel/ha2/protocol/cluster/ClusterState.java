@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
@@ -221,7 +222,7 @@ public enum ClusterState
                         ClusterMessage.ConfigurationChangeState newState = new ClusterMessage.ConfigurationChangeState();
                         newState.leave( context.me );
 
-                        outgoing.process(internal( ProposerMessage.propose, newState ));
+                        outgoing.process(internal( AtomicBroadcastMessage.broadcast, newState ));
 
                         return leaving;
                     }

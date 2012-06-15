@@ -99,12 +99,7 @@ public class HeartbeatContext
 
     public void suspicions(URI from, Set<URI> suspicions)
     {
-        Set<URI> serverSuspicions = nodeSuspicions.get( from );
-        if (serverSuspicions == null)
-        {
-            serverSuspicions = new HashSet<URI>(  );
-            nodeSuspicions.put( from, serverSuspicions );
-        }
+        Set<URI> serverSuspicions = getSuspicionsFor( from );
         serverSuspicions.clear();
         serverSuspicions.addAll( suspicions );
 

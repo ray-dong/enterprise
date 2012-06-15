@@ -51,9 +51,10 @@ public class PaxosInstance
     Object value_2;
     boolean clientValue = false;
 
-    public PaxosInstance( PaxosInstanceStore store )
+    public PaxosInstance( PaxosInstanceStore store, InstanceId instanceId )
     {
         this.store = store;
+        this.id = instanceId;
     }
 
     public boolean isState( State s )
@@ -61,10 +62,9 @@ public class PaxosInstance
         return state.equals( s );
     }
 
-    public void propose( InstanceId instanceId, long ballot, List<URI> acceptors)
+    public void propose( long ballot, List<URI> acceptors)
     {
         this.state = State.p1_pending;
-        this.id = instanceId;
         this.acceptors = acceptors;
         this.ballot = ballot;
     }
@@ -72,13 +72,6 @@ public class PaxosInstance
     {
         this.ballot = ballot;
         promises.clear();
-    }
-
-    public void prepare( InstanceId instanceId, long ballot )
-    {
-        this.state = State.p1_pending;
-        this.id = instanceId;
-        this.ballot = ballot;
     }
 
     public void promise( ProposerMessage.PromiseState promiseState )
@@ -124,12 +117,6 @@ public class PaxosInstance
         promises.clear();
         value_1 = null;
         phase1Ballot = 0;
-    }
-
-    public void accept( Object value )
-    {
-        state = State.p2_pending;
-        value_2 = value;
     }
 
     public void accepted( ProposerMessage.AcceptedState acceptedState )

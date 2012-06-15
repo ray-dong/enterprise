@@ -328,7 +328,7 @@ public enum ProposerState
 
         if (!(instance.isState( PaxosInstance.State.closed ) || instance.isState( PaxosInstance.State.delivered )))
         {
-            instance.propose(instanceId, ballot, acceptors);
+            instance.propose(ballot, acceptors);
 
             for( URI acceptor : acceptors )
             {

@@ -218,9 +218,9 @@ public class NetworkMock
         return now;
     }
 
-    public Collection<TestProtocolServer> getServers()
+    public List<TestProtocolServer> getServers()
     {
-        return participants.values();
+        return new ArrayList<TestProtocolServer>( participants.values() );
     }
 
     public MultipleFailureLatencyStrategy getNetworkLatencyStrategy()

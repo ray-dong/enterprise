@@ -24,6 +24,7 @@ import java.net.URI;
 import java.util.List;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
 
 import static org.neo4j.helpers.collection.Iterables.*;
@@ -36,15 +37,22 @@ public class MultiPaxosContext
     ClusterContext clusterContext;
     ProposerContext proposerContext;
     LearnerContext learnerContext;
+    HeartbeatContext heartbeatContext;
     Timeouts timeouts;
 
     PaxosInstanceStore paxosInstances = new PaxosInstanceStore();
 
-    public MultiPaxosContext(ClusterContext clusterContext, ProposerContext proposerContext, LearnerContext learnerContext, Timeouts timeouts)
+    public MultiPaxosContext( ClusterContext clusterContext,
+                              ProposerContext proposerContext,
+                              LearnerContext learnerContext,
+                              HeartbeatContext heartbeatContext,
+                              Timeouts timeouts
+    )
     {
         this.clusterContext = clusterContext;
         this.proposerContext = proposerContext;
         this.learnerContext = learnerContext;
+        this.heartbeatContext = heartbeatContext;
         this.timeouts = timeouts;
     }
 

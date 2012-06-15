@@ -26,6 +26,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
@@ -38,6 +39,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.kernel.ha2.ConnectedStateMachines;
 import org.neo4j.kernel.ha2.FixedNetworkLatencyStrategy;
 import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.MultipleFailureLatencyStrategy;
@@ -49,7 +51,11 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListenerDeserializer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastSerializer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InMemoryAcceptorInstanceStore;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.protocol.heartbeat.Heartbeat;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatMessage;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
@@ -65,7 +71,7 @@ public class ClusterMockTest
 {
     public static NetworkMock DEFAULT_NETWORK()
     {
-        return new NetworkMock( 10, new MultiPaxosServerFactory(new ClusterConfiguration("default")),
+        return new NetworkMock( 10, new MultiPaxosServerFactory(new ClusterConfiguration("default"), new InMemoryAcceptorInstanceStore()),
                                             new MultipleFailureLatencyStrategy( new FixedNetworkLatencyStrategy(10), new ScriptableNetworkFailureLatencyStrategy()),
                                             new MessageTimeoutStrategy(new FixedTimeoutStrategy(500) )
                                                 .timeout( HeartbeatMessage.send_heartbeat, 200 ));
@@ -74,7 +80,6 @@ public class ClusterMockTest
     List<TestProtocolServer> servers = new ArrayList<TestProtocolServer>(  );
     List<Cluster> out = new ArrayList<Cluster>( );
     List<Cluster> in = new ArrayList<Cluster>();
-    List<AtomicReference<ClusterConfiguration>> configurations = new ArrayList<AtomicReference<ClusterConfiguration>>(  );
 
     @Rule
     public LoggerRule logger = new LoggerRule();
@@ -106,14 +111,13 @@ public class ClusterMockTest
         servers.clear();
         out.clear();
         in.clear();
-        configurations.clear();
 
         for (int i = 0; i < nrOfServers; i++)
         {
             final URI uri = new URI( "server"+(i+1) );
             TestProtocolServer server = network.addServer( uri.toString() );
             final Cluster cluster = server.newClient( Cluster.class );
-            final AtomicReference<ClusterConfiguration> config2 = clusterStateListener( uri, cluster );
+            clusterStateListener( uri, cluster );
 
             server.newClient( Heartbeat.class ).addHeartbeatListener( new HeartbeatListener()
                     {
@@ -140,7 +144,6 @@ public class ClusterMockTest
 
             servers.add( server );
             out.add( cluster );
-            configurations.add( config2 );
         }
 
         // Run test
@@ -171,16 +174,14 @@ public class ClusterMockTest
         verifyConfigurations();
     }
 
-    private AtomicReference<ClusterConfiguration> clusterStateListener( final URI uri, final Cluster cluster )
+    private void clusterStateListener( final URI uri, final Cluster cluster )
     {
-        final AtomicReference<ClusterConfiguration> config = new AtomicReference<ClusterConfiguration>(  );
         cluster.addClusterListener( new ClusterListener()
         {
             @Override
             public void enteredCluster( ClusterConfiguration configuration )
             {
                 logger.getLogger().info( uri + " entered cluster:" + configuration.getNodes() );
-                config.set( new ClusterConfiguration( configuration ) );
                 in.add( cluster );
             }
 
@@ -188,14 +189,12 @@ public class ClusterMockTest
             public void joinedCluster( URI node )
             {
                 logger.getLogger().info( uri + " sees a join:" + node.toString() );
-                config.get().joined( node );
             }
 
             @Override
             public void leftCluster( URI node )
             {
                 logger.getLogger().info( uri + " sees a leave:" + node.toString() );
-                config.get().left( node );
             }
 
             @Override
@@ -203,7 +202,6 @@ public class ClusterMockTest
             {
                 logger.getLogger().info( uri + " left cluster" );
                 out.add( cluster );
-                config.set( null );
             }
 
             @Override
@@ -212,31 +210,40 @@ public class ClusterMockTest
                 logger.getLogger().info( uri + " sees an election: "+electedNode+" elected as "+role );
             }
         } );
-        return config;
     }
 
     public void verifyConfigurations()
     {
         logger.getLogger().info( "Verify configurations" );
         List<URI> nodes = null;
+        Map<String,URI> roles = null;
+        List<URI> failed = null;
         int foundConfiguration = 0;
-        for( int j = 0; j < configurations.size(); j++ )
+        List<TestProtocolServer> protocolServers = network.getServers();
+        for( int j = 0; j < protocolServers.size(); j++ )
         {
-            AtomicReference<ClusterConfiguration> configurationAtomicReference = configurations.get( j );
-            if (configurationAtomicReference.get() != null)
+            ConnectedStateMachines connectedStateMachines = protocolServers.get( j )
+                .getServer()
+                .getConnectedStateMachines();
+            ClusterContext context = (ClusterContext) connectedStateMachines.getStateMachine( ClusterMessage.class ).getContext();
+            HeartbeatContext heartbeatContext = (HeartbeatContext) connectedStateMachines.getStateMachine( HeartbeatMessage.class ).getContext();
+            ClusterConfiguration clusterConfiguration = context.getConfiguration();
+            if (!clusterConfiguration.getNodes().isEmpty())
             {
-                logger.getLogger().info( "   Server "+(j+1)+": "+configurationAtomicReference.get().getNodes() );
+                logger.getLogger().info( "   Server "+(j+1)+": Cluster:"+clusterConfiguration.getNodes()+", Roles:"+clusterConfiguration.getRoles()+", Failed:"+heartbeatContext.getFailed() );
                 foundConfiguration++;
                 if( nodes == null )
                 {
-                    nodes = configurationAtomicReference.get().getNodes();
+                    nodes = clusterConfiguration.getNodes();
+                    roles = clusterConfiguration.getRoles();
+                    failed = heartbeatContext.getFailed();
                 }
                 else
                 {
-                    assertEquals( "Config for server" + ( j + 1 ) + " is wrong", nodes, configurationAtomicReference.get()
-                        .getNodes() );
+                    assertEquals( "Config for server" + ( j + 1 ) + " is wrong", nodes, clusterConfiguration.getNodes() );
+                    assertEquals( "Roles for server" + ( j + 1 ) + " is wrong", roles, clusterConfiguration.getRoles() );
+                    assertEquals( "Failed for server" + ( j + 1 ) + " is wrong", failed, heartbeatContext.getFailed() );
                 }
-
             }
         }
 
@@ -245,7 +252,7 @@ public class ClusterMockTest
             assertEquals( "Nr of found active nodes does not match configuration size", nodes.size(), foundConfiguration );
         }
 
-        assertEquals( "In:" + in + ", Out:" + out, network.getServers().size(), Iterables.count( Iterables.<Cluster, List<Cluster>>flatten( in, out ) ) );
+        assertEquals( "In:" + in + ", Out:" + out, protocolServers.size(), Iterables.count( Iterables.<Cluster, List<Cluster>>flatten( in, out ) ) );
     }
 
     public interface ClusterTestScript

@@ -55,6 +55,11 @@ public class StateMachine
         return state;
     }
 
+    public Object getContext()
+    {
+        return context;
+    }
+
     public void addStateTransitionListener( StateTransitionListener listener
     )
     {

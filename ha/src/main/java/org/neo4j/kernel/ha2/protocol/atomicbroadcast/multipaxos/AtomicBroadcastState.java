@@ -125,7 +125,10 @@ public enum AtomicBroadcastState
                     case broadcast:
                     {
                         URI coordinator = context.getCoordinator();
-                        outgoing.process( to( ProposerMessage.propose, coordinator, message.getPayload() ) );
+                        if (coordinator != null)
+                            outgoing.process( to( ProposerMessage.propose, coordinator, message.getPayload() ) );
+                        else
+                            outgoing.process( internal( ProposerMessage.propose, message.getPayload() ) );
                         break;
                     }
 

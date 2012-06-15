@@ -40,7 +40,8 @@ public class ClusterHeartbeatTest
              join( 100, 1 ).
              join( 100,2 ).
              join( 100,3 ).
-             leave(1000, 1).
+             verifyConfigurations( 1000 ).
+             leave(0, 1).
              leave(200, 2).
              leave(200, 3));
     }
@@ -59,6 +60,7 @@ public class ClusterHeartbeatTest
              message( 1000, "*** Should have seen failure by now" ).
              up(0, 3).
              message( 200, "*** Should have recovered by now" ).
+             verifyConfigurations( 0 ).
              leave(200, 1).
              leave(200, 2).
              leave(200, 3));
@@ -69,7 +71,7 @@ public class ClusterHeartbeatTest
         throws URISyntaxException, ExecutionException, TimeoutException, InterruptedException
     {
          testCluster(3, DEFAULT_NETWORK(), new ClusterTestScriptDSL().
-             rounds( 300 ).
+             rounds( 1000 ).
              join( 100, 1 ).
              join( 100,2 ).
              join( 100,3 ).
@@ -79,9 +81,10 @@ public class ClusterHeartbeatTest
              up(0, 1).
              message( 200, "*** Should have recovered by now" ).
              down( 0, 2 ).
-             message( 1000, "*** Should have seen failure by now" ).
+             message( 1400, "*** Should have seen failure by now" ).
              up(0, 2).
-             message( 200, "*** All nodes leave" ).
+             message( 800, "*** All nodes leave" ).
+             verifyConfigurations( 0 ).
              leave(0, 1).
              leave(200, 2).
              leave(200, 3));

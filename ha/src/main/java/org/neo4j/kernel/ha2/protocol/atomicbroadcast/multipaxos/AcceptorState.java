@@ -29,12 +29,12 @@ import org.slf4j.LoggerFactory;
  * State machine for Paxos Acceptor
  */
 public enum AcceptorState
-    implements State<MultiPaxosContext, AcceptorMessage>
+    implements State<AcceptorContext, AcceptorMessage>
 {
     start
         {
             @Override
-            public AcceptorState handle( MultiPaxosContext context,
+            public AcceptorState handle( AcceptorContext context,
                                       Message<AcceptorMessage> message,
                                       MessageProcessor outgoing
             )
@@ -55,7 +55,7 @@ public enum AcceptorState
     acceptor
         {
             @Override
-            public AcceptorState handle( MultiPaxosContext context,
+            public AcceptorState handle( AcceptorContext context,
                                       Message<AcceptorMessage> message,
                                       MessageProcessor outgoing
             )
@@ -66,18 +66,18 @@ public enum AcceptorState
                     case prepare:
                     {
                         AcceptorMessage.PrepareState prepareState = message.getPayload();
-                        PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( prepareState.getInstanceId() );
+                        AcceptorInstance instance = context.getAcceptorInstance( prepareState.getInstanceId() );
 
-                        if ( prepareState.getBallot() >= instance.ballot)
+                        if ( prepareState.getBallot() >= instance.getBallot())
                         {
-                            instance.prepare(prepareState.getInstanceId(), prepareState.getBallot());
+                            context.promise(instance, prepareState.getBallot() );
 
-                            outgoing.process(Message.respond( ProposerMessage.promise, message, new ProposerMessage.PromiseState( instance.id, instance.ballot, instance.value_2 ) ));
+                            outgoing.process(Message.respond( ProposerMessage.promise, message, new ProposerMessage.PromiseState( prepareState.getInstanceId(), prepareState.getBallot(), instance.getValue() ) ));
                         } else
                         {
                             // Optimization - explicit reject
-                            LoggerFactory.getLogger(AcceptorState.class).info( "Reject "+prepareState.getInstanceId()+" ballot:"+instance.ballot );
-                            outgoing.process(Message.respond( ProposerMessage.rejectPropose, message, new ProposerMessage.RejectProposeState( instance.id, instance.ballot ) ));
+                            LoggerFactory.getLogger(AcceptorState.class).info( "Reject "+prepareState.getInstanceId()+" ballot:"+instance.getBallot() );
+                            outgoing.process(Message.respond( ProposerMessage.rejectPropose, message, new ProposerMessage.RejectProposeState( prepareState.getInstanceId(), instance.getBallot() ) ));
                         }
                         break;
                     }
@@ -86,19 +86,20 @@ public enum AcceptorState
                     {
                         // Task 4
                         AcceptorMessage.AcceptState acceptState = message.getPayload();
-                        PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( acceptState.getInstance() );
+                        AcceptorInstance instance = context.getAcceptorInstance( acceptState.getInstanceId() );
 
-                        if (acceptState.getInstance() != null)
+                        if (acceptState.getInstanceId() != null)
                         {
-                            if (acceptState.getBallot() == instance.ballot)
+                            if (acceptState.getBallot() == instance.getBallot())
                             {
+                                context.accept(instance, acceptState.getValue());
                                 instance.accept(acceptState.getValue());
 
-                                outgoing.process( Message.respond( ProposerMessage.accepted, message, new ProposerMessage.AcceptedState( instance.id ) ) );
+                                outgoing.process( Message.respond( ProposerMessage.accepted, message, new ProposerMessage.AcceptedState( acceptState.getInstanceId() ) ) );
                             } else
                             {
-                                LoggerFactory.getLogger(AcceptorState.class).info( "Reject "+acceptState.getInstance()+" accept ballot:"+acceptState.getBallot()+" actual ballot:"+instance.ballot );
-                                outgoing.process(Message.respond( ProposerMessage.rejectAccept, message, new ProposerMessage.RejectAcceptState( acceptState.getInstance() ) ));
+                                LoggerFactory.getLogger(AcceptorState.class).info( "Reject "+acceptState.getInstanceId()+" accept ballot:"+acceptState.getBallot()+" actual ballot:"+instance.getBallot() );
+                                outgoing.process(Message.respond( ProposerMessage.rejectAccept, message, new ProposerMessage.RejectAcceptState( acceptState.getInstanceId() ) ));
                             }
                         }
                         break;

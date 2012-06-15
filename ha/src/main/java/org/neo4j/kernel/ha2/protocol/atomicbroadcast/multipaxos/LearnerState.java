@@ -92,7 +92,7 @@ public enum LearnerState
                             {
                                 instance.delivered();
                                 outgoing.process(Message.internal(AtomicBroadcastMessage.broadcastResponse, instance.value_2));
-                                context.learnerContext.lastDeliveredInstanceId = instance.id.getId();
+                                context.learnerContext.lastDeliveredInstanceId = instanceId;
 
                                 instanceId++;
                             }
@@ -129,7 +129,14 @@ public enum LearnerState
                                 PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( id );
                                 if (!instance.isState( PaxosInstance.State.closed ) && !instance.isState( PaxosInstance.State.delivered ))
                                 {
-                                    outgoing.process( Message.to( LearnerMessage.learnRequest, context.clusterContext.getConfiguration().getNodes().get( 0 ).toString(), new LearnerMessage.LearnRequestState(id) ) );
+                                    for( URI node : context.heartbeatContext.getAlive() )
+                                    {
+                                        if (!node.equals( context.clusterContext.getMe() ))
+                                        {
+                                            outgoing.process( Message.to( LearnerMessage.learnRequest, node, new LearnerMessage.LearnRequestState(id) ) );
+                                            break;
+                                        }
+                                    }
                                 }
                             }
 

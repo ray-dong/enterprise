@@ -71,7 +71,7 @@ public enum AcceptorMessage
             this.value = value;
         }
 
-        public InstanceId getInstance()
+        public InstanceId getInstanceId()
         {
             return instance;
         }
