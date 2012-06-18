@@ -34,4 +34,5 @@ package org.neo4j.kernel.haonefive;
 public interface MasterElectionClient
 {
     void addMasterChangeListener( MasterChangeListener listener );
+    void removeMasterChangeListener( MasterChangeListener listener);
 }

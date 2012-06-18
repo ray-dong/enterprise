@@ -34,7 +34,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -48,12 +47,9 @@ import org.neo4j.kernel.ha2.ScriptableNetworkFailureLatencyStrategy;
 import org.neo4j.kernel.ha2.TestProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcast;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListenerDeserializer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastSerializer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InMemoryAcceptorInstanceStore;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.MultiPaxosContext;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
 import org.neo4j.kernel.ha2.protocol.heartbeat.Heartbeat;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
@@ -71,7 +67,7 @@ public class ClusterMockTest
 {
     public static NetworkMock DEFAULT_NETWORK()
     {
-        return new NetworkMock( 10, new MultiPaxosServerFactory(new ClusterConfiguration("default"), new InMemoryAcceptorInstanceStore()),
+        return new NetworkMock( 10, new MultiPaxosServerFactory(new ClusterConfiguration("default")),
                                             new MultipleFailureLatencyStrategy( new FixedNetworkLatencyStrategy(10), new ScriptableNetworkFailureLatencyStrategy()),
                                             new MessageTimeoutStrategy(new FixedTimeoutStrategy(500) )
                                                 .timeout( HeartbeatMessage.send_heartbeat, 200 ));
@@ -115,7 +111,7 @@ public class ClusterMockTest
         for (int i = 0; i < nrOfServers; i++)
         {
             final URI uri = new URI( "server"+(i+1) );
-            TestProtocolServer server = network.addServer( uri.toString() );
+            TestProtocolServer server = network.addServer( uri );
             final Cluster cluster = server.newClient( Cluster.class );
             clusterStateListener( uri, cluster );
 
@@ -133,14 +129,27 @@ public class ClusterMockTest
                             logger.getLogger().info( uri+": Alive:" + server );
                         }
                     } );
-            server.newClient( AtomicBroadcast.class ).addAtomicBroadcastListener( new AtomicBroadcastListenerDeserializer( new AtomicBroadcastSerializer(), new AtomicBroadcastListener()
+            server.newClient( AtomicBroadcast.class ).addAtomicBroadcastListener( new AtomicBroadcastListener()
             {
+                AtomicBroadcastSerializer serializer = new AtomicBroadcastSerializer();
+
                 @Override
-                public void receive( Object value )
+                public void receive( Payload value )
                 {
-                    logger.getLogger().info( uri+" received: "+value );
+                    try
+                    {
+                        logger.getLogger().info( uri+" received: "+serializer.receive(value) );
+                    }
+                    catch( IOException e )
+                    {
+                        e.printStackTrace();
+                    }
+                    catch( ClassNotFoundException e )
+                    {
+                        e.printStackTrace();
+                    }
                 }
-            } ));
+            } );
 
             servers.add( server );
             out.add( cluster );
@@ -179,9 +188,9 @@ public class ClusterMockTest
         cluster.addClusterListener( new ClusterListener()
         {
             @Override
-            public void enteredCluster( ClusterConfiguration configuration )
+            public void enteredCluster( ClusterConfiguration clusterConfiguration )
             {
-                logger.getLogger().info( uri + " entered cluster:" + configuration.getNodes() );
+                logger.getLogger().info( uri + " entered cluster:" + clusterConfiguration.getNodes() );
                 in.add( cluster );
             }
 

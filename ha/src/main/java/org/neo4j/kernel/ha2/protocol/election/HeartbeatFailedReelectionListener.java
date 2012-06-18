@@ -18,39 +18,33 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.atomicbroadcast;
+package org.neo4j.kernel.ha2.protocol.election;
 
-import java.io.IOException;
+import java.net.URI;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 
 /**
  * TODO
  */
-public class AtomicBroadcastListenerDeserializer
-    implements AtomicBroadcastListener
+public class HeartbeatFailedReelectionListener
+    implements HeartbeatListener
 {
-    private AtomicBroadcastListener delegate;
-    private AtomicBroadcastSerializer serializer;
+    private final Election election;
 
-    public AtomicBroadcastListenerDeserializer( AtomicBroadcastSerializer serializer, AtomicBroadcastListener delegate )
+    public HeartbeatFailedReelectionListener( Election election )
     {
-        this.delegate = delegate;
-        this.serializer = serializer;
+        this.election = election;
     }
 
     @Override
-    public void receive( Object value )
+    public void failed( URI server )
     {
-        try
-        {
-            delegate.receive( serializer.receive( (Payload) value ));
-        }
-        catch( IOException e )
-        {
-            e.printStackTrace();
-        }
-        catch( ClassNotFoundException e )
-        {
-            e.printStackTrace();
-        }
+        // Suggest reelection for all roles of this node
+        election.demote( server );
+    }
+
+    @Override
+    public void alive( URI server )
+    {
     }
 }

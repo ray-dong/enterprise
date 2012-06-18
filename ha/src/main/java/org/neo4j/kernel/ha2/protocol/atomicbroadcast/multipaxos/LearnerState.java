@@ -71,33 +71,33 @@ public enum LearnerState
                         PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( learnState.getInstanceId() );
 
                         // Skip if we already know about this
-                        if( learnState.getInstanceId().getId() <= context.learnerContext.lastDeliveredInstanceId )
+                        if( learnState.getInstanceId().getId() <= context.learnerContext.getLastDeliveredInstanceId() )
                         {
                             break;
                         }
 
-                        context.learnerContext.lastLearnedInstanceId = Math.max( context.learnerContext.lastLearnedInstanceId, learnState.getInstanceId().getId());
+                        context.learnerContext.learnedInstanceId( learnState.getInstanceId().getId() );
 
                         instance.closed(learnState.getValue());
 
                         // If this is the next instance to be learned, then do so and check if we have anything pending to be learnt
-                        if (learnState.getInstanceId().equals( new InstanceId( context.learnerContext.lastDeliveredInstanceId +1) ))
+                        if (learnState.getInstanceId().equals( new InstanceId( context.learnerContext.getLastDeliveredInstanceId() +1) ))
                         {
                             instance.delivered();
                             outgoing.process(Message.internal(AtomicBroadcastMessage.broadcastResponse, learnState.getValue()));
-                            context.learnerContext.lastDeliveredInstanceId = learnState.getInstanceId().getId();
+                            context.learnerContext.setLastDeliveredInstanceId( learnState.getInstanceId().getId());
 
                             long instanceId = learnState.getInstanceId().getId()+1;
                             while ((instance = context.getPaxosInstances().getPaxosInstance( new InstanceId( instanceId ) )).isState( PaxosInstance.State.closed ))
                             {
                                 instance.delivered();
-                                outgoing.process(Message.internal(AtomicBroadcastMessage.broadcastResponse, instance.value_2));
-                                context.learnerContext.lastDeliveredInstanceId = instanceId;
+                                context.learnerContext.setLastDeliveredInstanceId( instanceId );
+                                outgoing.process( Message.internal( AtomicBroadcastMessage.broadcastResponse, instance.value_2 ) );
 
                                 instanceId++;
                             }
 
-                            if (instanceId == context.learnerContext.lastLearnedInstanceId+1)
+                            if (instanceId == context.learnerContext.getLastKnownLearnedInstanceInCluster()+1)
                             {
                                 // No hole - all is ok
                                 // Cancel potential timeout, if one is active
@@ -120,10 +120,9 @@ public enum LearnerState
                     case learnTimedout:
                     {
                         // Timed out waiting for learned values - send explicit request to someone
-                        if (context.learnerContext.lastDeliveredInstanceId != context.learnerContext.lastLearnedInstanceId)
+                        if (!context.learnerContext.hasDeliveredAllKnownInstances())
                         {
-
-                            for (long instanceId = context.learnerContext.lastDeliveredInstanceId +1; instanceId < context.learnerContext.lastLearnedInstanceId; instanceId++)
+                            for (long instanceId = context.learnerContext.getLastDeliveredInstanceId() +1; instanceId < context.learnerContext.getLastKnownLearnedInstanceInCluster(); instanceId++)
                             {
                                 InstanceId id = new InstanceId( instanceId );
                                 PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( id );
@@ -175,6 +174,37 @@ public enum LearnerState
                             outgoing.process( Message.to( LearnerMessage.learnRequest, learnerNode, new LearnerMessage.LearnRequestState(state.getInstanceId()) ) );
                         }
 
+                        break;
+                    }
+
+                    case catchUp:
+                    {
+                        Long catchUpTo = message.getPayload();
+
+                        if (context.learnerContext.getLastKnownLearnedInstanceInCluster() < catchUpTo)
+                        {
+                            context.proposerContext.lastInstanceId = catchUpTo + 1;
+
+                            // Try to get up to date
+                            for (long instanceId = context.learnerContext.getLastLearnedInstanceId() +1; instanceId <= catchUpTo; instanceId++)
+                            {
+                                InstanceId id = new InstanceId( instanceId );
+                                PaxosInstance instance = context.getPaxosInstances().getPaxosInstance( id );
+                                if (!instance.isState( PaxosInstance.State.closed ) && !instance.isState( PaxosInstance.State.delivered ))
+                                {
+                                    for( URI node : context.heartbeatContext.getAlive() )
+                                    {
+                                        if (!node.equals( context.clusterContext.getMe() ))
+                                        {
+                                            outgoing.process( Message.to( LearnerMessage.learnRequest, node, new LearnerMessage.LearnRequestState(id) ) );
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            context.learnerContext.setLastKnownLearnedInstanceInCluster( catchUpTo );
+                        }
                         break;
                     }
 

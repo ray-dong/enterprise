@@ -42,13 +42,14 @@ import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterState;
+import org.neo4j.kernel.ha2.protocol.election.ClusterLeaveReelectionListener;
 import org.neo4j.kernel.ha2.protocol.election.Election;
 import org.neo4j.kernel.ha2.protocol.election.ElectionContext;
 import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.protocol.election.ElectionMessage;
 import org.neo4j.kernel.ha2.protocol.election.ElectionRole;
 import org.neo4j.kernel.ha2.protocol.election.ElectionState;
-import org.neo4j.kernel.ha2.protocol.election.ReelectionHeartbeatListener;
+import org.neo4j.kernel.ha2.protocol.election.HeartbeatFailedReelectionListener;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatIAmAliveProcessor;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatJoinListener;
@@ -74,16 +75,15 @@ public class MultiPaxosServerFactory
     implements ProtocolServerFactory
 {
     private ClusterConfiguration initialConfig;
-    private AcceptorInstanceStore acceptorInstanceStore;
 
-    public MultiPaxosServerFactory(ClusterConfiguration initialConfig, AcceptorInstanceStore acceptorInstanceStore)
+    public MultiPaxosServerFactory(ClusterConfiguration initialConfig)
     {
         this.initialConfig = initialConfig;
-        this.acceptorInstanceStore = acceptorInstanceStore;
     }
 
     @Override
-    public ProtocolServer newProtocolServer(TimeoutStrategy timeoutStrategy, MessageSource input, MessageProcessor output )
+    public ProtocolServer newProtocolServer(TimeoutStrategy timeoutStrategy, MessageSource input, MessageProcessor output,
+                                            AcceptorInstanceStore acceptorInstanceStore, ElectionCredentialsProvider electionCredentialsProvider )
     {
         LatencyCalculator latencyCalculator = new LatencyCalculator(timeoutStrategy, input);
 
@@ -96,7 +96,7 @@ public class MultiPaxosServerFactory
         LearnerContext learnerContext = new LearnerContext();
         ProposerContext proposerContext = new ProposerContext();
         final ClusterContext clusterContext = new ClusterContext(proposerContext, learnerContext, new ClusterConfiguration( initialConfig.getName(), initialConfig.getNodes() ),timeouts);
-        final HeartbeatContext heartbeatContext = new HeartbeatContext(clusterContext);
+        final HeartbeatContext heartbeatContext = new HeartbeatContext(clusterContext, learnerContext);
         final MultiPaxosContext context = new MultiPaxosContext(clusterContext, proposerContext, learnerContext, heartbeatContext, timeouts);
         ElectionContext electionContext = new ElectionContext( iterable( new ElectionRole( ClusterConfiguration.COORDINATOR ) ), clusterContext, heartbeatContext );
         SnapshotContext snapshotContext = new SnapshotContext( clusterContext, learnerContext );
@@ -130,15 +130,9 @@ public class MultiPaxosServerFactory
 
         server.newClient( Cluster.class ).addClusterListener( new HeartbeatJoinListener(connectedStateMachines.getOutgoing()));
 
-        heartbeatContext.addHeartbeatListener( new ReelectionHeartbeatListener(server.newClient( Election.class )) );
-        electionContext.setElectionCredentialsProvider( new ElectionCredentialsProvider()
-        {
-            @Override
-            public Comparable<Object> getCredentials( String role )
-            {
-                return (Comparable) server.getServerId().toString();
-            }
-        } );
+        heartbeatContext.addHeartbeatListener( new HeartbeatFailedReelectionListener(server.newClient( Election.class )) );
+        clusterContext.addClusterListener( new ClusterLeaveReelectionListener(server.newClient( Election.class )) );
+        electionContext.setElectionCredentialsProvider( electionCredentialsProvider );
 
         StateMachineRules rules = new StateMachineRules( connectedStateMachines.getOutgoing() )
            .rule( ClusterState.start, ClusterMessage.create, ClusterState.entered,
@@ -157,6 +151,7 @@ public class MultiPaxosServerFactory
 
            .rule( ClusterState.acquiringConfiguration, ClusterMessage.configurationResponse, ClusterState.entered,
                   internal( AtomicBroadcastMessage.entered ),
+                  internal( ProposerMessage.join ),
                   internal( AcceptorMessage.join ),
                   internal( LearnerMessage.join ),
                   internal( HeartbeatMessage.join ),
@@ -185,6 +180,15 @@ public class MultiPaxosServerFactory
                   internal( HeartbeatMessage.leave ),
                   internal( SnapshotMessage.leave ),
                   internal( ElectionMessage.leave ),
+                  internal( ProposerMessage.leave ) )
+
+           .rule( ClusterState.entered, ClusterMessage.leave, ClusterState.start,
+                  internal( AtomicBroadcastMessage.leave ),
+                  internal( AcceptorMessage.leave ),
+                  internal( LearnerMessage.leave ),
+                  internal( HeartbeatMessage.leave ),
+                  internal( ElectionMessage.leave ),
+                  internal( SnapshotMessage.leave ),
                   internal( ProposerMessage.leave ) )
 
            .rule( ClusterState.leaving, ClusterMessage.configurationChanged, ClusterState.start,

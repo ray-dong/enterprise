@@ -23,6 +23,9 @@ package org.neo4j.kernel.ha2.protocol.heartbeat;
 import java.net.URI;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerMessage;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.PaxosInstance;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
 
@@ -100,6 +103,16 @@ public enum HeartbeatState
                     context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+state.getServer(), timeout( HeartbeatMessage.timed_out, message, state
                         .getServer() ) );
 
+                    // Check if this server knows something that we don't
+                    if (message.hasHeader( "last-learned" ))
+                    {
+                        long lastLearned = Long.parseLong( message.getHeader( "last-learned" ) );
+                        if (lastLearned > context.getLearnerContext().getLastKnownLearnedInstanceInCluster())
+                        {
+                            outgoing.process( internal( LearnerMessage.catchUp, lastLearned ) );
+                        }
+                    }
+
                     break;
                 }
 
@@ -139,7 +152,7 @@ public enum HeartbeatState
                     if (context.getClusterContext().getConfiguration().getNodes().contains( to ))
                     {
                         // Send heartbeat message to given server
-                        outgoing.process( to( HeartbeatMessage.i_am_alive, to, new HeartbeatMessage.IAmAliveState( context.getClusterContext().getMe())));
+                        outgoing.process( to( HeartbeatMessage.i_am_alive, to, new HeartbeatMessage.IAmAliveState( context.getClusterContext().getMe())).setHeader( "last-learned", context.getLearnerContext().getLastLearnedInstanceId()+"" ));
 
                         // Set new timeout to send heartbeat to this host
                         context.getClusterContext().timeouts.setTimeout( HeartbeatMessage.send_heartbeat + "-" + to, timeout( HeartbeatMessage.send_heartbeat, message, to ) );

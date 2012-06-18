@@ -47,6 +47,7 @@ import org.neo4j.kernel.ha2.MultiPaxosServerFactory;
 import org.neo4j.kernel.ha2.NetworkedServerFactory;
 import org.neo4j.kernel.ha2.ProtocolServer;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InMemoryAcceptorInstanceStore;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ServerIdElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.logging.LogbackService;
@@ -151,10 +152,10 @@ public class ClusterNetworkTest
         {
             final URI uri = new URI( "neo4j://localhost:800"+(i+1) );
 
-            NetworkedServerFactory factory = new NetworkedServerFactory( life, new MultiPaxosServerFactory( new ClusterConfiguration( "default" ), new InMemoryAcceptorInstanceStore() ), new FixedTimeoutStrategy( 1000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
+            NetworkedServerFactory factory = new NetworkedServerFactory( life, new MultiPaxosServerFactory( new ClusterConfiguration( "default" ) ), new FixedTimeoutStrategy( 1000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
 
             ProtocolServer server = factory.newNetworkedServer( MapUtil.stringMap( NetworkNodeUDP.cluster_address.name(), uri.getHost(), NetworkNodeUDP
-                .cluster_port.name(), uri.getPort()+"" ) );
+                .cluster_port.name(), uri.getPort()+"" ), new InMemoryAcceptorInstanceStore(), new ServerIdElectionCredentialsProvider() );
             final Cluster cluster2 = server.newClient( Cluster.class );
             final AtomicReference<ClusterConfiguration> config2 = clusterStateListener( uri, cluster2 );
 
@@ -216,10 +217,10 @@ public class ClusterNetworkTest
         cluster.addClusterListener( new ClusterListener()
         {
             @Override
-            public void enteredCluster( ClusterConfiguration configuration )
+            public void enteredCluster( ClusterConfiguration clusterConfiguration )
             {
-                logger.getLogger().info( uri + " entered cluster:" + configuration.getNodes() );
-                config.set( new ClusterConfiguration( configuration ) );
+                logger.getLogger().info( uri + " entered cluster:" + clusterConfiguration.getNodes() );
+                config.set( new ClusterConfiguration( clusterConfiguration ) );
                 in.add( cluster );
             }
 

@@ -20,6 +20,7 @@
 
 package org.neo4j.com_2;
 
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.URI;
@@ -185,6 +186,7 @@ public class NetworkNodeTCP
         {
             channel1.close();
         }
+        executor.shutdownNow();
     }
 
     // MessageSource implementation
@@ -291,7 +293,7 @@ public class NetworkNodeTCP
             }
         } catch (Exception e)
         {
-            msgLog.error("Could not connect to:" + to, true);
+//            msgLog.error("Could not connect to:" + to, true);
             return;
         }
 
@@ -447,7 +449,8 @@ public class NetworkNodeTCP
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception
         {
-            msgLog.error("Receive exception:", e.getCause());
+            if (!(e.getCause() instanceof ConnectException ))
+                msgLog.error("Receive exception:", e.getCause());
         }
     }
 }

@@ -28,7 +28,6 @@ import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerContext;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -177,5 +176,10 @@ public class ClusterContext
     public boolean isElectedAs( String roleName )
     {
         return me.equals( configuration.getElected( roleName ));
+    }
+
+    public boolean isInCluster()
+    {
+        return !configuration.getNodes().isEmpty();
     }
 }

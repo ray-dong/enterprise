@@ -20,38 +20,48 @@
 
 package org.neo4j.kernel.ha2.protocol.election;
 
-import java.io.Serializable;
-import org.neo4j.com_2.message.MessageType;
+import java.net.URI;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
+import org.neo4j.kernel.ha2.protocol.cluster.ClusterListener;
+import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 
 /**
  * TODO
  */
-public enum ElectionMessage
-    implements MessageType
+public class ClusterLeaveReelectionListener
+    implements ClusterListener
 {
-    created,join,leave,
-    demote, promote, vote, electionTimeout, voted;
+    private final Election election;
 
-    public static class VotedData
-        implements Serializable
+    public ClusterLeaveReelectionListener( Election election )
     {
-        private String role;
-        private Comparable<Object> voteCredentials;
+        this.election = election;
+    }
 
-        public VotedData( String role, Comparable<Object> voteCredentials )
-        {
-            this.role = role;
-            this.voteCredentials = voteCredentials;
-        }
+    @Override
+    public void enteredCluster( ClusterConfiguration clusterConfiguration )
+    {
+    }
 
-        public String getRole()
-        {
-            return role;
-        }
+    @Override
+    public void joinedCluster( URI node )
+    {
+    }
 
-        public Comparable<Object> getVoteCredentials()
-        {
-            return voteCredentials;
-        }
+    @Override
+    public void leftCluster( URI node )
+    {
+        // Suggest reelection for all roles of this node
+        election.demote( node );
+    }
+
+    @Override
+    public void leftCluster()
+    {
+    }
+
+    @Override
+    public void elected( String role, URI electedNode )
+    {
     }
 }

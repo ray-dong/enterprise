@@ -23,9 +23,7 @@ package org.neo4j.kernel.ha2.protocol.election;
 import java.net.URI;
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AtomicBroadcastMessage;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerMessage;
-import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ProposerState;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterMessage;
 import org.neo4j.kernel.ha2.statemachine.State;
 import org.slf4j.LoggerFactory;
@@ -47,16 +45,16 @@ public enum ElectionState
             {
                 switch( message.getMessageType() )
                 {
-                    case created:
-                    {
-                        context.created();
-                        return election;
-                    }
+                case created:
+                {
+                    context.created();
+                    return election;
+                }
 
-                    case join:
-                    {
-                        return election;
-                    }
+                case join:
+                {
+                    return election;
+                }
                 }
 
                 return this;
@@ -78,40 +76,45 @@ public enum ElectionState
                     {
                         URI demoteNode = message.getPayload();
 
-                        // Start election process for all roles that this node hade
-                        for( String role : context.getRoles( demoteNode ) )
+                        if( context.getClusterContext().isInCluster() )
                         {
-                            if (!context.isElectionProcessInProgress( role ))
-                            {
-                                context.startElectionProcess( role );
 
-                                // Allow other live nodes to vote which one should take over
-                                for( URI uri : context.getClusterContext().getConfiguration().getNodes() )
+                            // Start election process for all roles that this node hade
+                            for( String role : context.getRoles( demoteNode ) )
+                            {
+                                if( !context.isElectionProcessInProgress( role ) )
                                 {
-                                    if (!context.getHeartbeatContext().getFailed().contains( uri ))
+                                    context.startElectionProcess( role );
+
+                                    // Allow other live nodes to vote which one should take over
+                                    for( URI uri : context.getClusterContext().getConfiguration().getNodes() )
                                     {
-                                        // This is a candidate - allow it to vote itself for promotion
-                                        outgoing.process( Message.to( ElectionMessage.vote, uri, role ));
+                                        if( !context.getHeartbeatContext().getFailed().contains( uri ) )
+                                        {
+                                            // This is a candidate - allow it to vote itself for promotion
+                                            outgoing.process( Message.to( ElectionMessage.vote, uri, role ) );
+                                        }
                                     }
+                                    context.getClusterContext()
+                                        .timeouts
+                                        .setTimeout( "election-" + role, Message.timeout( ElectionMessage.electionTimeout, message ) );
                                 }
-                                context.getClusterContext().timeouts.setTimeout( "election-"+role, Message.timeout( ElectionMessage.electionTimeout, message ) );
                             }
                         }
+                        break;
+                    }
 
+                    case promote:
+                    {
+                        // TODO
                         break;
                     }
 
                     case vote:
                     {
                         String role = message.getPayload();
-
-/*
-                        URI currentlyElectedNode = context.getClusterContext().getConfiguration().getElected( role );
-                        if (currentlyElectedNode == null || context.nodeIsSuspected(currentlyElectedNode))
-                        {
-*/
-                            outgoing.process( Message.respond( ElectionMessage.voted, message, new ElectionMessage.VotedData( role, context.getCredentialsForRole( role ))));
-//                        }
+                        outgoing.process( Message.respond( ElectionMessage.voted, message, new ElectionMessage.VotedData( role, context
+                            .getCredentialsForRole( role ) ) ) );
                         break;
                     }
 
@@ -120,18 +123,22 @@ public enum ElectionState
                         ElectionMessage.VotedData data = message.getPayload();
                         context.voted( data.getRole(), new URI( message.getHeader( Message.FROM ) ), data.getVoteCredentials() );
 
-                        if (context.getVoteCount(data.getRole()) == context.getNeededVoteCount())
+                        if( context.getVoteCount( data.getRole() ) == context.getNeededVoteCount() )
                         {
-                            context.getClusterContext().timeouts.cancelTimeout( "election-"+data.getRole() );
+                            URI demoted = context.getClusterContext()
+                                .timeouts
+                                .getTimeoutMessage( "election-" + data.getRole() )
+                                .getPayload();
+                            context.getClusterContext().timeouts.cancelTimeout( "election-" + data.getRole() );
 
                             // We have all votes now
-                            URI winner = context.getElectionWinner( data.getRole() );
+                            URI winner = context.getElectionWinner( data.getRole(), demoted );
 
                             // Broadcast this
                             ClusterMessage.ConfigurationChangeState configurationChangeState = new ClusterMessage.ConfigurationChangeState();
                             configurationChangeState.elected( data.getRole(), winner );
                             outgoing.process( Message.internal( ProposerMessage.propose,
-                                                                configurationChangeState ));
+                                                                configurationChangeState ) );
                         }
                         break;
                     }
@@ -139,7 +146,13 @@ public enum ElectionState
                     case electionTimeout:
                     {
                         // Something was lost
-                        LoggerFactory.getLogger(getClass()).warn( "Election timed out" );
+                        LoggerFactory.getLogger( getClass() ).warn( "Election timed out" );
+                        break;
+                    }
+
+                    case leave:
+                    {
+                        return start;
                     }
                 }
 

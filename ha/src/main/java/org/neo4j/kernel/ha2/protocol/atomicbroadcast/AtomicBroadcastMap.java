@@ -66,27 +66,37 @@ public class AtomicBroadcastMap<K,V>
         } );
 
         this.atomicBroadcast = atomicBroadcast;
-        atomicBroadcastListener = new AtomicBroadcastListenerDeserializer(serializer,
-                                  new AtomicBroadcastListenerFilter( MapCommand.class, new AtomicBroadcastListener()
+        atomicBroadcastListener = new AtomicBroadcastListener()
         {
             @Override
-            public void receive( Object value )
+            public void receive( Payload value )
             {
-                MapCommand command = (MapCommand) value;
-                command.execute( map );
+                try
+                {
+                    MapCommand command = (MapCommand) serializer.receive( value);
+                    command.execute( map );
 
 //                LoggerFactory.getLogger( getClass() ).info(  "Map:"+map );
 
-                synchronized( AtomicBroadcastMap.this )
-                {
-                    if (command.equals( lastCommand ))
+                    synchronized( AtomicBroadcastMap.this )
                     {
-                        lastCommand = null;
-                        AtomicBroadcastMap.this.notifyAll();
+                        if (command.equals( lastCommand ))
+                        {
+                            lastCommand = null;
+                            AtomicBroadcastMap.this.notifyAll();
+                        }
                     }
                 }
+                catch( IOException e )
+                {
+                    e.printStackTrace();
+                }
+                catch( ClassNotFoundException e )
+                {
+                    e.printStackTrace();
+                }
             }
-        }));
+        };
         atomicBroadcast.addAtomicBroadcastListener( atomicBroadcastListener );
     }
 

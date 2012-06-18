@@ -46,7 +46,7 @@ import static org.hamcrest.CoreMatchers.*;
  */
 public class MultiPaxosTest
 {
-    private NetworkMock network = new NetworkMock( 50, new MultiPaxosServerFactory(new ClusterConfiguration( "default" ), new InMemoryAcceptorInstanceStore()), new MultipleFailureLatencyStrategy(new FixedNetworkLatencyStrategy(0)), new MessageTimeoutStrategy(new FixedTimeoutStrategy( 1000 )) );
+    private NetworkMock network = new NetworkMock( 50, new MultiPaxosServerFactory(new ClusterConfiguration( "default" )), new MultipleFailureLatencyStrategy(new FixedNetworkLatencyStrategy(0)), new MessageTimeoutStrategy(new FixedTimeoutStrategy( 1000 )) );
 
     @Rule
     public ClusterRule cluster = new ClusterRule( network, 3 );

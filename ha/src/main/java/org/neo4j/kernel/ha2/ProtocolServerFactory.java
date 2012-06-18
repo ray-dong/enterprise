@@ -22,6 +22,8 @@ package org.neo4j.kernel.ha2;
 
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorInstanceStore;
+import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 
 /**
@@ -29,5 +31,5 @@ import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
  */
 public interface ProtocolServerFactory
 {
-    ProtocolServer newProtocolServer(TimeoutStrategy timeouts, MessageSource input, MessageProcessor output);
+    ProtocolServer newProtocolServer(TimeoutStrategy timeouts, MessageSource input, MessageProcessor output, AcceptorInstanceStore acceptorInstanceStore, ElectionCredentialsProvider electionCredentialsProvider);
 }

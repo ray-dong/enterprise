@@ -27,7 +27,7 @@ import java.net.URI;
  */
 public interface ClusterListener
 {
-    void enteredCluster(ClusterConfiguration nodes);
+    void enteredCluster(ClusterConfiguration clusterConfiguration);
     void joinedCluster(URI node);
     void leftCluster(URI node);
     void leftCluster();

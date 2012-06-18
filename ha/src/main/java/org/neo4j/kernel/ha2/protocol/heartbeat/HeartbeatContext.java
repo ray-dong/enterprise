@@ -31,7 +31,7 @@ import org.neo4j.com_2.message.Message;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.Specification;
 import org.neo4j.helpers.collection.Iterables;
-import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 
 import static org.neo4j.com_2.message.Message.*;
@@ -41,16 +41,18 @@ import static org.neo4j.com_2.message.Message.*;
  */
 public class HeartbeatContext
 {
-    private ClusterContext context;
+    private ClusterContext clusterContext;
+    private LearnerContext learnerContext;
     List<URI> failed = new ArrayList<URI>(  );
 
     Map<URI,Set<URI>> nodeSuspicions = new HashMap<URI,Set<URI>>(  );
 
     Iterable<HeartbeatListener> listeners = Listeners.newListeners();
 
-    public HeartbeatContext(ClusterContext context)
+    public HeartbeatContext(ClusterContext clusterContext, LearnerContext learnerContext)
     {
-        this.context = context;
+        this.clusterContext = clusterContext;
+        this.learnerContext = learnerContext;
     }
 
     public void started()
@@ -60,7 +62,7 @@ public class HeartbeatContext
 
     public boolean alive( final URI node )
     {
-        Set<URI> serverSuspicions = getSuspicionsFor( context.getMe() );
+        Set<URI> serverSuspicions = getSuspicionsFor( clusterContext.getMe() );
         boolean suspected = serverSuspicions.remove( node );
 
         if (!isFailed( node ) && failed.remove( node ))
@@ -80,7 +82,7 @@ public class HeartbeatContext
 
     public void suspect(final URI node)
     {
-        Set<URI> serverSuspicions = getSuspicionsFor( context.getMe() );
+        Set<URI> serverSuspicions = getSuspicionsFor( clusterContext.getMe() );
         serverSuspicions.add( node );
 
         if (isFailed( node ) && !failed.contains( node ))
@@ -134,12 +136,17 @@ public class HeartbeatContext
             {
                 return !isFailed( item );
             }
-        }, context.getConfiguration().getNodes() );
+        }, clusterContext.getConfiguration().getNodes() );
     }
 
     public ClusterContext getClusterContext()
     {
-        return context;
+        return clusterContext;
+    }
+
+    public LearnerContext getLearnerContext()
+    {
+        return learnerContext;
     }
 
     public void addHeartbeatListener( HeartbeatListener listener )
@@ -155,22 +162,22 @@ public class HeartbeatContext
     public void stopHeartbeatTimers()
     {
         // Cancel all existing timeouts
-        for( URI server : context.getConfiguration().getNodes() )
+        for( URI server : clusterContext.getConfiguration().getNodes() )
         {
-            context.timeouts.cancelTimeout( HeartbeatMessage.i_am_alive+"-"+server );
-            context.timeouts.cancelTimeout( HeartbeatMessage.send_heartbeat+"-"+server );
+            clusterContext.timeouts.cancelTimeout( HeartbeatMessage.i_am_alive+"-"+server );
+            clusterContext.timeouts.cancelTimeout( HeartbeatMessage.send_heartbeat+"-"+server );
         }
     }
 
     public void startHeartbeatTimers(Message<?> message)
     {
         // Start timers for sending and receiving heartbeats
-        for( URI server : context.getConfiguration().getNodes() )
+        for( URI server : clusterContext.getConfiguration().getNodes() )
         {
-            if (!context.isMe( server ))
+            if (!clusterContext.isMe( server ))
             {
-                context.timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+server, timeout( HeartbeatMessage.timed_out, message, server ) );
-                context.timeouts.setTimeout( HeartbeatMessage.send_heartbeat+"-"+server, timeout( HeartbeatMessage.send_heartbeat, message, server ) );
+                clusterContext.timeouts.setTimeout( HeartbeatMessage.i_am_alive+"-"+server, timeout( HeartbeatMessage.timed_out, message, server ) );
+                clusterContext.timeouts.setTimeout( HeartbeatMessage.send_heartbeat+"-"+server, timeout( HeartbeatMessage.send_heartbeat, message, server ) );
             }
         }
     }
@@ -188,7 +195,7 @@ public class HeartbeatContext
     {
         List<URI> suspicions = getSuspicionsOf( node );
 
-        return suspicions.size() > context.getConfiguration().getNodes().size() / 2;
+        return suspicions.size() > clusterContext.getConfiguration().getNodes().size() / 2;
     }
 
     public List<URI> getSuspicionsOf( URI uri )

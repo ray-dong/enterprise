@@ -18,33 +18,31 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.neo4j.kernel.ha2.protocol.election;
+package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.net.URI;
-import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
+import org.neo4j.kernel.ha2.BindingListener;
+import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 
 /**
- * TODO
+ * ElectionCredentialsProvider that provides the server URI as credentials
+ * for elections
  */
-public class ReelectionHeartbeatListener
-    implements HeartbeatListener
+public class ServerIdElectionCredentialsProvider
+    implements ElectionCredentialsProvider, BindingListener
 {
-    private final Election election;
+    URI me;
 
-    public ReelectionHeartbeatListener( Election election )
+    @Override
+    public void listeningAt( URI me )
     {
-        this.election = election;
+
+        this.me = me;
     }
 
     @Override
-    public void failed( URI server )
+    public Comparable<Object> getCredentials( String role )
     {
-        // Suggest reelection for all roles of this node
-        election.demote( server );
-    }
-
-    @Override
-    public void alive( URI server )
-    {
+        return (Comparable) me.toString();
     }
 }

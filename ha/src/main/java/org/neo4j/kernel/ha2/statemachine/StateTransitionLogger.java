@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.statemachine;
 
 import org.neo4j.com_2.message.Message;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * TODO
@@ -30,26 +31,49 @@ public class StateTransitionLogger
         implements StateTransitionListener
 {
     private String participant;
-    private Logger logger;
 
-    public StateTransitionLogger(String participant, Logger logger )
+    public StateTransitionLogger(String participant)
     {
         this.participant = participant;
-        this.logger = logger;
     }
 
     public void stateTransition(StateTransition transition)
     {
-        if (transition.getMessage().getPayload() instanceof String)
-            logger.info(participant+"/"+
-                        transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+":"+transition.getMessage().getPayload()+"]->"+
-                                                                                                                               transition.getNewState().toString());
-        else
+        Logger logger = LoggerFactory.getLogger(transition.getOldState().getClass());
+
+        if (logger.isInfoEnabled())
         {
-            if (transition.getMessage().hasHeader( Message.FROM ))
-                logger.info(participant+"/"+transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"("+transition.getMessage().getHeader( Message.FROM )+")]->"+transition.getNewState().toString());
+            if( transition.getMessage().getPayload() instanceof String )
+            {
+                logger.info( participant + "/" +
+                             transition.getOldState()
+                                 .getClass()
+                                 .getSuperclass()
+                                 .getSimpleName() + ": " + transition.getOldState()
+                    .toString() + "-[" + transition.getMessage().getMessageType() + ":" + transition.getMessage()
+                    .getPayload() + "]->" +
+                             transition.getNewState().toString() );
+            }
             else
-                logger.info(participant+"/"+transition.getOldState().getClass().getSuperclass().getSimpleName()+": "+transition.getOldState().toString()+"-["+transition.getMessage().getMessageType()+"]->"+transition.getNewState().toString());
+            {
+                if( transition.getMessage().hasHeader( Message.FROM ) )
+                {
+                    logger.info( participant + "/" + transition.getOldState()
+                        .getClass()
+                        .getSuperclass()
+                        .getSimpleName() + ": " + transition.getOldState().toString() + "-[" + transition.getMessage()
+                        .getMessageType() + "(" + transition.getMessage()
+                        .getHeader( Message.FROM ) + ")]->" + transition.getNewState().toString() );
+                }
+                else
+                {
+                    logger.info( participant + "/" + transition.getOldState()
+                        .getClass()
+                        .getSuperclass()
+                        .getSimpleName() + ": " + transition.getOldState().toString() + "-[" + transition.getMessage()
+                        .getMessageType() + "]->" + transition.getNewState().toString() );
+                }
+            }
         }
     }
 }

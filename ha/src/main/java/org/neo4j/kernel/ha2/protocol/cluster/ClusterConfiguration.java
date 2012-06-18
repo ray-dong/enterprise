@@ -91,6 +91,7 @@ public class ClusterConfiguration
         nodes.remove( nodeUrl );
 
         // Remove any roles that this node had
+/*
         Iterator<Map.Entry<String,URI>> entries = roles.entrySet().iterator();
         while( entries.hasNext() )
         {
@@ -99,6 +100,7 @@ public class ClusterConfiguration
             if (roleEntry.getValue().equals( nodeUrl ))
                 entries.remove();
         }
+*/
     }
 
     public void elected( String name, URI node )
@@ -145,6 +147,7 @@ public class ClusterConfiguration
     public void left()
     {
         this.nodes = new ArrayList<URI>();
+        roles = new HashMap<String, URI>( );
     }
 
     public void removeElected( String roleName )
@@ -158,7 +161,7 @@ public class ClusterConfiguration
         return roles.get( roleName );
     }
 
-    public Iterable<String> getRoles( final URI node)
+    public Iterable<String> getRolesOf( final URI node)
     {
         return Iterables.map( new Function<Map.Entry<String, URI>, String>()
         {
@@ -180,6 +183,6 @@ public class ClusterConfiguration
     @Override
     public String toString()
     {
-        return "Nodes:"+nodes+" Roles:"+roles;
+        return "Name:"+name+" Nodes:"+nodes+" Roles:"+roles;
     }
 }

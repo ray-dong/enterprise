@@ -287,16 +287,9 @@ public enum ProposerState
                                 // Check if we have anything pending - try to start process for it
                                 if (!context.proposerContext.pendingValues.isEmpty() && context.proposerContext.bookedInstances.size() < MAX_CONCURRENT_INSTANCES)
                                 {
-                                    if (context.learnerContext.lastLearnedInstanceId > context.learnerContext.lastDeliveredInstanceId)
-                                    {
-                                        LoggerFactory.getLogger( ProposerState.class ).debug( "** WHAT TO DO HERE ***" );
-                                    } else
-                                    {
-                                        Object value = context.proposerContext.pendingValues.remove();
-                                        LoggerFactory.getLogger( ProposerState.class ).debug( "Restarting "+value +" booked:"+context.proposerContext.bookedInstances.size() );
-                                        outgoing.process( Message.internal( ProposerMessage.propose, value ) );
-    //                                    propose( context, message, outgoing, value, context.getAcceptors() );
-                                    }
+                                    Object value = context.proposerContext.pendingValues.remove();
+                                    LoggerFactory.getLogger( ProposerState.class ).debug( "Restarting "+value +" booked:"+context.proposerContext.bookedInstances.size() );
+                                    outgoing.process( Message.internal( ProposerMessage.propose, value ) );
                                 }
                             }
                         }
@@ -318,7 +311,7 @@ public enum ProposerState
 
     private static void propose( MultiPaxosContext context, Message message, MessageProcessor outgoing, Object payload, List<URI> acceptors )
     {
-        InstanceId instanceId = context.proposerContext.newInstanceId(context.learnerContext.lastLearnedInstanceId );
+        InstanceId instanceId = context.proposerContext.newInstanceId(context.learnerContext.getLastKnownLearnedInstanceInCluster() );
 
         context.proposerContext.bookedInstances.put( instanceId, payload );
 

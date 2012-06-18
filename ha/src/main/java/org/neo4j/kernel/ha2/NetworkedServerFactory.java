@@ -27,6 +27,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.neo4j.com_2.NetworkNodeTCP;
 import org.neo4j.helpers.DaemonThreadFactory;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorInstanceStore;
+import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -53,18 +55,18 @@ public class NetworkedServerFactory
         this.logger = logger;
     }
 
-    public ProtocolServer newNetworkedServer(final Map<String, String> configuration)
+    public ProtocolServer newNetworkedServer(final Map<String, String> configuration, AcceptorInstanceStore acceptorInstanceStore, ElectionCredentialsProvider electionCredentialsProvider)
     {
         final NetworkNodeTCP node = new NetworkNodeTCP( configuration, logger );
 
-        final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeoutStrategy, node, node);
+        final ProtocolServer protocolServer = protocolServerFactory.newProtocolServer(timeoutStrategy, node, node, acceptorInstanceStore, electionCredentialsProvider);
         node.addNetworkChannelsListener( new NetworkNodeTCP.NetworkChannelsListener()
         {
             @Override
             public void listeningAt( URI me )
             {
                 protocolServer.listeningAt( me );
-                protocolServer.addStateTransitionListener( new StateTransitionLogger( me.toString(), LoggerFactory.getLogger( StateTransitionLogger.class ) ) );
+                protocolServer.addStateTransitionListener( new StateTransitionLogger( me.toString() ) );
             }
 
             @Override
@@ -77,6 +79,11 @@ public class NetworkedServerFactory
             {
             }
         } );
+
+        if (electionCredentialsProvider instanceof BindingListener)
+        {
+            protocolServer.addBindingListener( (BindingListener) electionCredentialsProvider);
+        }
 
         // Timeout timer - triggers every 10 ms
         life.add( new Lifecycle()

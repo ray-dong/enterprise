@@ -20,6 +20,7 @@
 
 package org.neo4j.kernel.ha2.timeout;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -64,6 +65,15 @@ public class Timeouts
         return timeouts;
     }
 
+    public Message<? extends MessageType> getTimeoutMessage( String timeoutName )
+    {
+        Timeout timeout = timeouts.get( timeoutName );
+        if (timeout != null)
+            return timeout.getTimeoutMessage();
+        else
+            return null;
+    }
+
     public void tick(long time)
     {
         synchronized(this)
@@ -104,6 +114,11 @@ public class Timeouts
         {
             this.timeout = timeout;
             this.timeoutMessage = timeoutMessage;
+        }
+
+        public Message<? extends MessageType> getTimeoutMessage()
+        {
+            return timeoutMessage;
         }
 
         public boolean checkTimeout(long now)

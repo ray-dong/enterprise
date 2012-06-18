@@ -58,16 +58,17 @@ public class MultiPaxosNetworkTest
     {
         final LifeSupport life = new LifeSupport();
         NetworkedServerFactory serverFactory = new NetworkedServerFactory( life,
-                new MultiPaxosServerFactory(new ClusterConfiguration("default", "neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003"), new InMemoryAcceptorInstanceStore()),
+                new MultiPaxosServerFactory(new ClusterConfiguration("default", "neo4j://localhost:5001","neo4j://localhost:5002","neo4j://localhost:5003")),
                 new FixedTimeoutStrategy( 5000 ), LoggerFactory.getLogger( NetworkNodeTCP.class ) );
 
-        final ProtocolServer server1 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5001") ));
-        final ProtocolServer server2 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply( MapUtil
-                                                                                                                                                  .stringMap( cluster_port
-                                                                                                                                                                  .name(), "5002" ) ) );
-        final ProtocolServer server3 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply( MapUtil
-                                                                                                                                                  .stringMap( cluster_port
-                                                                                                                                                                  .name(), "5003" ) ) );
+        final ProtocolServer server1 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply(MapUtil.stringMap( cluster_port.name(),"5001") ),
+                                                                         new InMemoryAcceptorInstanceStore(), new ServerIdElectionCredentialsProvider());
+        final ProtocolServer server2 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply( MapUtil.stringMap( cluster_port
+                                                                                                                                                                     .name(), "5002" ) ),
+                                                                         new InMemoryAcceptorInstanceStore(), new ServerIdElectionCredentialsProvider());
+        final ProtocolServer server3 = serverFactory.newNetworkedServer( new ConfigurationDefaults(NetworkNodeTCP.Configuration.class).apply( MapUtil.stringMap( cluster_port
+                                                                                                                                                                     .name(), "5003" ) ),
+                                                                         new InMemoryAcceptorInstanceStore(), new ServerIdElectionCredentialsProvider());
 
         server1.addBindingListener( new BindingListener()
         {
@@ -112,7 +113,7 @@ public class MultiPaxosNetworkTest
         server2.newClient( Cluster.class ).addClusterListener( new ClusterAdapter()
         {
             @Override
-            public void enteredCluster( ClusterConfiguration nodes )
+            public void enteredCluster( ClusterConfiguration clusterConfiguration )
             {
                 semaphore.release();
             }
@@ -144,9 +145,9 @@ public class MultiPaxosNetworkTest
         server3.newClient( Cluster.class ).addClusterListener( new ClusterAdapter()
         {
             @Override
-            public void enteredCluster( ClusterConfiguration nodes )
+            public void enteredCluster( ClusterConfiguration clusterConfiguration )
             {
-                LoggerFactory.getLogger(getClass()).info( "3 entered cluster of:"+nodes.getNodes() );
+                LoggerFactory.getLogger(getClass()).info( "3 entered cluster of:"+ clusterConfiguration.getNodes() );
                 semaphore.release();
             }
         } );

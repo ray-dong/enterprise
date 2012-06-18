@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
@@ -64,20 +63,14 @@ public class ElectionContext
         }
     }
 
-    public List<ElectionRole> getRoles()
+    public List<ElectionRole> getPossibleRoles()
     {
         return roles;
     }
 
     public Iterable<String> getRoles(URI server)
     {
-        List<String> roles = new ArrayList<String>(  );
-        for( Map.Entry<String, URI> stringURIEntry : clusterContext.getConfiguration().getRoles().entrySet() )
-        {
-            if (stringURIEntry.getValue().equals( server ))
-                roles.add( stringURIEntry.getKey() );
-        }
-        return roles;
+        return clusterContext.getConfiguration().getRolesOf( server );
     }
 
     public ClusterContext getClusterContext()
@@ -114,12 +107,7 @@ public class ElectionContext
         voteList.add( new Vote( suggestedNode, suggestionCredentials ) );
     }
 
-    public Map<String, List<Vote>> getVotes()
-    {
-        return votes;
-    }
-
-    public URI getElectionWinner( String role )
+    public URI getElectionWinner( String role, URI demoted )
     {
         List<Vote> voteList = votes.get( role );
         if ( voteList == null || voteList.isEmpty())
@@ -132,7 +120,14 @@ public class ElectionContext
         Collections.sort( voteList );
         Collections.reverse( voteList );
 
-        return voteList.get( 0 ).getSuggestedNode();
+        for( Vote vote : voteList )
+        {
+            // Dont elect as winner the node we are trying to demote
+            if (!vote.getSuggestedNode().equals( demoted ))
+                return vote.getSuggestedNode();
+        }
+
+        return null;
     }
 
     public Comparable<Object> getCredentialsForRole( String role )

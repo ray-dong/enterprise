@@ -30,7 +30,7 @@ public enum LearnerMessage
     implements MessageType
 {
     join,leave,
-    learn,learnRequest, learnFailed, learnTimedout;
+    learn,learnRequest, learnFailed, learnTimedout, catchUp;
 
     public static class LearnState
         implements Serializable

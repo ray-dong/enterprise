@@ -28,4 +28,5 @@ import java.net.URI;
 public interface Election
 {
     void demote( URI node);
+    void promote( URI node);
 }

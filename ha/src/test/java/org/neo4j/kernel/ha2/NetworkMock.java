@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -31,6 +32,8 @@ import java.util.Map;
 
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageType;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InMemoryAcceptorInstanceStore;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ServerIdElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.MessageTimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
@@ -62,21 +65,21 @@ public class NetworkMock
         logger = LoggerFactory.getLogger( NetworkMock.class );
     }
 
-    public TestProtocolServer addServer( String serverId )
+    public TestProtocolServer addServer( URI serverId )
     {
         TestProtocolServer server = newTestProtocolServer(serverId);
 
-        debug( serverId, "joins network" );
+        debug( serverId.toString(), "joins network" );
 
-        participants.put( serverId, server );
+        participants.put( serverId.toString(), server );
 
         return server;
     }
 
-    protected TestProtocolServer newTestProtocolServer(String serverId)
+    protected TestProtocolServer newTestProtocolServer(URI serverId)
     {
-        TestProtocolServer protocolServer = new TestProtocolServer( timeoutStrategy, factory, serverId );
-        protocolServer.addStateTransitionListener( new StateTransitionLogger( serverId, LoggerFactory.getLogger(StateTransitionLogger.class) ) );
+        TestProtocolServer protocolServer = new TestProtocolServer( timeoutStrategy, factory, serverId, new InMemoryAcceptorInstanceStore(), new ServerIdElectionCredentialsProvider() );
+        protocolServer.addStateTransitionListener( new StateTransitionLogger( serverId.toString() ) );
         return protocolServer;
     }
 

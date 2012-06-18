@@ -88,7 +88,7 @@ public enum SnapshotState
                 {
                     SnapshotMessage.SnapshotState state = message.getPayload();
                     state.setState( context.getSnapshotProvider());
-                    context.getLearnerContext().lastDeliveredInstanceId = state.getLastDeliveredInstanceId();
+                    context.getLearnerContext().setLastDeliveredInstanceId( state.getLastDeliveredInstanceId());
                     return ready;
                 }
             }
@@ -110,7 +110,7 @@ public enum SnapshotState
             {
                 case sendSnapshot:
                 {
-                    outgoing.process( Message.respond( SnapshotMessage.snapshot, message, new SnapshotMessage.SnapshotState( context.getLearnerContext().lastDeliveredInstanceId, context.getSnapshotProvider() ) ) );
+                    outgoing.process( Message.respond( SnapshotMessage.snapshot, message, new SnapshotMessage.SnapshotState( context.getLearnerContext().getLastDeliveredInstanceId(), context.getSnapshotProvider() ) ) );
                     break;
                 }
 

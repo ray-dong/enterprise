@@ -29,7 +29,7 @@ public class ClusterAdapter
     implements ClusterListener
 {
     @Override
-    public void enteredCluster( ClusterConfiguration nodes )
+    public void enteredCluster( ClusterConfiguration clusterConfiguration )
     {
     }
 

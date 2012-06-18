@@ -29,6 +29,8 @@ import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.helpers.Listeners;
+import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorInstanceStore;
+import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionListener;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
@@ -41,24 +43,18 @@ public class TestProtocolServer
 {
     protected final TestMessageSource receiver;
     protected final TestMessageSender sender;
-    protected Timeouts timeoxuts;
 
     protected ProtocolServer server;
 
-    public TestProtocolServer( TimeoutStrategy timeoutStrategy, ProtocolServerFactory factory, String serverId )
+    public TestProtocolServer( TimeoutStrategy timeoutStrategy, ProtocolServerFactory factory, URI serverId,
+                               AcceptorInstanceStore acceptorInstanceStore, ElectionCredentialsProvider electionCredentialsProvider )
     {
         this.receiver = new TestMessageSource();
         this.sender = new TestMessageSender();
 
-        server = factory.newProtocolServer( timeoutStrategy, receiver, sender );
+        server = factory.newProtocolServer( timeoutStrategy, receiver, sender, acceptorInstanceStore, electionCredentialsProvider );
 
-        try
-        {
-            server.listeningAt( new URI(serverId) );
-        } catch (URISyntaxException e)
-        {
-            e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-        }
+        server.listeningAt( serverId );
     }
 
     public ProtocolServer getServer()

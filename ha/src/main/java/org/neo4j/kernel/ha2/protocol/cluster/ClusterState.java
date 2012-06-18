@@ -96,8 +96,8 @@ public enum ClusterState
                     List<URI> nodeList = new ArrayList<URI>(state.getNodes());
                     if (!nodeList.contains(context.me))
                     {
-                        context.learnerContext.lastDeliveredInstanceId = state.getLatestReceivedInstanceId().getId();
-                        context.learnerContext.lastLearnedInstanceId = state.getLatestReceivedInstanceId().getId();
+                        context.learnerContext.setLastDeliveredInstanceId( state.getLatestReceivedInstanceId().getId());
+                        context.learnerContext.learnedInstanceId( state.getLatestReceivedInstanceId().getId());
                         context.proposerContext.lastInstanceId = state.getLatestReceivedInstanceId().getId()+1;
 
                         context.acquiredConfiguration( nodeList, state.getRoles() );
@@ -116,6 +116,8 @@ public enum ClusterState
                     } else
                     {
                         // TODO Already in, go to joined state
+                        context.acquiredConfiguration( nodeList, state.getRoles() );
+
                         return entered;
                     }
                 }
@@ -195,7 +197,7 @@ public enum ClusterState
                 {
                     outgoing.process( respond( ClusterMessage.configurationResponse, message, new ClusterMessage.ConfigurationResponseState( context.getConfiguration().getRoles(),
                                                                                                                                              context.getConfiguration().getNodes(),
-                                                                                                                                             new InstanceId(context.learnerContext.lastDeliveredInstanceId ) )));
+                                                                                                                                             new InstanceId(context.learnerContext.getLastDeliveredInstanceId() ) )));
                     break;
                 }
 

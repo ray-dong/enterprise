@@ -26,6 +26,44 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 public class LearnerContext
 {
     // Learner state
-    public long lastDeliveredInstanceId = -1;
-    public long lastLearnedInstanceId = -1;
+    private long lastDeliveredInstanceId = -1;
+    private long lastLearnedInstanceId = -1;
+    private long lastKnownLearnedInstanceInCluster = -1;
+
+    public long getLastDeliveredInstanceId()
+    {
+        return lastDeliveredInstanceId;
+    }
+
+    public void setLastDeliveredInstanceId( long lastDeliveredInstanceId )
+    {
+        this.lastDeliveredInstanceId = lastDeliveredInstanceId;
+    }
+
+    public long getLastLearnedInstanceId()
+    {
+        return lastLearnedInstanceId;
+    }
+
+    public long getLastKnownLearnedInstanceInCluster()
+    {
+        return lastKnownLearnedInstanceInCluster;
+    }
+
+    public void setLastKnownLearnedInstanceInCluster( long lastKnownLearnedInstanceInCluster )
+    {
+        this.lastKnownLearnedInstanceInCluster = lastKnownLearnedInstanceInCluster;
+    }
+
+    public void learnedInstanceId( long instanceId )
+    {
+        this.lastLearnedInstanceId =  Math.max( lastLearnedInstanceId, instanceId);
+        if (lastLearnedInstanceId > lastKnownLearnedInstanceInCluster)
+            lastKnownLearnedInstanceInCluster = lastLearnedInstanceId;
+    }
+
+    public boolean hasDeliveredAllKnownInstances()
+    {
+        return lastDeliveredInstanceId == lastKnownLearnedInstanceInCluster;
+    }
 }

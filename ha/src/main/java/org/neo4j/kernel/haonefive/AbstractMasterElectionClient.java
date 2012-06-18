@@ -21,14 +21,21 @@ package org.neo4j.kernel.haonefive;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.neo4j.helpers.Listeners;
 
 abstract class AbstractMasterElectionClient implements MasterElectionClient
 {
-    protected final List<MasterChangeListener> listeners = new CopyOnWriteArrayList<MasterChangeListener>();
+    protected Iterable<MasterChangeListener> listeners = Listeners.newListeners();
 
     @Override
     public void addMasterChangeListener( MasterChangeListener listener )
     {
-        listeners.add( listener );
+        listeners = Listeners.addListener( listener, listeners );
+    }
+
+    @Override
+    public void removeMasterChangeListener( MasterChangeListener listener )
+    {
+        listeners = Listeners.removeListener( listener, listeners );
     }
 }
