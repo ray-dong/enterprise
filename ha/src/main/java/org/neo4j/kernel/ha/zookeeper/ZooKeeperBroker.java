@@ -135,9 +135,10 @@ public class ZooKeeperBroker extends AbstractBroker
     {
         // Change the call-for-data value in ZK so that all clients gets a NodeChangedEvent
         // for that path and updates ZK.
-        ZooClient client = getZooClient();
-        client.triggerDataChangeWatcher( ZooClient.CALL_FOR_DATA );
-        client.updateLastCommittedTx();
+        // TODO
+//        ZooClient client = getZooClient();
+//        client.triggerDataChangeWatcher( ZooClient.CALL_FOR_DATA );
+//        client.updateLastCommittedTx();
     }
 
     @Override

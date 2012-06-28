@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.snapshot;
 
 import java.net.URI;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;

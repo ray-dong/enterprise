@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+
 import org.neo4j.com_2.message.MessageType;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InstanceId;
 

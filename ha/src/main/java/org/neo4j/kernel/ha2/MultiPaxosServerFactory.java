@@ -20,7 +20,11 @@
 
 package org.neo4j.kernel.ha2;
 
+import static org.neo4j.com_2.message.Message.internal;
+import static org.neo4j.helpers.collection.Iterables.iterable;
+
 import java.net.URI;
+
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageSource;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorContext;
@@ -64,9 +68,6 @@ import org.neo4j.kernel.ha2.statemachine.StateMachineRules;
 import org.neo4j.kernel.ha2.timeout.LatencyCalculator;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-
-import static org.neo4j.com_2.message.Message.*;
-import static org.neo4j.helpers.collection.Iterables.*;
 
 /**
  * TODO

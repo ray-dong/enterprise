@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.net.URI;
+
 import org.neo4j.helpers.Listeners;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.AtomicBroadcastListener;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.Payload;

@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.net.URI;
+
 import org.neo4j.kernel.ha2.BindingListener;
 import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 

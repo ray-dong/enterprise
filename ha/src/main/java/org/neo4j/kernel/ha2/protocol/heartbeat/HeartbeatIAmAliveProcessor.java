@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.protocol.heartbeat;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.com_2.message.MessageType;

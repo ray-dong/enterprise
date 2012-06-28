@@ -20,9 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.LoggerContext;
+import static org.neo4j.com_2.NetworkNodeTCP.Configuration.cluster_port;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -31,6 +30,7 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
+
 import org.neo4j.com_2.NetworkNodeTCP;
 import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
@@ -58,7 +58,9 @@ import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.slf4j.LoggerFactory;
 import org.slf4j.impl.StaticLoggerBinder;
 
-import static org.neo4j.com_2.NetworkNodeTCP.Configuration.*;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
 
 /**
  * TODO

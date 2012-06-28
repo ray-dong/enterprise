@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
 import org.jboss.netty.bootstrap.ClientBootstrap;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.Channel;
@@ -59,7 +60,6 @@ import org.neo4j.com_2.message.MessageType;
 import org.neo4j.graphdb.factory.Default;
 import org.neo4j.graphdb.factory.GraphDatabaseSetting;
 import org.neo4j.helpers.Listeners;
-import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.slf4j.Logger;
 
@@ -147,7 +147,7 @@ public class NetworkNodeTCP
         {
             try
             {
-                channel = serverBootstrap.bind(new InetSocketAddress(Configuration.cluster_address.getString( config ), checkPort));
+                channel = serverBootstrap.bind(new InetSocketAddress( config.get( Configuration.cluster_address ), checkPort));
                 listeningAt( ( getURI( (InetSocketAddress) channel.getLocalAddress() ) ) );
 
 

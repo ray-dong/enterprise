@@ -17,11 +17,16 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.com;
+package org.neo4j.server.enterprise;
 
-import org.neo4j.kernel.impl.nioneo.store.StoreId;
+import org.neo4j.server.NeoServer;
+import org.neo4j.server.advanced.AdvancedBootstrapper;
 
-public interface StoreIdGetter
+public class EnterpriseBootstrapper extends AdvancedBootstrapper
 {
-    StoreId get();
+    @Override
+	protected NeoServer createNeoServer() 
+	{
+		return new EnterpriseNeoServer( createConfigurator());
+	}
 }

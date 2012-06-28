@@ -21,9 +21,9 @@
 package org.neo4j.kernel.ha2.protocol.election;
 
 import java.net.URI;
+
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterConfiguration;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterListener;
-import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatListener;
 
 /**
  * TODO

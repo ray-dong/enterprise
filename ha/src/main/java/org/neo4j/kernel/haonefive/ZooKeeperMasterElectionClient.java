@@ -25,7 +25,6 @@ import java.net.URL;
 
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
-import org.neo4j.com.StoreIdGetter;
 import org.neo4j.helpers.Pair;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.InformativeStackTrace;
@@ -38,6 +37,7 @@ import org.neo4j.kernel.ha.zookeeper.Machine;
 import org.neo4j.kernel.ha.zookeeper.ZooClient;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperBroker;
 import org.neo4j.kernel.ha.zookeeper.ZooKeeperMachine;
+import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 
@@ -48,16 +48,16 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     private ZooClient zooClient;
     private final Config config;
     private final HaServiceSupplier stuff;
-    private final StoreIdGetter storeIdGetter;
+    private final StoreId storeId;
     private final String storeDir;
     private Machine currentMaster = ZooKeeperMachine.NO_MACHINE;
     
-    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreIdGetter storeIdGetter,
+    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreId storeId,
             String storeDir )
     {
         this.stuff = stuff;
         this.config = config;
-        this.storeIdGetter = storeIdGetter;
+        this.storeId = storeId;
         this.storeDir = storeDir;
     }
     
@@ -86,7 +86,7 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     @Override
     public ZooClient newZooClient()
     {
-        zooClient = new ZooClient( storeDir, StringLogger.SYSTEM, storeIdGetter, config, this, this );
+        zooClient = new ZooClient( storeDir, StringLogger.SYSTEM, config, this, this );
         return zooClient;
     }
 
@@ -159,6 +159,12 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
         {
             throw new RuntimeException( e );
         }
+    }
+    
+    @Override
+    public int getMasterForTx( long tx )
+    {
+        return stuff.getMasterIdForTx( tx );
     }
     
     @Override

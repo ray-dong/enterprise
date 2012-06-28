@@ -43,6 +43,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
 public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements ClusterClient
 {
     protected static final int SESSION_TIME_OUT = 5000;
+    public static final int CLUSTER_CLIENT_MACHINE_ID = -1;
 
     private final ZooKeeper zooKeeper;
     private String rootPath;
@@ -75,7 +76,7 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
     public ZooKeeperClusterClient( String zooKeeperServers, StringLogger msgLog, String clusterName,
             int sessionTimeout )
     {
-        super( zooKeeperServers, Client.NO_STORE_ID_GETTER, msgLog,
+        super( zooKeeperServers, msgLog,
                 Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
                 Client.DEFAULT_READ_RESPONSE_TIMEOUT_SECONDS,
                 Client.DEFAULT_MAX_NUMBER_OF_CONCURRENT_CHANNELS_PER_CLIENT,
@@ -112,6 +113,12 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
                 Thread.interrupted();
             }
         }
+    }
+
+    @Override
+    protected int getMyMachineId()
+    {
+        return CLUSTER_CLIENT_MACHINE_ID;
     }
 
     public int getBackupPort( int machineId )
@@ -159,12 +166,6 @@ public class ZooKeeperClusterClient extends AbstractZooKeeperManager implements 
             throw new RuntimeException( "Cluster '" + clusterName + "' not found" );
         }
         return asRootPath( storeId );
-    }
-
-    @Override
-    protected int getMyMachineId()
-    {
-        throw new UnsupportedOperationException();
     }
 
     /**

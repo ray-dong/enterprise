@@ -24,7 +24,6 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -36,7 +35,6 @@ import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.InMemoryAcceptor
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.ServerIdElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.MessageTimeoutStrategy;
-import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
 import org.slf4j.LoggerFactory;
 
 /**

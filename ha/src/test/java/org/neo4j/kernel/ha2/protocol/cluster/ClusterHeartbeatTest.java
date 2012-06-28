@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.protocol.cluster;
 import java.net.URISyntaxException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+
 import org.junit.Test;
 
 /**

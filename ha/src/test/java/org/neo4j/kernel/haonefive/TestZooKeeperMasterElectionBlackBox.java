@@ -39,7 +39,6 @@ import org.neo4j.backup.OnlineBackupSettings;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.SlaveContext.Tx;
-import org.neo4j.com.StoreIdGetter;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.configuration.Config;
@@ -52,7 +51,7 @@ import org.neo4j.test.ha.LocalhostZooKeeperCluster;
 
 public class TestZooKeeperMasterElectionBlackBox
 {
-    private StoreIdGetter storeIdGetter;
+    private StoreId storeId = new StoreId();
     private LocalhostZooKeeperCluster zoo;
     private Instance[] instances;
     private Instance[] shutDownInstances;
@@ -61,16 +60,6 @@ public class TestZooKeeperMasterElectionBlackBox
     public void before() throws Exception
     {
         zoo = LocalhostZooKeeperCluster.singleton().clearDataAndVerifyConnection();
-        storeIdGetter = new StoreIdGetter()
-        {
-            private StoreId storeId = new StoreId();
-            
-            @Override
-            public StoreId get()
-            {
-                return storeId;
-            }
-        };
     }
 
     @After
@@ -125,7 +114,7 @@ public class TestZooKeeperMasterElectionBlackBox
     
     private Instance newInstance( int id )
     {
-        return new Instance( id, storeIdGetter, "target/db/" + id );
+        return new Instance( id, storeId, "target/db/" + id );
     }
     
     private void startInstance( int id )
@@ -230,10 +219,10 @@ public class TestZooKeeperMasterElectionBlackBox
         private volatile int lastMasterServerId;
         private volatile boolean masterAvailable;
         
-        Instance( int id, StoreIdGetter storeIdGetter, String storeDir )
+        Instance( int id, StoreId storeId, String storeDir )
         {
             this.id = id;
-            this.client = new ZooKeeperMasterElectionClient( this, config( id ), storeIdGetter, storeDir );
+            this.client = new ZooKeeperMasterElectionClient( this, config( id ), storeId, storeDir );
             this.client.addMasterChangeListener( this );
             try
             {

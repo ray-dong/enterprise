@@ -20,6 +20,8 @@
 
 package org.neo4j.kernel.ha2.protocol.heartbeat;
 
+import static org.neo4j.com_2.message.Message.timeout;
+
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,14 +29,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.helpers.Listeners;
 import org.neo4j.helpers.Specification;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.LearnerContext;
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
-
-import static org.neo4j.com_2.message.Message.*;
 
 /**
  * TODO

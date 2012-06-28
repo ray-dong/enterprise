@@ -19,8 +19,6 @@
  */
 package org.neo4j.kernel.haonefive;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import org.neo4j.helpers.Listeners;
 
 abstract class AbstractMasterElectionClient implements MasterElectionClient

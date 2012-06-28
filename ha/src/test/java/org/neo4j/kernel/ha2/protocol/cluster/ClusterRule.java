@@ -23,6 +23,7 @@ package org.neo4j.kernel.ha2.protocol.cluster;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.junit.rules.ExternalResource;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;

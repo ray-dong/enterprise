@@ -20,9 +20,12 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import static org.hamcrest.CoreMatchers.equalTo;
+
 import java.net.URISyntaxException;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -38,8 +41,6 @@ import org.neo4j.kernel.ha2.protocol.cluster.ClusterRule;
 import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.ha2.timeout.MessageTimeoutStrategy;
-
-import static org.hamcrest.CoreMatchers.*;
 
 /**
  * TODO

@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
 import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
 import org.neo4j.kernel.ha2.protocol.snapshot.SnapshotProvider;
 import org.slf4j.LoggerFactory;

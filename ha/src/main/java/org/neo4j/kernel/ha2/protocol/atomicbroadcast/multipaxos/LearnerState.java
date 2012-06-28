@@ -22,6 +22,7 @@ package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
 import java.net.URI;
 import java.util.List;
+
 import org.neo4j.com_2.message.Message;
 import org.neo4j.com_2.message.MessageProcessor;
 import org.neo4j.kernel.ha2.statemachine.State;

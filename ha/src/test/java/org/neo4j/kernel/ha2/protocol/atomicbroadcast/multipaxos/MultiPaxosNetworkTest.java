@@ -20,11 +20,14 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import static org.neo4j.com_2.NetworkNodeTCP.Configuration.cluster_port;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
+
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
@@ -44,8 +47,6 @@ import org.neo4j.kernel.ha2.protocol.snapshot.Snapshot;
 import org.neo4j.kernel.ha2.timeout.FixedTimeoutStrategy;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.slf4j.LoggerFactory;
-
-import static org.neo4j.com_2.NetworkNodeTCP.Configuration.*;
 
 /**
  * TODO

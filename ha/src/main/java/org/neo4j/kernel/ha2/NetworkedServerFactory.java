@@ -25,17 +25,16 @@ import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
 import org.neo4j.com_2.NetworkNodeTCP;
 import org.neo4j.helpers.DaemonThreadFactory;
 import org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos.AcceptorInstanceStore;
 import org.neo4j.kernel.ha2.protocol.election.ElectionCredentialsProvider;
 import org.neo4j.kernel.ha2.statemachine.StateTransitionLogger;
 import org.neo4j.kernel.ha2.timeout.TimeoutStrategy;
-import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * TODO

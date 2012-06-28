@@ -20,14 +20,15 @@
 
 package org.neo4j.kernel.ha2.protocol.atomicbroadcast.multipaxos;
 
+import static org.neo4j.helpers.collection.Iterables.limit;
+import static org.neo4j.helpers.collection.Iterables.toList;
+
 import java.net.URI;
 import java.util.List;
-import org.neo4j.helpers.collection.Iterables;
+
 import org.neo4j.kernel.ha2.protocol.cluster.ClusterContext;
 import org.neo4j.kernel.ha2.protocol.heartbeat.HeartbeatContext;
 import org.neo4j.kernel.ha2.timeout.Timeouts;
-
-import static org.neo4j.helpers.collection.Iterables.*;
 
 /**
  * Context shared by all Paxos state machines.

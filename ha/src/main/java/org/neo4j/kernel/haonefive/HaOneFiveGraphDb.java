@@ -34,7 +34,6 @@ import org.neo4j.com.MasterUtil;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.SlaveContext.Tx;
-import org.neo4j.com.StoreIdGetter;
 import org.neo4j.com.ToFileStoreWriter;
 import org.neo4j.com.TxChecksumVerifier;
 import org.neo4j.graphdb.index.IndexProvider;
@@ -54,7 +53,6 @@ import org.neo4j.kernel.ha.MasterImpl;
 import org.neo4j.kernel.ha.MasterServer;
 import org.neo4j.kernel.impl.cache.CacheProvider;
 import org.neo4j.kernel.impl.core.RelationshipTypeCreator;
-import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.TxHook;
@@ -79,16 +77,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     
     // TODO configurable
     private final int stateSwitchTimeout = DEFAULT_STATE_SWITCH_TIMEOUT;
-    
-    // TODO This is an artifact of integrating with legacy code (MasterClient should change to not use this).
-    private final StoreIdGetter storeIdGetter = new StoreIdGetter()
-    {
-        @Override
-        public StoreId get()
-        {
-            return storeId;
-        }
-    };
     
     public HaOneFiveGraphDb( String storeDir, Map<String, String> params )
     {
@@ -230,7 +218,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     protected MasterElectionClient createMasterElectionClient()
     {
-        return new ZooKeeperMasterElectionClient( stuff, config, storeIdGetter, storeDir );
+        return new ZooKeeperMasterElectionClient( stuff, config, storeId, storeDir );
     }
     
     @Override
@@ -540,7 +528,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         {
             // TODO Wrap returned Master in something that handles exceptions (network a.s.o.)
             // and feeds back to master election black box if we decide to have input channels to it.
-            return new MasterClient( masterIp, masterPort, db.getMessageLog(), db.storeIdGetter,
+            return new MasterClient( masterIp, masterPort, db.getMessageLog(), db.getStoreId(),
                     new ConnectionFailureHandler( db ), 20, 20, 20 );
         }
 

@@ -39,5 +39,7 @@ public interface SlaveDatabaseOperations extends ConnectionLostHandler
 
     void exceptionHappened( RuntimeException e );
 
+    int getMasterForTx( long tx );
+    
     Pair<Long, Integer> getLastTxData();
 }

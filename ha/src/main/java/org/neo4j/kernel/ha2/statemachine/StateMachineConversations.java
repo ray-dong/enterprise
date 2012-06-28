@@ -21,6 +21,7 @@
 package org.neo4j.kernel.ha2.statemachine;
 
 import java.net.URI;
+
 import org.neo4j.kernel.ha2.BindingListener;
 
 /**
