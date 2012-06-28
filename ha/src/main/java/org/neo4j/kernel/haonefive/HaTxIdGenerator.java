@@ -24,28 +24,37 @@ import java.nio.channels.ReadableByteChannel;
 
 import org.neo4j.com.Response;
 import org.neo4j.com.TxExtractor;
+import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.transaction.xaframework.LogBuffer;
 import org.neo4j.kernel.impl.transaction.xaframework.TxIdGenerator;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
 public class HaTxIdGenerator implements TxIdGenerator
 {
-    private final HaServiceSupplier stuff;
     private final int serverId;
+    private Master master;
+    private int masterId;
+    private final ComRequestSupport requestSupport;
 
-    public HaTxIdGenerator( HaServiceSupplier stuff, int serverId )
+    public HaTxIdGenerator( ComRequestSupport requestSupport, int serverId )
     {
-        this.stuff = stuff;
+        this.requestSupport = requestSupport;
         this.serverId = serverId;
+    }
+    
+    void masterChanged( Master master, int masterServerId )
+    {
+        this.master = master;
+        this.masterId = masterServerId;
     }
 
     @Override
     public long generate( XaDataSource dataSource, int identifier )
     {
-        Response<Long> response = stuff.getMaster().commitSingleResourceTransaction(
-                stuff.getSlaveContext( dataSource ), dataSource.getName(),
+        Response<Long> response = master.commitSingleResourceTransaction(
+                requestSupport.getSlaveContext( dataSource ), dataSource.getName(),
                 myPreparedTransactionToCommit( dataSource, identifier ) );
-        stuff.receive( response );
+        requestSupport.receive( response );
         return response.response().longValue();
     }
 
@@ -77,7 +86,7 @@ public class HaTxIdGenerator implements TxIdGenerator
     @Override
     public int getCurrentMasterId()
     {
-        return stuff.getMasterServerId();
+        return masterId;
     }
 
     @Override

@@ -22,6 +22,7 @@ package org.neo4j.kernel.haonefive;
 import javax.transaction.TransactionManager;
 
 import org.neo4j.com.Response;
+import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.core.RelationshipTypeCreator;
 import org.neo4j.kernel.impl.core.RelationshipTypeHolder;
 import org.neo4j.kernel.impl.persistence.EntityIdGenerator;
@@ -29,19 +30,25 @@ import org.neo4j.kernel.impl.persistence.PersistenceManager;
 
 public class HaRelationshipTypeCreator implements RelationshipTypeCreator
 {
-    private final HaServiceSupplier stuff;
+    private Master master;
+    private final ComRequestSupport requestSupport;
 
-    public HaRelationshipTypeCreator( HaServiceSupplier stuff )
+    public HaRelationshipTypeCreator( ComRequestSupport requestSupport )
     {
-        this.stuff = stuff;
+        this.requestSupport = requestSupport;
+    }
+    
+    void masterChanged( Master master, int masterId )
+    {
+        this.master = master;
     }
     
     @Override
     public int getOrCreate( TransactionManager txManager, EntityIdGenerator idGenerator,
             PersistenceManager persistence, RelationshipTypeHolder relTypeHolder, String name )
     {
-        Response<Integer> response = stuff.getMaster().createRelationshipType( stuff.getSlaveContext(), name );
-        stuff.receive( response );
+        Response<Integer> response = master.createRelationshipType( requestSupport.getSlaveContext(), name );
+        requestSupport.receive( response );
         return response.response().intValue();
     }
 }

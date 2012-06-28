@@ -34,15 +34,13 @@ import org.neo4j.kernel.impl.nioneo.store.IdRange;
 
 public class HaIdGeneratorFactory implements IdGeneratorFactory
 {
-    private final HaServiceSupplier stuff;
     private final Map<IdType, HaIdGenerator> generators =
             new EnumMap<IdType, HaIdGenerator>( IdType.class );
     private final IdGeneratorFactory localFactory = new DefaultIdGeneratorFactory();
     private final int serverId;
 
-    public HaIdGeneratorFactory( HaServiceSupplier stuff, int serverId )
+    public HaIdGeneratorFactory( int serverId )
     {
-        this.stuff = stuff;
         this.serverId = serverId;
     }
 

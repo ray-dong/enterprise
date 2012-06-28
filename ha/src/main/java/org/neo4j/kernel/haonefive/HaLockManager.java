@@ -28,6 +28,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.kernel.DeadlockDetectedException;
 import org.neo4j.kernel.ha.LockResult;
+import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.core.GraphProperties;
 import org.neo4j.kernel.impl.transaction.IllegalResourceException;
 import org.neo4j.kernel.impl.transaction.LockManager;
@@ -38,12 +39,16 @@ import org.neo4j.kernel.info.LockInfo;
 
 public class HaLockManager implements LockManager
 {
-    private final HaServiceSupplier stuff;
+    private ComRequestSupport requestSupport;
     private final LockManager local;
+    private Master master;
+    private final TransactionSupport transactionSupport;
 
-    public HaLockManager( HaServiceSupplier stuff, RagManager ragManager )
+    public HaLockManager( ComRequestSupport requestSupport, TransactionSupport transactionSupport,
+            RagManager ragManager )
     {
-        this.stuff = stuff;
+        this.requestSupport = requestSupport;
+        this.transactionSupport = transactionSupport;
         this.local = new LockManagerImpl( ragManager );
     }
     
@@ -62,23 +67,28 @@ public class HaLockManager implements LockManager
         }
     }
     
+    void masterChanged( Master master )
+    {
+        this.master = master;
+    }
+    
     private boolean getReadLockOnMaster( Object resource )
     {
         Response<LockResult> response = null;
         if ( resource instanceof Node )
         {
-            stuff.makeSureTxHasBeenInitialized();
-            response = stuff.getMaster().acquireNodeReadLock( stuff.getSlaveContext(), ((Node)resource).getId() );
+            transactionSupport.makeSureTxHasBeenInitialized();
+            response = master.acquireNodeReadLock( requestSupport.getSlaveContext(), ((Node)resource).getId() );
         }
         else if ( resource instanceof Relationship )
         {
-            stuff.makeSureTxHasBeenInitialized();
-            response = stuff.getMaster().acquireRelationshipReadLock( stuff.getSlaveContext(), ((Relationship)resource).getId() );
+            transactionSupport.makeSureTxHasBeenInitialized();
+            response = master.acquireRelationshipReadLock( requestSupport.getSlaveContext(), ((Relationship)resource).getId() );
         }
         else if ( resource instanceof GraphProperties )
         {
-            stuff.makeSureTxHasBeenInitialized();
-            response = stuff.getMaster().acquireGraphReadLock( stuff.getSlaveContext() );
+            transactionSupport.makeSureTxHasBeenInitialized();
+            response = master.acquireGraphReadLock( requestSupport.getSlaveContext() );
         }
         else
         {
@@ -89,7 +99,7 @@ public class HaLockManager implements LockManager
 
     private boolean receiveLockResponse( Response<LockResult> response )
     {
-        stuff.receive( response );
+        requestSupport.receive( response );
         LockResult result = response.response();
         switch ( result.getStatus() )
         {
@@ -120,18 +130,18 @@ public class HaLockManager implements LockManager
         Response<LockResult> response = null;
         if ( resource instanceof Node )
         {
-            stuff.makeSureTxHasBeenInitialized();
-            response = stuff.getMaster().acquireNodeWriteLock( stuff.getSlaveContext(), ((Node)resource).getId() );
+            transactionSupport.makeSureTxHasBeenInitialized();
+            response = master.acquireNodeWriteLock( requestSupport.getSlaveContext(), ((Node)resource).getId() );
         }
         else if ( resource instanceof Relationship )
         {
-            stuff.makeSureTxHasBeenInitialized();
-            response = stuff.getMaster().acquireRelationshipWriteLock( stuff.getSlaveContext(), ((Relationship)resource).getId() );
+            transactionSupport.makeSureTxHasBeenInitialized();
+            response = master.acquireRelationshipWriteLock( requestSupport.getSlaveContext(), ((Relationship)resource).getId() );
         }
         else if ( resource instanceof GraphProperties )
         {
-            stuff.makeSureTxHasBeenInitialized();
-            response = stuff.getMaster().acquireGraphWriteLock( stuff.getSlaveContext() );
+            transactionSupport.makeSureTxHasBeenInitialized();
+            response = master.acquireGraphWriteLock( requestSupport.getSlaveContext() );
         }
         else
         {

@@ -17,26 +17,19 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.kernel.ha;
+package org.neo4j.kernel.haonefive;
 
-import org.neo4j.com.Client.ConnectionLostHandler;
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
+import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 
-public interface SlaveDatabaseOperations extends ConnectionLostHandler
+public interface ComRequestSupport
 {
-    /**
-     * Returns a {@link SlaveContext} instance that has {@code eventIdentifier}
-     * as the event identifier.
-     *
-     * @param eventIdentifier The event identifier of the returned slave context
-     * @return The slave context
-     */
     SlaveContext getSlaveContext( int eventIdentifier );
 
-    <T> T receive( Response<T> response );
-
-    void exceptionHappened( RuntimeException e );
-
-    int getMasterForTx( long tx );
+    SlaveContext getSlaveContext( XaDataSource dataSource );
+    
+    SlaveContext getSlaveContext();
+    
+    void receive( Response<?> response );
 }

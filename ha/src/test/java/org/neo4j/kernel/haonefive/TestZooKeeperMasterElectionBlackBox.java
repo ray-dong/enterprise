@@ -30,8 +30,6 @@ import static org.neo4j.kernel.configuration.Config.DEFAULT_DATA_SOURCE_NAME;
 
 import java.net.URL;
 
-import javax.transaction.Transaction;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -40,11 +38,9 @@ import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
 import org.neo4j.com.SlaveContext.Tx;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
-import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.configuration.ConfigurationDefaults;
 import org.neo4j.kernel.ha.HaSettings;
-import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.transaction.xaframework.XaDataSource;
 import org.neo4j.test.ha.LocalhostZooKeeperCluster;
@@ -206,9 +202,7 @@ public class TestZooKeeperMasterElectionBlackBox
 //            instance.client.requestMaster();
     }
 
-    private class Instance implements
-            HaServiceSupplier, // Trim this down. ZooKeeperMasterElectionClient doesn't need it all
-            MasterChangeListener
+    private class Instance implements MasterChangeListener, ComRequestSupport
     {
         private final ZooKeeperMasterElectionClient client;
         private long lastTx = 1;
@@ -222,7 +216,15 @@ public class TestZooKeeperMasterElectionBlackBox
         Instance( int id, StoreId storeId, String storeDir )
         {
             this.id = id;
-            this.client = new ZooKeeperMasterElectionClient( this, config( id ), storeId, storeDir );
+            this.client = new ZooKeeperMasterElectionClient( this, config( id ), storeId, storeDir )
+            {
+                @Override
+                public int getMasterForTx( long tx )
+                {
+                    throw new UnsupportedOperationException();
+                }
+            };
+            
             this.client.addMasterChangeListener( this );
             try
             {
@@ -269,12 +271,6 @@ public class TestZooKeeperMasterElectionBlackBox
         }
 
         @Override
-        public Master getMaster()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
         public SlaveContext getSlaveContext( int eventIdentifier )
         {
             return new SlaveContext( 0, id, eventIdentifier, new Tx[] { lastAppliedTx( DEFAULT_DATA_SOURCE_NAME, lastTx ) }, masterIdForLastTx, 0 );
@@ -293,44 +289,8 @@ public class TestZooKeeperMasterElectionBlackBox
         }
 
         @Override
-        public SlaveContext getEmptySlaveContext()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
         public void receive( Response<?> response )
         {
-        }
-
-        @Override
-        public boolean hasAnyLocks( Transaction tx )
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int getMasterServerId()
-        {
-            return id;
-        }
-
-        @Override
-        public void makeSureTxHasBeenInitialized()
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int getMasterIdForTx( long tx )
-        {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public Triplet<Long, Integer, Long> getLastTx()
-        {
-            return Triplet.of( lastTx, masterIdForLastTx, 0L );
         }
 
         @Override

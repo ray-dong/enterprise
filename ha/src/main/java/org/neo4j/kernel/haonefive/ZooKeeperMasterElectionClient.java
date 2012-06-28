@@ -25,8 +25,6 @@ import java.net.URL;
 
 import org.neo4j.com.Response;
 import org.neo4j.com.SlaveContext;
-import org.neo4j.helpers.Pair;
-import org.neo4j.helpers.Triplet;
 import org.neo4j.kernel.InformativeStackTrace;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.ha.Broker;
@@ -41,21 +39,21 @@ import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 
-public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
+public abstract class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
         implements ZooClientFactory, SlaveDatabaseOperations, ClusterEventReceiver, Lifecycle
 {
     private Broker broker;
     private ZooClient zooClient;
     private final Config config;
-    private final HaServiceSupplier stuff;
     private final StoreId storeId;
     private final String storeDir;
     private Machine currentMaster = ZooKeeperMachine.NO_MACHINE;
+    private final ComRequestSupport requestSupport;
     
-    public ZooKeeperMasterElectionClient( HaServiceSupplier stuff, Config config, StoreId storeId,
+    public ZooKeeperMasterElectionClient( ComRequestSupport requestSupport, Config config, StoreId storeId,
             String storeDir )
     {
-        this.stuff = stuff;
+        this.requestSupport = requestSupport;
         this.config = config;
         this.storeId = storeId;
         this.storeDir = storeDir;
@@ -98,13 +96,13 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
     @Override
     public SlaveContext getSlaveContext( int eventIdentifier )
     {
-        return stuff.getSlaveContext( eventIdentifier );
+        return requestSupport.getSlaveContext( eventIdentifier );
     }
 
     @Override
     public <T> T receive( Response<T> response )
     {
-        stuff.receive( response );
+        requestSupport.receive( response );
         return response.response();
     }
 
@@ -161,18 +159,11 @@ public class ZooKeeperMasterElectionClient extends AbstractMasterElectionClient
         }
     }
     
-    @Override
-    public int getMasterForTx( long tx )
-    {
-        return stuff.getMasterIdForTx( tx );
-    }
-    
-    @Override
-    public Pair<Long, Integer> getLastTxData()
-    {
-        Triplet<Long, Integer, Long> data = stuff.getLastTx();
-        return Pair.of( data.first(), data.second() );
-    }
+//    @Override
+//    public int getMasterForTx( long tx )
+//    {
+//        return stuff.getMasterIdForTx( tx );
+//    }
 
     @Override
     public void reconnect( Exception cause )

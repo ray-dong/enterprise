@@ -63,7 +63,8 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 {
     private static final int DEFAULT_STATE_SWITCH_TIMEOUT = 20;
     
-    final HaServiceSupplier stuff;
+    final ComRequestSupport requestSupport;
+    final TransactionSupport transactionSupport;
     private final int serverId;
     private volatile long sessionTimestamp;
     private volatile long lastUpdated;
@@ -85,7 +86,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         
         serverId = new Config( params ).getInteger( HaSettings.server_id );
         sessionTimestamp = System.currentTimeMillis();
-        stuff = new HaServiceSupplier()
+        requestSupport = new ComRequestSupport()
         {
             @Override
             public void receive( Response<?> response )
@@ -99,12 +100,6 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 {
                     throw new RuntimeException( e );
                 }
-            }
-            
-            @Override
-            public boolean hasAnyLocks( Transaction tx )
-            {
-                return lockReleaser.hasLocks( tx );
             }
             
             @Override
@@ -124,26 +119,16 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
             {
                 return MasterUtil.getSlaveContext( xaDataSourceManager, sessionTimestamp, serverId, eventIdentifier );
             }
-            
+        };
+        
+        transactionSupport = new TransactionSupport()
+        {
             @Override
-            public SlaveContext getEmptySlaveContext()
+            public boolean hasAnyLocks( Transaction tx )
             {
-                return new SlaveContext( 0, serverId, 0, new Tx[0], 0, 0 );
+                return lockReleaser.hasLocks( tx );
             }
             
-            @Override
-            public int getMasterServerId()
-            {
-                return masterServerId;
-            }
-            
-            @Override
-            public Master getMaster()
-            {
-                databaseState.beforeGetMaster( HaOneFiveGraphDb.this );
-                return master;
-            }
-
             @Override
             public void makeSureTxHasBeenInitialized()
             {
@@ -163,34 +148,18 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
                 }
             }
 
-            @Override
-            public int getMasterIdForTx( long tx )
-            {
-                try
-                {
-                    return getXaDataSourceManager().getNeoStoreDataSource().getMasterForCommittedTx( tx ).first().intValue();
-                }
-                catch ( IOException e )
-                {
-                    throw new RuntimeException( e );
-                }
-            }
-            
-            @Override
-            public Triplet<Long, Integer, Long> getLastTx()
-            {
-                try
-                {
-                    NeoStoreXaDataSource neoStoreDataSource = getXaDataSourceManager().getNeoStoreDataSource();
-                    long tx = neoStoreDataSource.getLastCommittedTxId();
-                    Pair<Integer, Long> gottenMaster = neoStoreDataSource.getMasterForCommittedTx( tx );
-                    return Triplet.of( tx, gottenMaster.first(), gottenMaster.other() );
-                }
-                catch ( IOException e )
-                {
-                    throw new RuntimeException( e );
-                }
-            }
+//            @Override
+//            public int getMasterIdForTx( long tx )
+//            {
+//                try
+//                {
+//                    return getXaDataSourceManager().getNeoStoreDataSource().getMasterForCommittedTx( tx ).first().intValue();
+//                }
+//                catch ( IOException e )
+//                {
+//                    throw new RuntimeException( e );
+//                }
+//            }
         };
         
         run();
@@ -209,6 +178,21 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         return databaseState == DatabaseState.MASTER;
     }
     
+    private Triplet<Long, Integer, Long> getLastTx()
+    {
+        try
+        {
+            NeoStoreXaDataSource neoStoreDataSource = getXaDataSourceManager().getNeoStoreDataSource();
+            long tx = neoStoreDataSource.getLastCommittedTxId();
+            Pair<Integer, Long> gottenMaster = neoStoreDataSource.getMasterForCommittedTx( tx );
+            return Triplet.of( tx, gottenMaster.first(), gottenMaster.other() );
+        }
+        catch ( IOException e )
+        {
+            throw new RuntimeException( e );
+        }
+    }
+    
     private static Map<String, String> withDefaults( Map<String, String> params )
     {
         params = new ConfigurationDefaults( HaSettings.class ).apply( params );
@@ -218,7 +202,21 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     protected MasterElectionClient createMasterElectionClient()
     {
-        return new ZooKeeperMasterElectionClient( stuff, config, storeId, storeDir );
+        return new ZooKeeperMasterElectionClient( requestSupport, config, storeId, storeDir )
+        {
+            @Override
+            public int getMasterForTx( long tx )
+            {
+                try
+                {
+                    return getXaDataSourceManager().getNeoStoreDataSource().getMasterForCommittedTx( tx ).first().intValue();
+                }
+                catch ( IOException e )
+                {
+                    throw new RuntimeException( e );
+                }
+            }
+        };
     }
     
     @Override
@@ -248,31 +246,31 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     @Override
     protected TxHook createTxHook()
     {
-        return new HaTxHook( stuff );
+        return new HaTxHook( requestSupport, transactionSupport );
     }
     
     @Override
     protected TxIdGenerator createTxIdGenerator()
     {
-        return new HaTxIdGenerator( stuff, serverId );
+        return new HaTxIdGenerator( requestSupport, serverId );
     }
     
     @Override
     protected IdGeneratorFactory createIdGeneratorFactory()
     {
-        return new HaIdGeneratorFactory( stuff, serverId );
+        return new HaIdGeneratorFactory( serverId );
     }
     
     @Override
     protected LockManager createLockManager()
     {
-        return new HaLockManager( stuff, ragManager );
+        return new HaLockManager( requestSupport, transactionSupport, ragManager );
     }
     
     @Override
     protected RelationshipTypeCreator createRelationshipTypeCreator()
     {
-        return new HaRelationshipTypeCreator( stuff );
+        return new HaRelationshipTypeCreator( requestSupport );
     }
 
     @Override
@@ -295,6 +293,9 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         }
         this.masterServerId = masterServerId;
         ((HaIdGeneratorFactory) idGeneratorFactory).masterChanged( master, masterServerId );
+        ((HaTxIdGenerator) txIdGenerator).masterChanged( master, masterServerId );
+        ((HaTxHook) txIdGenerator).masterChanged( master );
+        ((HaLockManager) txIdGenerator).masterChanged( master );
         
         databaseState = newState;
     }
@@ -321,8 +322,8 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
     
     public void pullUpdates()
     {
-        Response<Void> response = master.pullUpdates( stuff.getSlaveContext() );
-        stuff.receive( response );
+        Response<Void> response = master.pullUpdates( requestSupport.getSlaveContext() );
+        requestSupport.receive( response );
     }
 
     enum DatabaseState
@@ -551,8 +552,9 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
         try
         {
             policy.handle( this );
-            Response<Void> response = master.copyStore( stuff.getEmptySlaveContext(), new ToFileStoreWriter( storeDir ) );
-            stuff.receive( response );
+            SlaveContext context = new SlaveContext( 0, serverId, 0, new Tx[0], 0, 0 );
+            Response<Void> response = master.copyStore( context, new ToFileStoreWriter( storeDir ) );
+            requestSupport.receive( response );
         }
         finally
         {
@@ -562,7 +564,7 @@ public class HaOneFiveGraphDb extends AbstractGraphDatabase implements MasterCha
 
     private void verifyConsistencyWithMaster()
     {
-        Triplet<Long, Integer, Long> myLastTx = stuff.getLastTx();
+        Triplet<Long, Integer, Long> myLastTx = getLastTx();
         boolean okWithMaster = false;
         try
         {

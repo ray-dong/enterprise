@@ -22,41 +22,50 @@ package org.neo4j.kernel.haonefive;
 import javax.transaction.Transaction;
 
 import org.neo4j.com.Response;
+import org.neo4j.kernel.ha.Master;
 import org.neo4j.kernel.impl.transaction.TxHook;
 
 public class HaTxHook implements TxHook
 {
-    private final HaServiceSupplier stuff;
+    private Master master;
+    private final ComRequestSupport requestSupport;
+    private final TransactionSupport transactionSupport;
 
-    public HaTxHook( HaServiceSupplier stuff )
+    public HaTxHook( ComRequestSupport requestSupport, TransactionSupport transactionSupport )
     {
-        this.stuff = stuff;
+        this.requestSupport = requestSupport;
+        this.transactionSupport = transactionSupport;
+    }
+    
+    void masterChanged( Master master )
+    {
+        this.master = master;
     }
     
     @Override
     public void initializeTransaction( int eventIdentifier )
     {
-        Response<Void> response = stuff.getMaster().initializeTx( stuff.getSlaveContext( eventIdentifier ) );
-        stuff.receive( response );
+        Response<Void> response = master.initializeTx( requestSupport.getSlaveContext( eventIdentifier ) );
+        requestSupport.receive( response );
     }
 
     @Override
     public boolean hasAnyLocks( Transaction tx )
     {
-        return stuff.hasAnyLocks( tx );
+        return transactionSupport.hasAnyLocks( tx );
     }
 
     @Override
     public void finishTransaction( int eventIdentifier, boolean success )
     {
-        Response<Void> response = stuff.getMaster().finishTransaction( stuff.getSlaveContext( eventIdentifier ), success );
-        stuff.receive( response );
+        Response<Void> response = master.finishTransaction(
+                requestSupport.getSlaveContext( eventIdentifier ), success );
+        requestSupport.receive( response );
     }
 
     @Override
     public boolean freeIdsDuringRollback()
     {
-        // TODO run cronies with true
         return false;
     }
 }

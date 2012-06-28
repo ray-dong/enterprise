@@ -98,7 +98,6 @@ import org.neo4j.kernel.impl.core.RelationshipTypeHolder;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
-import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.persistence.PersistenceSource;
 import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.impl.transaction.LockType;
@@ -1617,23 +1616,6 @@ public class HighlyAvailableGraphDatabase
             catch ( IOException e )
             {
                 throw new ComException( "Master id not found for tx:" + tx, e );
-            }
-        }
-        
-        @Override
-        public Pair<Long, Integer> getLastTxData()
-        {
-            long tx = -1;
-            try
-            {
-                NeoStoreXaDataSource neoStoreDataSource = localGraph().getXaDataSourceManager().getNeoStoreDataSource();
-                tx = neoStoreDataSource.getLastCommittedTxId();
-                int master = neoStoreDataSource.getMasterForCommittedTx( tx ).first();
-                return Pair.of( tx, master );
-            }
-            catch ( IOException e )
-            {
-                throw new ComException( "Master id not found for last tx:" + tx, e );
             }
         }
     }
